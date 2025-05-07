@@ -6,6 +6,7 @@ use App\Http\Controllers\ClientController;
 use App\Http\Controllers\DocenteteController;
 use App\Http\Controllers\PermissionController;
 use App\Http\Controllers\RoleController;
+use App\Http\Controllers\UserController;
 use App\Http\Controllers\UserPermissionController;
 use App\Models\Docentete;
 use App\Models\User;
@@ -62,4 +63,6 @@ Route::post('/login', [AuthController::class, 'login']);
 Route::post('/register', [AuthController::class, 'register']);
 // Route::get('/user', [AuthController::class, 'user']);
 Route::get('/user/{id}', [AuthController::class, 'show']);
+
+Route::post('/user/update/{id}', [UserController::class, 'update']);
 
