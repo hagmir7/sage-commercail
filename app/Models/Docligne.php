@@ -23,4 +23,9 @@ class Docligne extends Model
     {
         return $this->belongsTo(Docentete::class, "DC_Piece", "cbMarq");
     }
+
+
+    public function article(){
+        $this->belongsTo(Article::class, "AR_Ref");
+    }
 }

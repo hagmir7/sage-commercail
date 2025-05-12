@@ -20,10 +20,42 @@ class DocenteteController extends Controller
     }
 
 
+
+    function getDoclignes($query) {}
+
+
     public function show($id)
     {
         try {
-            $docentete = Docentete::with('doclignes')->findOrFail($id);
+            $docentete = Docentete::with(['doclignes' => function ($query) {
+                $query->select(
+                    "DO_Piece",
+                    "AR_Ref",
+                    'DL_Qte',
+                    "Nom",
+                    "Hauteur",
+                    "Largeur",
+                    "Profondeur",
+                    "Langeur",
+                    "Couleur",
+                    "Chant",
+                    "Episseur",
+                    "cbMarq"
+
+                );
+            }])
+                ->select(
+                    "DO_Piece",
+                    "DO_Ref",
+                    "DO_Tiers",
+                    "DO_Expedit",
+                    "cbMarq",
+                    "Type",
+                    "DO_Reliquat",
+                    DB::raw("CONVERT(VARCHAR(10), DO_Date, 111) AS DO_Date"),
+                    DB::raw("CONVERT(VARCHAR(10), DO_DateLivr, 111) AS DO_DateLivr")
+                )
+                ->findOrFail($id);
             return response(json_encode($docentete, JSON_INVALID_UTF8_IGNORE), 200, ['Content-Type' => 'application/json']);
         } catch (\Throwable $th) {
             return response()->json(["message" => 'Document is not found'], 404);
