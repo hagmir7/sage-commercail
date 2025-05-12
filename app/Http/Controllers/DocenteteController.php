@@ -6,22 +6,50 @@ use App\Models\Docentete;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
-use function Pest\Laravel\json;
-
 class DocenteteController extends Controller
 {
 
-    public function index($status)
+
+    public function index(Request $request)
     {
-        return DB::select(
-            "SELECT DO_Reliquat, DO_Piece, DO_Ref, DO_Tiers, cbMarq, CONVERT(VARCHAR(10), DO_Date, 111) AS DO_Date, CONVERT(VARCHAR(10), DO_DateLivr, 111) AS DO_DateLivr, DO_Expedit
-            FROM F_DOCENTETE WHERE DO_Domaine = 0 AND DO_Type = 2 AND DO_Statut = 1"
-        );
+        $query = Docentete::query()
+            ->select([
+                'DO_Reliquat',
+                'DO_Piece',
+                'DO_Ref',
+                'DO_Tiers',
+                'cbMarq',
+                \DB::raw("CONVERT(VARCHAR(10), DO_Date, 111) AS DO_Date"),
+                \DB::raw("CONVERT(VARCHAR(10), DO_DateLivr, 111) AS DO_DateLivr"),
+                'DO_Expedit'
+            ])
+            ->orderByDesc("DO_Date")
+            ->where('DO_Domaine', 0)
+            ->where('DO_Statut', 1);
+
+
+        if ($request->has('status')) {
+            $query->where('DO_Type', $request->status);
+        } else {
+            $query->where('DO_Type', 2);
+        }
+
+        if ($request->has('search') && $request->search !== '') {
+            $search = $request->search;
+            $query->where(function ($q) use ($search) {
+                $q->where('DO_Reliquat', 'like', "%$search%")
+                    ->orWhere('DO_Piece', 'like', "%$search%")
+                    ->orWhere('DO_Ref', 'like', "%$search%")
+                    ->orWhere('DO_Tiers', 'like', "%$search%");
+            });
+        }
+
+
+        $results = $query->paginate(20);
+
+        return response()->json($results);
     }
 
-
-
-    function getDoclignes($query) {}
 
 
     public function show($id)

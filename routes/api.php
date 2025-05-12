@@ -22,7 +22,7 @@ Route::get('/user', function (Request $request) {
 
 
 
-Route::get("docentetes/{status}", [DocenteteController::class, 'index']);
+Route::get("docentetes", [DocenteteController::class, 'index']);
 Route::get("docentete/{id}", [DocenteteController::class, 'show']);
 
 Route::get("client/{client}", [ClientController::class, 'show']);
