@@ -27,4 +27,9 @@ class Docligne extends Model
     {
         return $this->belongsTo(Article::class, "AR_Ref");
     }
+
+    public function line()
+    {
+        return $this->hasOne(Line::class, 'docligne_id', 'cbMarq');
+    }
 }

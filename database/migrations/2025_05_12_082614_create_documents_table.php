@@ -15,13 +15,15 @@ return new class extends Migration
     {
         Schema::create('documents', function (Blueprint $table) {
             $table->id();
-            $table->foreignIdFor(Docentete::class, 'docentete_id');
-            $table->string("piece");
+            $table->integer('docentete_id');
+            $table->string('piece');
             $table->string('type');
             $table->string('ref');
             $table->integer('expedition');
-            $table->foreignIdFor(User::class, 'transfer_by');
-            $table->boolean("completed");
+            $table->boolean('completed')->default(false);
+            $table->string('client_id', 17);
+            $table->foreignIdFor(User::class, 'transfer_by')->constrained('users')->onDelete('cascade');
+            $table->foreign('docentete_id')->references('cbMarq')->on('F_DOCENTETE')->onDelete('cascade');
             $table->timestamps();
         });
     }

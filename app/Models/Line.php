@@ -6,7 +6,17 @@ use Illuminate\Database\Eloquent\Model;
 
 class Line extends Model
 {
-    protected $fillable = ['tiers', 'ref', 'quantity', 'design', 'dimensions', 'document_id', 'docligne_id', 'company_id', 'role_id', 'complated'];
+    protected $fillable = [
+        'ref',
+        'quantity',
+        'design',
+        'dimensions',
+        'document_id',
+        'docligne_id',
+        'company_id',
+        'role_id',
+        'complated'
+    ];
 
     public function company()
     {
@@ -15,8 +25,9 @@ class Line extends Model
 
     public function docligne()
     {
-        return $this->belongsTo(Docligne::class);
+        return $this->belongsTo(Docligne::class, 'docligne_id', 'cbMarq');
     }
+
 
     public function document()
     {

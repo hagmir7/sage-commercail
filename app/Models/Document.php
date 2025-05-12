@@ -7,11 +7,15 @@ use Illuminate\Database\Eloquent\Model;
 class Document extends Model
 {
 
-    protected $fillable = ['docentete_id', 'piece', 'type', 'ref', 'expedition', 'transfer_by', 'completed'];
+    protected $fillable = ['docentete_id', 'piece', 'type', 'ref', 'expedition', 'transfer_by', 'completed', 'client_id'];
 
     public function docentete()
     {
         return $this->belongsTo(Docentete::class, 'docentete_id');
+    }
+
+    public function lines(){
+        return $this->hasMany(Line::class);
     }
 
 
@@ -19,6 +23,4 @@ class Document extends Model
     {
         return $this->belongsToMany(User::class, 'transfer_by');
     }
-
-    
 }

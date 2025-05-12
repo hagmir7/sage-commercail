@@ -17,13 +17,14 @@ return new class extends Migration
     {
         Schema::create('lines', function (Blueprint $table) {
             $table->id();
-            $table->string('tiers');
             $table->string('ref');
+            $table->string('name')->nullable();
             $table->string('quantity');
             $table->string('design');
             $table->string('dimensions')->nullable();
             $table->foreignIdFor(Document::class, 'document_id');
-            $table->foreignIdFor(Docligne::class, 'docligne_id');
+            $table->integer('docligne_id');
+            $table->foreign('docligne_id')->references('cbMarq')->on('F_DOCLIGNE')->onDelete('cascade');
             $table->foreignIdFor(Company::class);
             $table->foreignIdFor(Role::class)->nullable();
             $table->boolean('completed')->default(false);
