@@ -1,0 +1,215 @@
+
+
+Company
+ - name
+ - logo
+
+User
+ - full_name
+ - username
+ - email
+ - phone
+ - company_id
+
+
+Document
+ - id
+ - cpMarq
+ - DO_Piece
+ - DO_Type
+ - DO_Ref
+ - DO_Tiers
+ - DO_Expedition
+ - transfer_by
+ - completed
+
+
+Line
+ - id
+ - document_id
+ - cpMarq
+ - DO_Piece
+ - AR_Ref
+ - DL_Design
+ - DL_Qte
+
+ - dementions
+ - company_id
+ - current_department : Null able - the department who responsible for the operation
+ - preparation : The operator complete the operation
+
+ - confirm_preparation : Preparation chief will confirm the completion
+
+
+Depot:
+ - id
+ - code
+ - company
+
+
+Emplacement:
+ - id
+ - code
+ - intitule
+ - depot_id
+
+
+Palate:
+ - code
+ - id
+ - document_id: Null able
+ - emplacement_id
+ - company_id
+
+
+Document Palate:
+ - line_id
+ - palate_id
+ - validate
+ - quantity
+
+
+1: Order preparation -
+2: Preparation de livraison -
+    - Preparation Cuisine
+    - Preparation Trailer
+
+3: Montage 
+4: Fabrication
+5: Magasinier
+
+
+6: Controller Validation - auto 
+7: Confirmation Validation - auto
+8: Livraison 
+9: Chargement - 
+
+
+Status:
+ - status (Transférer, Reçu, Preparation, Validation, Prête, Livrée)
+
+
+Transfer Line
+ - transfer_id
+ - company_id
+ - role_operation
+ - status_id (Transférer, Reçu, Preparation, Validation, Prête, Livrée)
+
+
+
+Type d'action
+  - name (Transfer, Print, Preparation, Validation, Livraison, Confirmation livraison)
+
+
+Actions
+ - user_id
+ - type_action_id
+ - document_id
+ - line_id
+ - description
+
+
+--------------- Users tabel in sage database
+select * from F_PROTECTIONCIAL
+select * from F_PROTECTIONCPTA
+
+
+---------------------
+
+Préparateur 1 : Cuisine
+Préparateur 2 : Trailer
+
+Ahmad Bayou + Préparateur 1 : Spécial
+
+Said Montage + Préparateur 1 : Cuisine
+Said Montage + Préparateur 2 : Trailer
+
+Magasinier
+
+
+Department:
+> Preparation (Cuisine, Trailer)
+> Coupe || Fabrication (Spécial)
+> Montage et Emballage à chaud (Cuisine, Trailer)
+> Magasinier
+> Controller
+
+
+
+> Assemblage
+> Fabrication
+
+----------------------------
+
+SELECT 
+    DO_Reliquat, 
+    DO_Piece, 
+    DO_Ref, 
+    DO_Tiers, 
+    CONVERT(VARCHAR(10), DO_Date, 111) AS DO_Date, 
+    CONVERT(VARCHAR(10), DO_DateLivr, 111) AS DO_DateLivr, 
+    DO_Expedit 
+FROM F_DOCENTETE 
+WHERE DO_Domaine = 0 
+  AND DO_Type = 2 
+  AND DO_Piece NOT IN (
+    '22PL002353', '23BPL00385', '23BPL00403', '24BPL01135', '24BPL01218', '24BPL01309', 
+    '24PL000428', '24PL000555', '24PL000679', '24PL001046', '24PL001208', '24PL001303', 
+    '24PL001374', '24PL001375', '24PL001435', '24PL001472', '24PL001534', '24PL001541', 
+    '24PL001611', '25BPL00027', '25BPL00037', '25BPL00111', '25BPL00116', '25BPL00119', 
+    '25BPL00129', '25BPL00130', '25BPL00135', '25BPL00136', '25BPL00137', '25BPL00140', 
+    '25BPL00161', '25BPL00186', '25BPL00196', '25BPL00202', '25BPL00208', '25BPL00213', 
+    '25BPL00220', '25BPL00224', '25BPL00234', '25BPL00241', '25BPL00242', '25BPL00252', 
+    '25BPL00263', '25BPL00264', '25BPL00265', '25BPL00269', '25BPL00276', '25BPL00278', 
+    '25BPL00281', '25BPL00285', '25BPL00305', '25BPL00311', '25BPL00327', '25BPL00385', 
+    '25BPL00394', '25BPL00397', '25BPL00399', '25BPL00412', '25BPL00419', '25BPL00425', 
+    '25BPL00430', '25BPL00441', '25BPL00442', '25BPL00444', '25BPL00446', '25BPL00449', 
+    '25BPL00452', '25BPL00469', '25BPL00492', '25BPL00500', '25BPL00507', '25BPL00513', 
+    '25BPL00521', '25BPL00528', '25BPL00529', '25BPL00532', '25BPL00534', '25BPL00541', 
+    '25BPL00546', '25BPL00548', '25BPL00560', '25BPL00569', '25BPL00572', '25BPL00589', 
+    '25BPL00597', '25BPL00598', '25BPL00599', '25BPL00606', '25BPL00607', '25BPL00622', 
+    '25BPL00628', '25BPL00636', '25BPL00644', '25BPL00663', '25BPL00666', '25BPL00675', 
+    '25BPL00678', '25BPL00679', '25BPL00681', '25BPL00689', '25BPL00694', '25BPL00699', 
+    '25BPL00701', '25BPL00712', '25BPL00726', '25BPL00736', '25BPL00740', '25BPL00743', 
+    '25BPL00744', '25PL000011', '25PL000080', '25PL000089', '25PL001385', '25PL001397', 
+    '25PL001418', '25PL001434', '25PL001471', '25PL001500', '25PL001501', '25PL001511', 
+    '25PL001539', '25PL001543', '25PL001550', '25PL001556', '25PL001566', '25PL001580', 
+    '25PL001590', '25PL001622', '25PL001632', '25PL001678', '25PL001679', '25PL001697', 
+    '25PL001716', '25PL001717', '25PL001725', '25PL001727', '25PL001730', '25PL001737', 
+    '25PL001738', '25PL001743', '25PL001744', '25PL001751', '25PL001754', '25PL001814', 
+    '25PL001820', '25PL001834', '25PL001858', '25PL001859', '25PL001860', '25PL001870', 
+    '25PL001883', '25PL001899', '25PL001939', '25PL001970', '25PL001985', '25PL001989', 
+    '25PL001990', '25PL002009', '25PL002027', '25PL002028', '25PL002036', '25PL002038', 
+    '25PL002042', '25PL002045', '25PL002067', '25PL002084', '25PL002085', '25PL002094', 
+    '25PL002097', '25PL002098', '25PL002106', '25PL002120', '25PL002125', '25PL002127', 
+    '25PL002136', '25PL002164', '25PL002177', '25PL002193', '25PL002214', '25PL002215', 
+    '25PL002223', '25PL002234', '25PL002260', '25PL002272', '25PL002276', '25PL002303', 
+    '25PL002304', '25PL002305', '25PL002314', '25PL002328', '25PL002331', '25PL002349', 
+    '25PL002350', '25PL002358', '25PL002378', '25PL002388', '25PL002401', '25PL002403', 
+    '25PL002410', '25PL002411', '25PL002412', '25PL002413', '25PL002415', '25PL002417', 
+    '25PL002419', '25PL002434', '25PL002438', '25PL002448', '25PL002451', '25PL002452', 
+    '25PL002455', '25PL002491', '25PL002494', '25PL002504', '25PL002509', '25PL002511', 
+    '25PL002516', '25PL002520', '25PL002550', '25PL002597', '25PL002621', '25PL002631', 
+    '25PL002665', '25PL002682', '25PL002686', '25PL002697', '25PL002700', '25PL002722', 
+    '25PL002729', '25PL002735', '25PL002744', '25PL002746', '25PL002767', '25PL002771', 
+    '25PL002786', '25PL002799', '25PL002801'
+  );
+
+
+-----------------
+SELECT TOP (1000) * FROM [STILEMOBILI].[dbo].[F_DOCENTETE] WHERE DO_Piece = '25BLX002947' ORDER BY cbCreation DESC;
+SELECT TOP (1000) * FROM [STILEMOBILI].[dbo].F_DOCLIGNE WHERE cbDL_PieceBC = '25BBC00214' ORDER BY cbCreation DESC;
+
+SELECT * FROM F_COMPTET WHERE CT_Num = 'FR001';
+
+
+  -- cpMarq, DO_Domaine, DO_Piece, DO_Type, DO_Ref, DO_Tiers, DO_Expedition, DO_DateLivr, DO_TotalTTC, cbCreation, Type
+  -- cpMarq, DO_Piece, AR_Ref, DL_Design, DL_Qte, DL_PrixUnitaire, DL_MontantTTC, DL_Remise01REM_Valeur,
+  -- DL_PieceBC, DL_PieceBL, DL_PiecePL, DL_PieceDE
+  -- (Nom, Hauteur, Largeur, Profondeur, Langeur, Couleur, Chant, Episseur, TRANSMIS, Poignée, Description, Rotation)
+
+
+
+
+
+

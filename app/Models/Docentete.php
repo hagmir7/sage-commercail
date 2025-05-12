@@ -7,11 +7,8 @@ use Illuminate\Database\Eloquent\Model;
 class Docentete extends Model
 {
     protected $table = 'F_DOCENTETE';
-    protected $primaryKey = 'cbMarq';
-    protected $keyType = "integer";
-
-    
-
+    protected $primaryKey = 'DO_Piece';
+    protected $keyType = 'string';
     public $incrementing = false;
 
     protected $dateFormat = 'Y-d-m H:i:s.v';

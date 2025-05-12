@@ -21,7 +21,7 @@ Route::get('/user', function (Request $request) {
 })->middleware('auth:sanctum');
 
 
-
+Route::post("docentete/transfer", [DocenteteController::class, 'transfer']);
 Route::get("docentetes", [DocenteteController::class, 'index']);
 Route::get("docentete/{id}", [DocenteteController::class, 'show']);
 

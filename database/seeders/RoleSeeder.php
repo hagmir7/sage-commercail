@@ -14,54 +14,22 @@ class RoleSeeder extends Seeder
      */
     public function run(): void
     {
-
         $roles = [
-            [
-                "name"  => "supper_admin",
-                'guard_name' => "web"
-            ],
-
-            [
-                "name"  => "admin",
-                'guard_name' => "web"
-            ],
-
-
-            [
-                "name"  => "préparateur",
-                'guard_name' => "web"
-            ],
-
-            [
-                "name"  => "opérateur",
-                'guard_name' => "web"
-            ],
-
-            [
-                "name"  => "livraison",
-                'guard_name' => "web"
-            ],
-
-            [
-                "name"  => "caisse",
-                'guard_name' => "web"
-            ],
-
-            [
-                "name"  => "commercial",
-                'guard_name' => "web"
-            ],
-            [
-                "name"  => "directeur commercial",
-                'guard_name' => "web"
-            ],
+            ["name" => "supper_admin", 'guard_name' => "web"],
+            ["name" => "admin", 'guard_name' => "web"],
+            ["name" => "préparateur", 'guard_name' => "web"],
+            ["name" => "preparation_cuisine", 'guard_name' => "web"],
+            ["name" => "preparation_trailer", 'guard_name' => "web"],
+            ["name" => "coupe_et_fabrication", 'guard_name' => "web"],
+            ["name" => "montage_cuisine", 'guard_name' => "web"],
+            ["name" => "montage_trailer", 'guard_name' => "web"],
+            ["name" => "commercial", 'guard_name' => "web"],
+            ["name" => "expedition", 'guard_name' => "web"],
         ];
 
-
-        foreach ($roles as $role) {
-            Role::create($role);
+        foreach ($roles as $roleData) {
+            Role::firstOrCreate($roleData);
         }
-
 
         $permissions = [
             ['name' => 'view:users', 'guard_name' => 'web'],
@@ -74,9 +42,12 @@ class RoleSeeder extends Seeder
             ['name' => 'edit:roles', 'guard_name' => 'web'],
         ];
 
-
-        foreach ($permissions as $permission) {
-            Permission::create($permission);
+        foreach ($permissions as $permissionData) {
+            Permission::firstOrCreate($permissionData);
         }
+
+        $supperAdminRole = Role::where('name', 'supper_admin')->first();
+        $allPermissions = Permission::all();
+        $supperAdminRole->syncPermissions($allPermissions);
     }
 }
