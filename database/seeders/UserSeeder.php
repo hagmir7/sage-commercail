@@ -24,5 +24,19 @@ class UserSeeder extends Seeder
                 'email_verified_at' => now(),
             ]);
         }
+
+        if (!User::where("email", "preparation@admin.com")->first()) {
+            User::factory()->create([
+                'name' => 'adil',
+                'full_name' => "Adil Adil",
+                'email' => 'preparation@admin.com',
+                'phone' => '1234567890',
+                'password' => Hash::make("password"),
+                'email_verified_at' => now(),
+            ]);
+        }
+
+
+
     }
 }

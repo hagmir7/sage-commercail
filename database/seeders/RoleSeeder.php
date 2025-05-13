@@ -22,7 +22,7 @@ class RoleSeeder extends Seeder
         $roles = [
             ["name" => "supper_admin", 'guard_name' => "web"],
             ["name" => "admin", 'guard_name' => "web"],
-            ["name" => "préparateur", 'guard_name' => "web"],
+            ["name" => "preparateur", 'guard_name' => "web"],
             ["name" => "preparation_cuisine", 'guard_name' => "web"],
             ["name" => "preparation_trailer", 'guard_name' => "web"],
             ["name" => "coupe_et_fabrication", 'guard_name' => "web"],
@@ -46,7 +46,7 @@ class RoleSeeder extends Seeder
             ['name' => 'delete:roles', 'guard_name' => 'web'],
             ['name' => 'edit:roles', 'guard_name' => 'web'],
         ];
-           
+
 
         foreach ($permissions as $permissionData) {
 

@@ -14,8 +14,52 @@ use Illuminate\Support\Facades\Validator;
 class DocenteteController extends Controller
 {
 
+    public function preparation(Request $request)
+    {
+        $documents = Document::whereHas("lines", function($query){
+            $query->where("company_id", auth()->user()->company_id);
+        });
+        $query = Docentete::query()
+            ->select([
+                'DO_Reliquat',
+                'DO_Piece',
+                'DO_Ref',
+                'DO_Tiers',
+                'cbMarq',
+                \DB::raw("CONVERT(VARCHAR(10), DO_Date, 111) AS DO_Date"),
+                \DB::raw("CONVERT(VARCHAR(10), DO_DateLivr, 111) AS DO_DateLivr"),
+                'DO_Expedit'
+            ])
+            ->whereIn("DO_Piece", $documents->pluck('piece'))
+            ->orderByDesc("DO_Date")
+            ->where('DO_Domaine', 0)
+            ->where('DO_Statut', 1);
 
-    public function index(Request $request)
+
+        if ($request->has('status')) {
+            $query->where('DO_Type', $request->status);
+        } else {
+            $query->where('DO_Type', 2);
+        }
+
+        if ($request->has('search') && $request->search !== '') {
+            $search = $request->search;
+            $query->where(function ($q) use ($search) {
+                $q->where('DO_Reliquat', 'like', "%$search%")
+                    ->orWhere('DO_Piece', 'like', "%$search%")
+                    ->orWhere('DO_Ref', 'like', "%$search%")
+                    ->orWhere('DO_Tiers', 'like', "%$search%");
+            });
+        }
+
+
+        $results = $query->paginate(20);
+
+        return response()->json($results);
+    }
+
+
+    public function commercial(Request $request)
     {
         $query = Docentete::query()
             ->select([
@@ -57,31 +101,47 @@ class DocenteteController extends Controller
 
 
 
+
+
     public function show($id)
     {
-        $docentete = Docentete::select(
-                "DO_Piece",
-                "DO_Ref",
-                "DO_Tiers",
-                "DO_Expedit",
-                "cbMarq",
-                "Type",
-                "DO_Reliquat",
-                DB::raw("CONVERT(VARCHAR(10), DO_Date, 111) AS DO_Date"),
-                DB::raw("CONVERT(VARCHAR(10), DO_DateLivr, 111) AS DO_DateLivr")
-            )
-            ->findOrFail($id);
 
-        $docligne = Docligne::with(['line' => function ($query) {
-            $query->select('company_id', 'docligne_id')->get();
+        // $document = Document::with('lines')->where("piece", $id)->first();
+        // dd($document->lines->count());
+        $docentete = Docentete::select(
+            "DO_Piece",
+            "DO_Ref",
+            "DO_Tiers",
+            "DO_Expedit",
+            "cbMarq",
+            "Type",
+            "DO_Reliquat",
+            DB::raw("CONVERT(VARCHAR(10), DO_Date, 111) AS DO_Date"),
+            DB::raw("CONVERT(VARCHAR(10), DO_DateLivr, 111) AS DO_DateLivr")
+        )
+            ->where('DO_Piece', $id)
+            ->firstOrFail();
+
+        // Build the doclignes query
+        $docligneQuery = Docligne::with(['line' => function ($query) {
+            $query->select('company_id', 'docligne_id');
         }])
             ->where('DO_Piece', $id)
-            ->select("DO_Piece", "AR_Ref", 'DL_Qte', "Nom", "Hauteur", "Largeur", "Profondeur", "Langeur", "Couleur", "Chant", "Episseur", "cbMarq")
-            ->get();
+            ->select("DO_Piece", "AR_Ref", 'DL_Qte', "Nom", "Hauteur", "Largeur", "Profondeur", "Langeur", "Couleur", "Chant", "Episseur", "cbMarq");
+
+        // Apply role-based filtering if needed
+        if (auth()->user()->hasRole(['preparateur'])) {
+            $docligneQuery->whereHas('line', function ($query) {
+                $query->where('company_id', auth()->user()->company_id);
+            });
+        }
+
+        // Execute the query
+        $doclignes = $docligneQuery->get();
 
         return response()->json([
             'docentete' => $docentete,
-            'doclignes' => $docligne
+            'doclignes' => $doclignes
         ], 200);
     }
 
@@ -117,27 +177,20 @@ class DocenteteController extends Controller
                 throw new \Exception('Docentete not found');
             }
 
-            // Check if document already exists using UUID
-            $document = Document::where('docentete_id', $docentete->id)->first();
 
-            // Create document if it doesn't exist
-            if (!$document) {
-                        DB::statement("SET DATEFORMAT ymd");
-                        DB::statement("SET LANGUAGE English");
-                $document = Document::create([
-                    'docentete_id' => intval($docentete->cbMarq),
+            $document = Document::firstOrCreate(
+                ['docentete_id' => $docentete->cbMarq],
+                [
                     'piece' => $docentete->DO_Piece,
                     'type' => $docentete->Type,
-                    'transfer_by' => 1, // optionally use auth()->id()
+                    'transfer_by' => 1,
                     'ref' => $docentete->DO_Ref,
                     'client_id' => $docentete->DO_Tiers,
                     'expedition' => $docentete->DO_Expedit,
                     'completed' => false
-                ]);
-            }
+                ]
+            );
 
-            // Create lines
-            // Nom, Hauteur, Largeur, Profondeur, Langeur, Couleur, Chant, Episseur, TRANSMIS, Poignée, Description, Rotation
 
             $lines = [];
             foreach ($request->lines as $lineId) {
@@ -175,7 +228,9 @@ class DocenteteController extends Controller
                 }
 
                 if($currentDocligne->AR_Ref != null){
-                    $line = Line::create([
+                    $line = Line::firstOrCreate([
+                        'docligne_id' => $currentDocligne->cbMarq,
+                    ],[
                         'tiers' => $currentDocligne->item,
                         'ref' => $currentDocligne->AR_Ref,
                         'design' => $currentDocligne->DL_Design,
@@ -183,11 +238,9 @@ class DocenteteController extends Controller
                         'dimensions' => $currentDocligne->item,
                         'company_id' => $request->company,
                         'document_id' => $document->id,
-                        'docligne_id' => $currentDocligne->cbMarq,
+
                     ]);
                 }
-
-
                 $lines[] = $line;
             }
 

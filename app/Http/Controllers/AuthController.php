@@ -39,7 +39,7 @@ class AuthController extends Controller
             "api_token" => Str::random(60)
         ]);
 
-        
+
         $token = $user->createToken('auth_token')->plainTextToken;
 
         return response()->json([
@@ -58,6 +58,8 @@ class AuthController extends Controller
             'password' => 'required|string',
         ]);
 
+
+
         $login = $validatedData['login'];
         $fieldType = filter_var($login, FILTER_VALIDATE_EMAIL) ? 'email' : 'name';
 
@@ -70,6 +72,8 @@ class AuthController extends Controller
         }
 
         $token = $user->createToken('auth_token')->plainTextToken;
+
+
 
         return response()->json([
             'access_token' => $token,

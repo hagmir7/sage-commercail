@@ -21,9 +21,7 @@ Route::get('/user', function (Request $request) {
 })->middleware('auth:sanctum');
 
 
-Route::post("docentete/transfer", [DocenteteController::class, 'transfer']);
-Route::get("docentetes", [DocenteteController::class, 'index']);
-Route::get("docentete/{id}", [DocenteteController::class, 'show']);
+
 
 Route::get("client/{client}", [ClientController::class, 'show']);
 Route::get("article/{article}", [ArticleController::class, 'show']);
@@ -56,6 +54,15 @@ Route::middleware('auth:sanctum')->group(function () {
     // Get user Role and permissions
     Route::get('/user/{id}/permissions', [UserPermissionController::class, 'getUserRolesAndPermissions']);
     Route::get('/user/permissions', [UserPermissionController::class, 'getAuthUserRolesAndPermissions']);
+
+
+
+    //
+    Route::post("docentete/transfer", [DocenteteController::class, 'transfer']);
+    Route::get("docentetes/commercial", [DocenteteController::class, 'commercial']);
+    Route::get("docentetes/preparation", [DocenteteController::class, 'preparation']);
+
+    Route::get("docentete/{id}", [DocenteteController::class, 'show']);
 });
 
 Route::post('/login', [AuthController::class, 'login']);

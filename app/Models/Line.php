@@ -19,7 +19,7 @@ class Line extends Model
     ];
 
 
-    protected $dateFormat = 'Y-d-m H:i:s.v';
+    // protected $dateFormat = 'Y-d-m H:i:s.v';
 
     const CREATED_AT = 'created_at';
     const UPDATED_AT = 'updated_at';
