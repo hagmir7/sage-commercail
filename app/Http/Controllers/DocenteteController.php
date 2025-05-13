@@ -122,6 +122,8 @@ class DocenteteController extends Controller
 
             // Create document if it doesn't exist
             if (!$document) {
+                        DB::statement("SET DATEFORMAT ymd");
+                        DB::statement("SET LANGUAGE English");
                 $document = Document::create([
                     'docentete_id' => intval($docentete->cbMarq),
                     'piece' => $docentete->DO_Piece,

@@ -14,13 +14,15 @@ class UserSeeder extends Seeder
      */
     public function run(): void
     {
-        User::factory()->create([
-            'name' => 'ADMIN',
-            'full_name' => "Hassan Agmir",
-            'email' => 'admin@admin.com',
-            'phone' => '0648382674',
-            'password' => Hash::make("password"),
-            'email_verified_at' => now(),
-        ]);
+        if (!User::where("email", "admin@admin.com")->first()) {
+            User::factory()->create([
+                'name' => 'ADMIN',
+                'full_name' => "Hassan Agmir",
+                'email' => 'admin@admin.com',
+                'phone' => '0648382674',
+                'password' => Hash::make("password"),
+                'email_verified_at' => now(),
+            ]);
+        }
     }
 }

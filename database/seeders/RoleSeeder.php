@@ -6,12 +6,17 @@ use App\Models\Role;
 use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
 use Spatie\Permission\Models\Permission;
+use Illuminate\Support\Facades\DB;
 
 class RoleSeeder extends Seeder
 {
     /**
      * Run the database seeds.
      */
+
+
+
+
     public function run(): void
     {
         $roles = [
@@ -41,8 +46,10 @@ class RoleSeeder extends Seeder
             ['name' => 'delete:roles', 'guard_name' => 'web'],
             ['name' => 'edit:roles', 'guard_name' => 'web'],
         ];
+           
 
         foreach ($permissions as $permissionData) {
+
             Permission::firstOrCreate($permissionData);
         }
 

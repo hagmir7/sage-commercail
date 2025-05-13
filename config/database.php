@@ -114,11 +114,19 @@ return [
             'encrypt' => env('DB_ENCRYPT', 'yes'),
             'trust_server_certificate' => env('DB_TRUST_SERVER_CERTIFICATE', 'true'),
             'charset'  => 'utf8',
-            // 'options'  => [],
+            'options' => [
+                PDO::ATTR_STRINGIFY_FETCHES => false,
+                PDO::SQLSRV_ATTR_ENCODING => PDO::SQLSRV_ENCODING_UTF8,
+                // Force proper date format
+                PDO::ATTR_EMULATE_PREPARES => true,
+            ],
+            'date_format' => 'Y-d-m H:i:s.v',
+            // Add these settings
+            'timezone' => 'UTC',
+            'dateformat' => '%Y-%m-%d %H:%M:%S',
         ],
 
     ],
-
     /*
     |--------------------------------------------------------------------------
     | Migration Repository Table

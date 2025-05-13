@@ -11,6 +11,8 @@ class Client extends Model
     protected $keyType = "stringe";
     public $incrementing = false;
 
+    protected $dateFormat = 'Y-d-m H:i:s.v';
+
 
     public function docentete()
     {
