@@ -124,7 +124,7 @@ class DocenteteController extends Controller
 
         // Build the doclignes query
         $docligneQuery = Docligne::with(['line' => function ($query) {
-            $query->select('company_id', 'docligne_id');
+            $query->select('id', 'company_id', 'docligne_id', 'role_id');
         }])
             ->where('DO_Piece', $id)
             ->select("DO_Piece", "AR_Ref", 'DL_Qte', "Nom", "Hauteur", "Largeur", "Profondeur", "Langeur", "Couleur", "Chant", "Episseur", "cbMarq");
@@ -147,36 +147,53 @@ class DocenteteController extends Controller
 
 
 
-    public function transfer(Request $request)
+  public function roleTransfer($request)
     {
-        $validator = Validator::make($request->all(), [
-            'company' => 'required|integer|exists:companies,id',
-            'lines' => 'required|array'
-        ]);
+        DB::beginTransaction();
+        try {
+            $lines = Line::whereIn("id", $request->lines)->get();
 
-        if ($validator->fails()) {
+            foreach ($lines as $line) {
+                $line->update([
+                    'role_id' => intval($request->transfer)
+                ]);
+            }
+
+            DB::commit();
+
+            return response()->json([
+                'status' => 'success',
+                'message' => 'Document transferred successfully',
+                'lines' => $lines
+            ], 200);
+        } catch (\Exception $e) {
+            DB::rollBack();
+
             return response()->json([
                 'status' => 'error',
-                'errors' => $validator->errors()
-            ], 422);
+                'message' => $e->getMessage()
+            ], 500);
         }
+    }
+
+
+
+
+    public function transferCompany($request){
 
         DB::beginTransaction();
         try {
-            // Find the first document line
-            $docligne = Docligne::where('cbMarq', $request->lines[0])->first();
+            $docligne = Docligne::with('docentete')->where('cbMarq', $request->lines[0])->first();
 
             if (!$docligne || !$docligne->docentete) {
                 throw new \Exception('Invalid document line or header');
             }
 
-            // Get the Docentete using cbMarq
             $docentete = Docentete::where("cbMarq", intval($docligne->docentete->cbMarq))->first();
 
             if (!$docentete) {
                 throw new \Exception('Docentete not found');
             }
-
 
             $document = Document::firstOrCreate(
                 ['docentete_id' => $docentete->cbMarq],
@@ -261,6 +278,50 @@ class DocenteteController extends Controller
                 'message' => $e->getMessage()
             ], 500);
         }
+    }
+
+
+
+    public function transfer(Request $request)
+    {
+
+        $user = auth()->user();
+
+        // if (!$user->hasRole("commercial") || !$user->hasRole("preparateur")) {
+        //     return response()->json(["message" => "Unauthorized user"], 403);
+        // }
+
+        if ($user->hasRole("commercial")) {
+            $validator = Validator::make($request->all(), [
+                'transfer' => 'required|integer|exists:companies,id',
+                'lines' => 'required|array'
+            ]);
+
+            $this->transferCompany($request);
+            
+
+            
+        } else {
+            $validator = Validator::make($request->all(), [
+                'transfer' => 'required|integer|exists:roles,id',
+                'lines' => 'required|array'
+            ]);
+
+            $this->roleTransfer($request);
+
+        }
+
+        if ($validator->fails()) {
+            return response()->json(['errors' => $validator->errors()], 422);
+        }
+
+        if ($validator->fails()) {
+            return response()->json([
+                'status' => 'error',
+                'errors' => $validator->errors()
+            ], 422);
+        }
+
     }
 
 }
