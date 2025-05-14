@@ -17,8 +17,19 @@ class DocenteteController extends Controller
     public function preparation(Request $request)
     {
         $documents = Document::whereHas("lines", function($query){
-            $query->where("company_id", auth()->user()->company_id);
+            $user_roles = auth()->user()->roles()->pluck('id');
+            $line = $query->where("company_id", auth()->user()->company_id);
+
+            if(auth()->user()->hasRole(['fabrication', 'montage'])){
+                $line = $line->whereIn("role_id", $user_roles);
+            }
+
+            return $line;
+
+
         });
+
+
         $query = Docentete::query()
             ->select([
                 'DO_Reliquat',
@@ -132,7 +143,7 @@ class DocenteteController extends Controller
                 $query->where('company_id', auth()->user()->company_id);
             });
 
-        } elseif (auth()->user()->hasRole(['fabrication'])) {
+        } elseif (auth()->user()->hasRole(['fabrication', 'montage'])) {
             $user_roles = auth()->user()->roles()->pluck('id');
             $docligne->whereHas('line', function ($query) use ($user_roles) {
                 $query->where('company_id', auth()->user()->company_id)
