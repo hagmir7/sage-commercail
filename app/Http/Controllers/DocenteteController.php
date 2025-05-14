@@ -105,9 +105,6 @@ class DocenteteController extends Controller
 
     public function show($id)
     {
-
-        // $document = Document::with('lines')->where("piece", $id)->first();
-        // dd($document->lines->count());
         $docentete = Docentete::select(
             "DO_Piece",
             "DO_Ref",
@@ -178,18 +175,16 @@ class DocenteteController extends Controller
 
 
 
-
-    public function transferCompany($request){
-
-        DB::beginTransaction();
+    public function transferCompany($request)
+    {
         try {
-            $docligne = Docligne::with('docentete')->where('cbMarq', $request->lines[0])->first();
+            $docligne = Docligne::where('cbMarq', $request->lines[0])->first();
 
             if (!$docligne || !$docligne->docentete) {
                 throw new \Exception('Invalid document line or header');
             }
 
-            $docentete = Docentete::where("cbMarq", intval($docligne->docentete->cbMarq))->first();
+            $docentete = Docentete::where('cbMarq', intval($docligne->docentete->cbMarq))->first();
 
             if (!$docentete) {
                 throw new \Exception('Docentete not found');
@@ -204,21 +199,22 @@ class DocenteteController extends Controller
                     'ref' => $docentete->DO_Ref,
                     'client_id' => $docentete->DO_Tiers,
                     'expedition' => $docentete->DO_Expedit,
-                    'completed' => false
+                    'completed' => false,
                 ]
             );
 
-
             $lines = [];
+
             foreach ($request->lines as $lineId) {
                 $currentDocligne = Docligne::where('cbMarq', $lineId)->first();
-
-                if ($currentDocligne && $currentDocligne->AR_Ref !== null && $currentDocligne->AR_Ref !== "SP000001") {
+                if (!$currentDocligne) {
+                    throw new \Exception("Invalid line: {$lineId}");
+                }
+                if ($currentDocligne->AR_Ref && $currentDocligne->AR_Ref !== 'SP000001') {
                     $article = Article::find($currentDocligne->AR_Ref);
 
-
-
                     if ($article) {
+
                         DB::connection('sqlsrv')->unprepared("
                             SET NOCOUNT ON;
                             SET XACT_ABORT ON;
@@ -238,47 +234,40 @@ class DocenteteController extends Controller
                     }
                 }
 
-
-
                 if (!$currentDocligne) {
                     throw new \Exception("Invalid line: {$lineId}");
                 }
 
-                if($currentDocligne->AR_Ref != null){
+                if ($currentDocligne->AR_Ref != null) {
                     $line = Line::firstOrCreate([
                         'docligne_id' => $currentDocligne->cbMarq,
-                    ],[
-                        'tiers' => $currentDocligne->item,
+                    ], [
+                        'docligne_id' => $currentDocligne->cbMarq,
+                        'tiers' => $currentDocligne->CT_Num,
                         'ref' => $currentDocligne->AR_Ref,
                         'design' => $currentDocligne->DL_Design,
                         'quantity' => $currentDocligne->DL_Qte,
                         'dimensions' => $currentDocligne->item,
-                        'company_id' => $request->company,
+                        'company_id' => $request->transfer,
                         'document_id' => $document->id,
 
                     ]);
                 }
+
                 $lines[] = $line;
             }
-
-            DB::commit();
-
             return response()->json([
-                'status' => 'success',
+                'status'  => 'success',
                 'message' => 'Document transferred successfully',
-                'document' => $document,
-                'lines' => $lines
             ], 200);
-
         } catch (\Exception $e) {
-            DB::rollBack();
-
             return response()->json([
                 'status' => 'error',
-                'message' => $e->getMessage()
+                'message' => $e->getMessage(),
             ], 500);
         }
     }
+
 
 
 
@@ -286,11 +275,6 @@ class DocenteteController extends Controller
     {
 
         $user = auth()->user();
-
-        // if (!$user->hasRole("commercial") || !$user->hasRole("preparateur")) {
-        //     return response()->json(["message" => "Unauthorized user"], 403);
-        // }
-
         if ($user->hasRole("commercial")) {
             $validator = Validator::make($request->all(), [
                 'transfer' => 'required|integer|exists:companies,id',
