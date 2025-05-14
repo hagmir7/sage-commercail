@@ -61,6 +61,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post("docentete/transfer", [DocenteteController::class, 'transfer']);
     Route::get("docentetes/commercial", [DocenteteController::class, 'commercial']);
     Route::get("docentetes/preparation", [DocenteteController::class, 'preparation']);
+    Route::get("docentetes/fabrication", [DocenteteController::class, 'fabrication']);
 
     Route::get("docentete/{id}", [DocenteteController::class, 'show']);
 });
@@ -72,4 +73,27 @@ Route::post('/register', [AuthController::class, 'register']);
 Route::get('/user/{id}', [AuthController::class, 'show']);
 
 Route::post('/user/update/{id}', [UserController::class, 'update']);
+
+
+
+
+Route::prefix('v1')->group(function () {
+    // Companies
+    Route::apiResource('companies', CompanyController::class);
+
+    // Depots
+    Route::apiResource('depots', DepotController::class);
+
+    // Positions
+    Route::apiResource('positions', PositionController::class);
+
+    // Palettes
+    Route::apiResource('palettes', PaletteController::class);
+
+    // Article Families
+    Route::apiResource('article-families', ArticleFamilyController::class);
+
+    // Articles
+    Route::apiResource('articles', ArticleController::class);
+});
 

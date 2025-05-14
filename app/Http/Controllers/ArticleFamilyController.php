@@ -3,11 +3,11 @@
 namespace App\Http\Controllers\API;
 
 use App\Http\Controllers\Controller;
-use App\Models\Company;
+use App\Models\ArticleFamily;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
 
-class CompanyController extends Controller
+class ArticleFamilyController extends Controller
 {
     /**
      * Display a listing of the resource.
@@ -16,8 +16,8 @@ class CompanyController extends Controller
      */
     public function index()
     {
-        $companies = Company::all();
-        return response()->json(['data' => $companies]);
+        $families = ArticleFamily::all();
+        return response()->json(['data' => $families]);
     }
 
     /**
@@ -29,15 +29,16 @@ class CompanyController extends Controller
     public function store(Request $request)
     {
         $validator = Validator::make($request->all(), [
-            'name' => 'required|string|max:255',
+            'code' => 'required|string|max:255|unique:article_families',
+            'description' => 'nullable|string',
         ]);
 
         if ($validator->fails()) {
             return response()->json(['errors' => $validator->errors()], 422);
         }
 
-        $company = Company::create($request->all());
-        return response()->json(['data' => $company, 'message' => 'Company created successfully'], 201);
+        $family = ArticleFamily::create($request->all());
+        return response()->json(['data' => $family, 'message' => 'Article Family created successfully'], 201);
     }
 
     /**
@@ -48,8 +49,8 @@ class CompanyController extends Controller
      */
     public function show($id)
     {
-        $company = Company::findOrFail($id);
-        return response()->json(['data' => $company]);
+        $family = ArticleFamily::findOrFail($id);
+        return response()->json(['data' => $family]);
     }
 
     /**
@@ -61,18 +62,20 @@ class CompanyController extends Controller
      */
     public function update(Request $request, $id)
     {
+        $family = ArticleFamily::findOrFail($id);
+
         $validator = Validator::make($request->all(), [
-            'name' => 'required|string|max:255',
+            'code' => 'sometimes|required|string|max:255|unique:article_families,code,' . $id,
+            'description' => 'nullable|string',
         ]);
 
         if ($validator->fails()) {
             return response()->json(['errors' => $validator->errors()], 422);
         }
 
-        $company = Company::findOrFail($id);
-        $company->update($request->all());
+        $family->update($request->all());
 
-        return response()->json(['data' => $company, 'message' => 'Company updated successfully']);
+        return response()->json(['data' => $family, 'message' => 'Article Family updated successfully']);
     }
 
     /**
@@ -83,15 +86,15 @@ class CompanyController extends Controller
      */
     public function destroy($id)
     {
-        $company = Company::findOrFail($id);
+        $family = ArticleFamily::findOrFail($id);
 
-        // Check if the company has any associated records
-        if ($company->depots()->count() > 0 || $company->positions()->count() > 0 || $company->palettes()->count() > 0) {
-            return response()->json(['message' => 'Cannot delete company with associated records'], 422);
+        // Check if the family has any articles
+        if ($family->articles()->count() > 0) {
+            return response()->json(['message' => 'Cannot delete family with associated articles'], 422);
         }
 
-        $company->delete();
+        $family->delete();
 
-        return response()->json(['message' => 'Company deleted successfully']);
+        return response()->json(['message' => 'Article Family deleted successfully']);
     }
 }

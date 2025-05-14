@@ -14,9 +14,6 @@ class RoleSeeder extends Seeder
      * Run the database seeds.
      */
 
-
-
-
     public function run(): void
     {
         $roles = [
@@ -25,9 +22,9 @@ class RoleSeeder extends Seeder
             ["name" => "preparateur", 'guard_name' => "web"],
             ["name" => "preparation_cuisine", 'guard_name' => "web"],
             ["name" => "preparation_trailer", 'guard_name' => "web"],
-            ["name" => "coupe_et_fabrication", 'guard_name' => "web"],
-            ["name" => "montage_cuisine", 'guard_name' => "web"],
-            ["name" => "montage_trailer", 'guard_name' => "web"],
+            ["name" => "fabrication", 'guard_name' => "web"],
+            ["name" => "montage", 'guard_name' => "web"],
+            ["name" => "magasinier", 'guard_name' => "web"],
             ["name" => "commercial", 'guard_name' => "web"],
             ["name" => "expedition", 'guard_name' => "web"],
         ];

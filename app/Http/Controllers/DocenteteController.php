@@ -119,22 +119,29 @@ class DocenteteController extends Controller
             ->where('DO_Piece', $id)
             ->firstOrFail();
 
-        // Build the doclignes query
-        $docligneQuery = Docligne::with(['line' => function ($query) {
+        $docligne = Docligne::with(['line' => function ($query) {
             $query->select('id', 'company_id', 'docligne_id', 'role_id');
         }])
-            ->where('DO_Piece', $id)
-            ->select("DO_Piece", "AR_Ref", 'DL_Qte', "Nom", "Hauteur", "Largeur", "Profondeur", "Langeur", "Couleur", "Chant", "Episseur", "cbMarq");
+            ->select("DO_Piece", "AR_Ref", 'DL_Qte', "Nom", "Hauteur", "Largeur", "Profondeur", "Langeur", "Couleur", "Chant", "Episseur", "cbMarq")
+            ->where('DO_Piece', $id);
 
-        // Apply role-based filtering if needed
+
         if (auth()->user()->hasRole(['preparateur'])) {
-            $docligneQuery->whereHas('line', function ($query) {
+
+            $docligne->whereHas('line', function ($query) {
                 $query->where('company_id', auth()->user()->company_id);
+            });
+
+        } elseif (auth()->user()->hasRole(['fabrication'])) {
+            $user_roles = auth()->user()->roles()->pluck('id');
+            $docligne->whereHas('line', function ($query) use ($user_roles) {
+                $query->where('company_id', auth()->user()->company_id)
+                    ->whereIn('role_id', $user_roles);
             });
         }
 
         // Execute the query
-        $doclignes = $docligneQuery->get();
+        $doclignes = $docligne->get();
 
         return response()->json([
             'docentete' => $docentete,
@@ -282,9 +289,9 @@ class DocenteteController extends Controller
             ]);
 
             $this->transferCompany($request);
-            
 
-            
+
+
         } else {
             $validator = Validator::make($request->all(), [
                 'transfer' => 'required|integer|exists:roles,id',
@@ -306,6 +313,55 @@ class DocenteteController extends Controller
             ], 422);
         }
 
+    }
+
+
+    public function fabrication(Request $request)
+    {
+
+        $user_roles = auth()->user()->roles()->get()->pluck('id');
+
+        $documents = Document::whereHas("lines", function ($query) use ($user_roles) {
+            $query->where("company_id", auth()->user()->company_id)->whereIn("role_id", $user_roles);
+        });
+
+        $query = Docentete::query()
+            ->select([
+                'DO_Reliquat',
+                'DO_Piece',
+                'DO_Ref',
+                'DO_Tiers',
+                'cbMarq',
+                \DB::raw("CONVERT(VARCHAR(10), DO_Date, 111) AS DO_Date"),
+                \DB::raw("CONVERT(VARCHAR(10), DO_DateLivr, 111) AS DO_DateLivr"),
+                'DO_Expedit'
+            ])
+            ->whereIn("DO_Piece", $documents->pluck('piece'))
+            ->orderByDesc("DO_Date")
+            ->where('DO_Domaine', 0)
+            ->where('DO_Statut', 1);
+
+
+        if ($request->has('status')) {
+            $query->where('DO_Type', $request->status);
+        } else {
+            $query->where('DO_Type', 2);
+        }
+
+        if ($request->has('search') && $request->search !== '') {
+            $search = $request->search;
+            $query->where(function ($q) use ($search) {
+                $q->where('DO_Reliquat', 'like', "%$search%")
+                    ->orWhere('DO_Piece', 'like', "%$search%")
+                    ->orWhere('DO_Ref', 'like', "%$search%")
+                    ->orWhere('DO_Tiers', 'like', "%$search%");
+            });
+        }
+
+
+        $results = $query->paginate(20);
+
+        return response()->json($results);
     }
 
 }
