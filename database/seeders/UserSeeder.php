@@ -87,6 +87,31 @@ class UserSeeder extends Seeder
         }
 
 
+        if (!User::where("email", "p1@admin.com")->first()) {
+            User::factory()->create([
+                'name' => 'p1',
+                'full_name' => "Ayoub",
+                'email' => 'p1@admin.com',
+                'phone' => '1234567890',
+                'password' => Hash::make("password"),
+                'email_verified_at' => now(),
+                'company_id' => 2
+            ]);
+        }
+
+        if (!User::where("email", "p2@admin.com")->first()) {
+            User::factory()->create([
+                'name' => 'nordin',
+                'full_name' => "El ghayat",
+                'email' => 'p2@admin.com',
+                'phone' => '24322342345',
+                'password' => Hash::make("password"),
+                'email_verified_at' => now(),
+                'company_id' => 1
+            ]);
+        }
+
+
 
     }
 }

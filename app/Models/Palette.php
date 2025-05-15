@@ -6,7 +6,7 @@ use Illuminate\Database\Eloquent\Model;
 
 class Palette extends Model
 {
-    protected $fillable = ['code', 'company_id', 'position_id'];
+    protected $fillable = ['code', 'company_id', 'position_id', 'document_id', 'type'];
 
     public function company()
     {

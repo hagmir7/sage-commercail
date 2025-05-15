@@ -1,10 +1,15 @@
 <?php
 
-namespace App\Http\Controllers\API;
+namespace App\Http\Controllers;
 
 use App\Http\Controllers\Controller;
+use App\Models\Docligne;
+use App\Models\Document;
+use App\Models\Line;
 use App\Models\Palette;
 use Illuminate\Http\Request;
+// use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
 
 class PaletteController extends Controller
@@ -37,6 +42,93 @@ class PaletteController extends Controller
      * @param  \Illuminate\Http\Request  $request
      * @return \Illuminate\Http\Response
      */
+
+    public function generatePaletteCode()
+    {
+        // Get the last inserted code
+        $lastCode = DB::table('palettes')
+            ->orderBy('id', 'desc')
+            ->value('code');
+
+        if (!$lastCode) {
+            $nextNumber = 1;
+        } else {
+            // Extract numeric part (remove PB)
+            $number = (int) substr($lastCode, 2);
+            $nextNumber = $number + 1;
+        }
+
+        // Format with leading zeros and prefix
+        return 'PB' . str_pad($nextNumber, 8, '0', STR_PAD_LEFT);
+    }
+
+    public function generate(Request $request)
+    {
+        $validator = Validator::make($request->all(), [
+            'document_id' => 'required|exists:documents,piece',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json(['errors' => $validator->errors()], 422);
+        }
+
+        $document = Document::where("piece", $request->document_id)?->first();
+
+        $palette = Palette::create([
+            'code' => $this->generatePaletteCode(),
+            'type' => "Livraison",
+            'document_id' => $document->id,
+            'company_id' => auth()->user()->company_id || 1
+        ]);
+
+        return response()->json($palette, 201);
+    }
+
+
+
+    public function scan(Request $request)
+    {
+        $validator = Validator::make($request->all(), [
+            'document' => 'required|exists:documents,piece',
+            'line' => 'required|exists:lines,id',
+            'palette' => 'required|exists:palettes,code'
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json(['errors' => $validator->errors()], 422);
+        }
+
+        DB::beginTransaction();
+
+        try {
+            $line = Line::find($request->line);
+            $palette = Palette::where('code', $request->palette)->first();
+            $line->update([
+                'palette_id' => $palette->id,
+            ]);
+
+            $document = Document::where("piece", $request->document)->first();
+
+            $palette->update([
+                'document_id' => $document->id
+            ]);
+
+            DB::commit();
+
+            $docligne = $line->docligne;
+            return response()->json($docligne);
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return response()->json([
+                'error' => 'An error occurred while processing the scan.',
+                'message' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+
+
+
     public function store(Request $request)
     {
         $validator = Validator::make($request->all(), [

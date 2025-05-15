@@ -1,7 +1,9 @@
 <?php
 
 use App\Models\Company;
+use App\Models\Document;
 use App\Models\Position;
+use App\Models\User;
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
@@ -18,6 +20,9 @@ return new class extends Migration
             $table->string('code');
             $table->foreignIdFor(Company::class);
             $table->foreignIdFor(Position::class)->nullable();
+            $table->enum('type', ["Livraison", 'Stock'])->nullable();
+            $table->foreignIdFor(Document::class)->nullable();
+            $table->foreignIdFor(User::class);
             $table->timestamps();
             $table->unique(['code', 'company_id']);
         });
