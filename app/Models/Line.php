@@ -15,7 +15,8 @@ class Line extends Model
         'docligne_id',
         'company_id',
         'role_id',
-        'complated'
+        'complated',
+        'palette_id'
     ];
 
 

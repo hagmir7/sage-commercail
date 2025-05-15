@@ -3,6 +3,7 @@
 use App\Models\Company;
 use App\Models\Docligne;
 use App\Models\Document;
+use App\Models\Palette;
 use App\Models\Role;
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
@@ -25,9 +26,11 @@ return new class extends Migration
             $table->foreignIdFor(Document::class, 'document_id');
             $table->integer('docligne_id');
             $table->foreign('docligne_id')->references('cbMarq')->on('F_DOCLIGNE')->onDelete('cascade');
+            $table->foreignIdFor(Palette::class)->nullable();
             $table->foreignIdFor(Company::class);
             $table->foreignIdFor(Role::class)->nullable();
             $table->boolean('completed')->default(false);
+            $table->boolean('validated')->default(false);
             $table->timestamps();
         });
     }

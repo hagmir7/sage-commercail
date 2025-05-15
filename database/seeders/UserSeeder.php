@@ -33,6 +33,56 @@ class UserSeeder extends Seeder
                 'phone' => '1234567890',
                 'password' => Hash::make("password"),
                 'email_verified_at' => now(),
+                'company_id' => 1
+            ]);
+        }
+
+        if (!User::where("email", "bayou@admin.com")->first()) {
+            User::factory()->create([
+                'name' => 'bayou',
+                'full_name' => "Ahmend El Bayou",
+                'email' => 'bayou@admin.com',
+                'phone' => '1234567890',
+                'password' => Hash::make("password"),
+                'email_verified_at' => now(),
+                'company_id' => 1
+            ]);
+        }
+
+
+         if (!User::where("email", "montage@admin.com")->first()) {
+            User::factory()->create([
+                'name' => 'Said Montage',
+                'full_name' => "Adil Adil",
+                'email' => 'montage@admin.com',
+                'phone' => '1234567890',
+                'password' => Hash::make("password"),
+                'email_verified_at' => now(),
+                'company_id' => 1
+            ]);
+        }
+
+        if (!User::where("email", "fatima@admin.com")->first()) {
+            User::factory()->create([
+                'name' => 'fati',
+                'full_name' => "Fatima Serie",
+                'email' => 'fatima@admin.com',
+                'phone' => '1234567890',
+                'password' => Hash::make("password"),
+                'email_verified_at' => now(),
+                'company_id' => 2
+            ]);
+        }
+
+        if (!User::where("email", "peinture@admin.com")->first()) {
+            User::factory()->create([
+                'name' => 'nordin',
+                'full_name' => "Nordin Seri",
+                'email' => 'peinture@admin.com',
+                'phone' => '1234567890',
+                'password' => Hash::make("password"),
+                'email_verified_at' => now(),
+                'company_id' => 2
             ]);
         }
 
