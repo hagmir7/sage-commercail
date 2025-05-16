@@ -101,8 +101,8 @@ class UserSeeder extends Seeder
 
         if (!User::where("email", "p2@admin.com")->first()) {
             User::factory()->create([
-                'name' => 'nordin',
-                'full_name' => "El ghayat",
+                'name' => 'p2',
+                'full_name' => "El ghayat Mohamed",
                 'email' => 'p2@admin.com',
                 'phone' => '24322342345',
                 'password' => Hash::make("password"),

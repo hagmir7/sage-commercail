@@ -32,4 +32,9 @@ class Docligne extends Model
     {
         return $this->hasOne(Line::class, 'docligne_id', 'cbMarq');
     }
+
+    public function stock()
+    {
+        return $this->belongsTo(ArticleStock::class, 'AR_Ref', 'code');
+    }
 }

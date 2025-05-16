@@ -1,8 +1,12 @@
 <?php
 
+use App\Http\Controllers\API\ArticleFamilyController;
+use App\Http\Controllers\API\CompanyController;
+use App\Http\Controllers\API\PositionController;
 use App\Http\Controllers\ArticleController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\ClientController;
+use App\Http\Controllers\DepotController;
 use App\Http\Controllers\DocenteteController;
 use App\Http\Controllers\PaletteController;
 use App\Http\Controllers\PermissionController;
@@ -65,6 +69,9 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get("docentetes/fabrication", [DocenteteController::class, 'fabrication']);
     Route::get("docentete/{id}", [DocenteteController::class, 'show']);
 
+    Route::post("docentetes/start", [DocenteteController::class, 'start']);
+    Route::post("docentetes/complation", [DocenteteController::class, 'complation']);
+
 
     Route::post('palettes/generate', [PaletteController::class, 'generate']);
     Route::post('palettes/scan', [PaletteController::class, 'scan']);
@@ -73,14 +80,12 @@ Route::middleware('auth:sanctum')->group(function () {
 Route::post('/login', [AuthController::class, 'login']);
 
 Route::post('/register', [AuthController::class, 'register']);
-// Route::get('/user', [AuthController::class, 'user']);
+
 Route::get('/user/{id}', [AuthController::class, 'show']);
 
 Route::post('/user/update/{id}', [UserController::class, 'update']);
 
 // Pallets
-
-
 Route::prefix('v1')->group(function () {
     // Companies
     Route::apiResource('companies', CompanyController::class);

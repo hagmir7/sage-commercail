@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Action;
 use App\Models\Article;
 use App\Models\Docentete;
 use App\Models\Docligne;
@@ -68,9 +69,80 @@ class DocenteteController extends Controller
         }
 
 
+
+
+
+
         $results = $query->paginate(20);
 
         return response()->json($results);
+    }
+
+
+    public function complation(Request $request)
+    {
+        $validator = Validator::make($request->all(), [
+            'lines' => 'required|array'
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json(['errors' => $validator->errors()], 422);
+        }
+
+        foreach ($request->lines as $line) {
+            $line = Line::find($line);
+            $line->update([
+                'completed' => true,
+                'role_id' => $line->next_role_id || null
+            ]);
+
+            if (auth()->user()->hasRole('fabrication')) {
+                $action = Action::where("line_id", $line->id)->where('action_type_id', 4); // Action for fabrication
+            } elseif (auth()->user()->hasRole('montage')) {
+                $action = Action::where("line_id", $line->id)->where('action_type_id', 5); // Action for fabrication
+            }
+
+            try {
+                $action->updat(['end' => now()]);
+            } catch (\Throwable $th) {
+                //throw $th;
+            }
+        }
+
+        return response()->json($request->all(), 200);
+    }
+
+
+
+    public function start(Request $request)
+    {
+
+        $validator = Validator::make($request->all(), [
+            'complation_date'  => "required",
+            'lines' => 'required|array'
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json(['errors' => $validator->errors()], 422);
+        }
+
+        if (!auth()->user()->hasRole("fabrication") ||  !auth()->user()->hasRole("fabrication")) {
+            foreach ($request->lines as $line){
+                $line = Line::find($line);
+
+                $line->update([
+                    'complation_date' => $request->complation_date
+                ]);
+
+                Action::create([
+                    'user_id' => auth()->id(),
+                    'action_type_id' =>  auth()->user()->hasRole("fabrication") ? 4 : 5,
+                    'line_id' => $line->id,
+                    'description' => "Fabrication",
+                    'start' => now(),
+                ]);
+            }     
+        }
     }
 
 
@@ -137,11 +209,17 @@ class DocenteteController extends Controller
 
         $docligne = Docligne::with(['article' => function ($query) {
             $query->select("Nom", 'Hauteur', 'Largeur', 'Profonduer', 'Longueur', 'Couleur',  'Chant', 'Episseur', 'Description', 'AR_Ref');
+
         }, 'line' => function ($query) {
-            $query->select('id', 'company_id', 'docligne_id', 'role_id');
+            $query->select('id', 'company_id', 'docligne_id', 'role_id', 'completed');
+        }, 'stock' => function($query){
+            $query->select('code', 'qte_inter', 'qte_serie');
         }])
             ->select("DO_Piece", "AR_Ref", 'DL_Qte', "Nom", "Hauteur", "Largeur", "Profondeur", "Langeur", "Couleur", "Chant", "Episseur", "cbMarq")
             ->where('DO_Piece', $id);
+
+        
+
 
 
         if (auth()->user()->hasRole(['preparateur'])) {
@@ -296,42 +374,34 @@ class DocenteteController extends Controller
     }
 
 
-
-
     public function transfer(Request $request)
     {
         $user = auth()->user();
+
+
         if ($user->hasRole("commercial")) {
             $validator = Validator::make($request->all(), [
                 'transfer' => 'required|integer|exists:companies,id',
                 'lines' => 'required|array'
             ]);
 
+            if ($validator->fails()) {
+                return response()->json(['errors' => $validator->errors()], 422);
+            }
+
             $this->transferCompany($request);
-
-
-
         } else {
             $validator = Validator::make($request->all(), [
                 'transfer' => 'required|integer|exists:roles,id',
                 'lines' => 'required|array'
             ]);
 
+            if ($validator->fails()) {
+                return response()->json(['errors' => $validator->errors()], 422);
+            }
+
             $this->roleTransfer($request);
-
         }
-
-        if ($validator->fails()) {
-            return response()->json(['errors' => $validator->errors()], 422);
-        }
-
-        if ($validator->fails()) {
-            return response()->json([
-                'status' => 'error',
-                'errors' => $validator->errors()
-            ], 422);
-        }
-
     }
 
 

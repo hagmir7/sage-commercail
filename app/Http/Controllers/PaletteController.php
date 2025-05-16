@@ -78,7 +78,8 @@ class PaletteController extends Controller
             'code' => $this->generatePaletteCode(),
             'type' => "Livraison",
             'document_id' => $document->id,
-            'company_id' => auth()->user()->company_id || 1
+            'company_id' => auth()->user()->company_id || 1,
+            'user_id' => auth()->id()
         ]);
 
         return response()->json($palette, 201);

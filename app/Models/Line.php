@@ -16,7 +16,12 @@ class Line extends Model
         'company_id',
         'role_id',
         'complated',
-        'palette_id'
+        'palette_id',
+        'next_role_id',
+        'received',
+        'complation_date',
+        'completed',
+        'validated'
     ];
 
 
@@ -44,5 +49,9 @@ class Line extends Model
     public function role()
     {
         return $this->belongsTo(Role::class);
+    }
+
+    public function article_stock(){
+        return $this->belongsTo(ArticleStock::class, 'AR_Ref', 'ref');
     }
 }

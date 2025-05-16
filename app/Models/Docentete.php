@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class Docentete extends Model
 {
@@ -32,4 +33,6 @@ class Docentete extends Model
     public function doclignes(){
         return $this->hasMany(Docligne::class, 'DO_Piece', 'DO_Piece');
     }
+
+ 
 }
