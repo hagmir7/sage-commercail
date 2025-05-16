@@ -17,7 +17,7 @@ class DocenteteController extends Controller
 
     public function preparation(Request $request)
     {
- 
+
         $user_roles = auth()->user()->roles()->pluck('name', 'id');
 
         if ($user_roles->isEmpty()) {
@@ -67,11 +67,6 @@ class DocenteteController extends Controller
                     ->orWhere('DO_Tiers', 'like', "%$search%");
             });
         }
-
-
-
-
-
 
         $results = $query->paginate(20);
 
@@ -126,8 +121,8 @@ class DocenteteController extends Controller
             return response()->json(['errors' => $validator->errors()], 422);
         }
 
-        if (!auth()->user()->hasRole("fabrication") ||  !auth()->user()->hasRole("fabrication")) {
-            foreach ($request->lines as $line){
+        if (auth()->user()->hasRole("fabrication") ||  auth()->user()->hasRole("montage")) {
+            foreach ($request->lines as $line) {
                 $line = Line::find($line);
 
                 $line->update([
@@ -141,7 +136,11 @@ class DocenteteController extends Controller
                     'description' => "Fabrication",
                     'start' => now(),
                 ]);
-            }     
+            }
+        }
+
+        if ($validator->fails()) {
+            return response()->json(['error' => "You have no access"], 401);
         }
     }
 
@@ -196,6 +195,7 @@ class DocenteteController extends Controller
         $docentete = Docentete::select(
             "DO_Piece",
             "DO_Ref",
+
             "DO_Tiers",
             "DO_Expedit",
             "cbMarq",
@@ -209,16 +209,15 @@ class DocenteteController extends Controller
 
         $docligne = Docligne::with(['article' => function ($query) {
             $query->select("Nom", 'Hauteur', 'Largeur', 'Profonduer', 'Longueur', 'Couleur',  'Chant', 'Episseur', 'Description', 'AR_Ref');
-
         }, 'line' => function ($query) {
-            $query->select('id', 'company_id', 'docligne_id', 'role_id', 'completed');
-        }, 'stock' => function($query){
+            $query->select('id', 'company_id', 'docligne_id', 'role_id', 'completed', 'complation_date');
+        }, 'stock' => function ($query) {
             $query->select('code', 'qte_inter', 'qte_serie');
         }])
-            ->select("DO_Piece", "AR_Ref", 'DL_Qte', "Nom", "Hauteur", "Largeur", "Profondeur", "Langeur", "Couleur", "Chant", "Episseur", "cbMarq")
+            ->select("DO_Piece", "AR_Ref", 'DL_Design', 'DL_Qte', "Nom", "Hauteur", "Largeur", "Profondeur", "Langeur", "Couleur", "Chant", "Episseur", "cbMarq")
             ->where('DO_Piece', $id);
 
-        
+
 
 
 
@@ -227,7 +226,6 @@ class DocenteteController extends Controller
             $docligne->whereHas('line', function ($query) {
                 $query->where('company_id', auth()->user()->company_id);
             });
-
         } elseif (auth()->user()->hasRole(['fabrication', 'montage'])) {
             $user_roles = auth()->user()->roles()->pluck('id');
             $docligne->whereHas('line', function ($query) use ($user_roles) {
@@ -247,7 +245,7 @@ class DocenteteController extends Controller
 
 
 
-  public function roleTransfer($request)
+    public function roleTransfer($request)
     {
         DB::beginTransaction();
         try {
@@ -281,7 +279,7 @@ class DocenteteController extends Controller
     public function transferCompany($request)
     {
 
-        
+
         try {
             $docligne = Docligne::where('cbMarq', $request->lines[0])->first();
 
@@ -408,7 +406,7 @@ class DocenteteController extends Controller
     public function fabrication(Request $request)
     {
 
-      $user_roles = auth()->user()->roles()->pluck('name', 'id');
+        $user_roles = auth()->user()->roles()->pluck('name', 'id');
 
         if ($user_roles->isEmpty()) {
             return response()->json([]);
@@ -461,5 +459,4 @@ class DocenteteController extends Controller
 
         return response()->json($results);
     }
-
 }

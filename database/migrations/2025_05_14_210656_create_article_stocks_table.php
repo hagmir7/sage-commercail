@@ -21,7 +21,6 @@ return new class extends Migration
             $table->string('color')->nullable();
             $table->integer('qte_inter')->default(0);
             $table->integer('qte_serie')->default(0);
-            $table->foreignIdFor(Palette::class);
             $table->foreignIdFor(ArticleFamily::class);
             $table->float('thickness')->nullable();
             $table->float('hieght')->nullable();
