@@ -23,6 +23,10 @@ class Palette extends Model
         return $this->hasMany(Article::class);
     }
 
+    public function documen(){
+        return $this->belongsTo(Document::class);
+    }
+
 
     public function lines()
     {

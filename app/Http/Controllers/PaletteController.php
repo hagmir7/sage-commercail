@@ -126,7 +126,6 @@ class PaletteController extends Controller
 
     public function confirm(Request $request)
     {
-
         $validator = Validator::make($request->all(), [
             'quantity' => 'required|int|max:1000|min:1',
             'line' => 'required|exists:lines,id',
@@ -138,18 +137,17 @@ class PaletteController extends Controller
         }
 
         $line = Line::find($request->line);
+
         $palette = Palette::where("code", $request->palette)->first();
 
+
+        // return response(['line_id' => $line->document_id, 'palette_id' => $palette->document_id]);
+        if($line->document_id !== $palette->document_id){
+            return response()->json(['errors' => ["document" => "The document is not exits"]], 500);
+        }
+
         $line->palettes()->attach($palette->id, ['quantity' => $request->quantity]);
-
-        $line->update([
-            'palette_id' => $palette->id
-        ]);
-
         $palette->load(['lines.article_stock']);
-
-
-
         return response()->json($palette, 201);
     }
 
@@ -246,6 +244,6 @@ class PaletteController extends Controller
         $palette->load(['lines.article_stock']);
 
 
-        return response()->json(['data' => $palette, 'message' => 'Article supprimé avec succès !']);
+        return response()->json($palette);
     }
 }
