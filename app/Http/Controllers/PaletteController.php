@@ -150,6 +150,13 @@ class PaletteController extends Controller
 
         try {
             $line = Line::with('docligne')->find($request->line);
+            // Calculate total qte from the pivot for this line
+            $totalQte = $line->palettes->sum(function ($palette) {
+                return $palette->pivot->quantity;
+            });
+
+            // return response()->json(['message' => $totalQte]);
+
             return response()->json($line);
         } catch (\Exception $e) {
             return response()->json([
@@ -175,6 +182,21 @@ class PaletteController extends Controller
         $line = Line::find($request->line);
 
         $palette = Palette::where("code", $request->palette)->first();
+
+
+        // Calculate total qte from the pivot for this line
+        $line_qte =  $line->quantity;
+        $totalQte = $line->palettes->sum(function ($palette) {
+            return $palette->pivot->quantity;
+        });
+
+
+        if(intval($line_qte) < ($totalQte + intval($request->quantity))){
+            return response()->json(['message' => $totalQte, 'cur' => intval($line_qte), 'rq'=> intval($request->quantity)], 500);
+        }
+
+
+
 
         if ($line->document_id !== $palette->document_id) {
             return response()->json(['errors' => ["document" => "The document is not exits"]], 500);
