@@ -17,7 +17,6 @@ class DocenteteController extends Controller
 
     public function preparation(Request $request)
     {
-
         $user_roles = auth()->user()->roles()->pluck('name', 'id');
 
         if ($user_roles->isEmpty()) {
@@ -88,7 +87,7 @@ class DocenteteController extends Controller
             $line = Line::find($line);
             $line->update([
                 'completed' => true,
-                'role_id' => $line->next_role_id || null
+                'role_id' => $line->next_role_id || null,
             ]);
 
             if (auth()->user()->hasRole('fabrication')) {
@@ -98,7 +97,7 @@ class DocenteteController extends Controller
             }
 
             try {
-                $action->updat(['end' => now()]);
+                $action->update(['end' => now()]);
             } catch (\Throwable $th) {
                 //throw $th;
             }
@@ -121,7 +120,7 @@ class DocenteteController extends Controller
             return response()->json(['errors' => $validator->errors()], 422);
         }
 
-        if (!auth()->user()->hasRole("fabrication") ||  !auth()->user()->hasRole("fabrication")) {
+        if (!auth()->user()->hasRole("fabrication") ||  !auth()->user()->hasRole("montage")) {
             foreach ($request->lines as $line){
                 $line = Line::find($line);
 
@@ -206,7 +205,7 @@ class DocenteteController extends Controller
         $docligne = Docligne::with(['article' => function ($query) {
             $query->select("Nom", 'Hauteur', 'Largeur', 'Profonduer', 'Longueur', 'Couleur',  'Chant', 'Episseur', 'Description', 'AR_Ref');
         }, 'line' => function ($query) {
-            $query->select('id', 'company_id', 'docligne_id', 'role_id', 'completed');
+            $query->select('id', 'company_id', 'docligne_id', 'role_id', 'completed', 'complation_date');
         }, 'stock' => function($query){
             $query->select('code', 'qte_inter', 'qte_serie');
         }])
@@ -241,6 +240,8 @@ class DocenteteController extends Controller
 
 
 
+
+    // Transfer to Role (Fabrication, Montage, Preparation)
     public function roleTransfer($request)
     {
         DB::beginTransaction();
@@ -271,11 +272,9 @@ class DocenteteController extends Controller
     }
 
 
-
+    // Transfer to Company controller (Adill)
     public function transferCompany($request)
     {
-
-
         try {
             $docligne = Docligne::where('cbMarq', $request->lines[0])->first();
 

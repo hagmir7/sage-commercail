@@ -52,6 +52,12 @@ class Line extends Model
     }
 
     public function article_stock(){
-        return $this->belongsTo(ArticleStock::class, 'AR_Ref', 'ref');
+        return $this->belongsTo(ArticleStock::class, 'ref', 'code');
     }
+
+
+    public function palettes(){
+        return $this->belongsToMany(Palette::class, 'line_palettes')->withPivot('quantity');
+    }
+
 }

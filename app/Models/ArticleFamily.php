@@ -6,10 +6,16 @@ use Illuminate\Database\Eloquent\Model;
 
 class ArticleFamily extends Model
 {
-    protected $fillable = ['code', 'description'];
+
+    protected $table = "F_FAMILLE";
+    protected $primaryKey = "FA_CodeFamille";
+    protected $keyType = "string";
+
+
+    protected $guarded = [];
 
     public function articles()
     {
-        return $this->hasMany(Article::class, 'family_id');
+        return $this->hasMany(Article::class, 'FA_CodeFamille', 'FA_CodeFamille');
     }
 }

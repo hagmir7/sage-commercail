@@ -22,4 +22,10 @@ class Palette extends Model
     {
         return $this->hasMany(Article::class);
     }
+
+
+    public function lines()
+    {
+        return $this->belongsToMany(Line::class, 'line_palettes')->withPivot('quantity');
+    }
 }

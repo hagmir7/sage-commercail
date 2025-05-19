@@ -12,23 +12,24 @@ class ArticleStock extends Model
         'description',
         'name',
         'color',
+        'article_id',
         'qte_inter',
         'qte_serie',
         'family_id',
         'thickness',
-        'hieght',
+        'height',
         'width',
         'depth',
         'chant'
     ];
 
-    public function palette()
+    public function article()
     {
-        return $this->belongsTo(Palette::class);
+        return $this->belongsTo(Article::class, 'cbMarq');
     }
 
     public function family()
     {
-        return $this->belongsTo(ArticleFamily::class, 'family_id');
+        return $this->belongsTo(ArticleFamily::class, 'cbMarq');
     }
 }

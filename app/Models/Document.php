@@ -29,4 +29,8 @@ class Document extends Model
     {
         return $this->belongsToMany(User::class, 'transfer_by');
     }
+
+    public function palettes(){
+        return $this->hasMany(Palette::class);
+    }
 }

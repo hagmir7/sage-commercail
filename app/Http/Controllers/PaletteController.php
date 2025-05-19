@@ -72,15 +72,30 @@ class PaletteController extends Controller
             return response()->json(['errors' => $validator->errors()], 422);
         }
 
-        $document = Document::where("piece", $request->document_id)?->first();
+        $document = Document::where('piece', $request->document_id)->first();
 
-        $palette = Palette::create([
-            'code' => $this->generatePaletteCode(),
-            'type' => "Livraison",
-            'document_id' => $document->id,
-            'company_id' => auth()->user()->company_id || 1,
-            'user_id' => auth()->id()
-        ]);
+        if (!$document) {
+            return response()->json(['error' => 'Document not found.'], 404);
+        }
+
+        if ($document->palettes()->exists()) {
+            $palette = $document->palettes()
+                ->with('lines', function ($query) {
+                    return $query->with('article_stock');
+                })
+                ->first();
+        } else {
+            $palette = Palette::create([
+                'code'        => $this->generatePaletteCode(),
+                'type'        => 'Livraison',
+                'document_id' => $document->id,
+                'company_id'  => auth()->user()->company_id ?? 1,
+                'user_id'     => auth()->id(),
+            ]);
+
+            // Corrected: Load relationships after creation
+            $palette->load(['lines.article_stock']);
+        }
 
         return response()->json($palette, 201);
     }
@@ -90,36 +105,17 @@ class PaletteController extends Controller
     public function scan(Request $request)
     {
         $validator = Validator::make($request->all(), [
-            'document' => 'required|exists:documents,piece',
             'line' => 'required|exists:lines,id',
-            'palette' => 'required|exists:palettes,code'
         ]);
 
         if ($validator->fails()) {
             return response()->json(['errors' => $validator->errors()], 422);
         }
 
-        DB::beginTransaction();
-
         try {
-            $line = Line::find($request->line);
-            $palette = Palette::where('code', $request->palette)->first();
-            $line->update([
-                'palette_id' => $palette->id,
-            ]);
-
-            $document = Document::where("piece", $request->document)->first();
-
-            $palette->update([
-                'document_id' => $document->id
-            ]);
-
-            DB::commit();
-
-            $docligne = $line->docligne;
-            return response()->json($docligne);
+            $line = Line::with('docligne')->find($request->line);
+            return response()->json($line);
         } catch (\Exception $e) {
-            DB::rollBack();
             return response()->json([
                 'error' => 'An error occurred while processing the scan.',
                 'message' => $e->getMessage()
@@ -128,6 +124,34 @@ class PaletteController extends Controller
     }
 
 
+    public function confirm(Request $request)
+    {
+
+        $validator = Validator::make($request->all(), [
+            'quantity' => 'required|int|max:1000|min:1',
+            'line' => 'required|exists:lines,id',
+            'palette' => 'required|exists:palettes,code'
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json(['errors' => $validator->errors()], 422);
+        }
+
+        $line = Line::find($request->line);
+        $palette = Palette::where("code", $request->palette)->first();
+
+        $line->palettes()->attach($palette->id, ['quantity' => $request->quantity]);
+
+        $line->update([
+            'palette_id' => $palette->id
+        ]);
+
+        $palette->load(['lines.article_stock']);
+
+
+
+        return response()->json($palette, 201);
+    }
 
 
     public function store(Request $request)
@@ -195,5 +219,33 @@ class PaletteController extends Controller
         $palette->delete();
 
         return response()->json(['message' => 'Palette deleted successfully']);
+    }
+
+
+    public function detach(Request $request)
+    {
+
+        $validator = Validator::make($request->all(), [
+            'line' => 'required|exists:lines,id',
+            'palette' => 'required|exists:palettes,code'
+        ]);
+
+
+
+        // return response()->json(['data' => $request->palette]);
+
+        if ($validator->fails()) {
+            return response()->json(['errors' => $validator->errors()], 422);
+        }
+
+        $line = Line::find($request->line);
+        $palette = Palette::where("code", $request->palette)->first();
+
+        $line->palettes()->detach($palette->id);
+
+        $palette->load(['lines.article_stock']);
+
+
+        return response()->json(['data' => $palette, 'message' => 'Article supprimé avec succès !']);
     }
 }

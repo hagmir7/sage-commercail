@@ -21,12 +21,24 @@ return new class extends Migration
             $table->string('color')->nullable();
             $table->integer('qte_inter')->default(0);
             $table->integer('qte_serie')->default(0);
-            $table->foreignIdFor(ArticleFamily::class);
             $table->float('thickness')->nullable();
-            $table->float('hieght')->nullable();
+            $table->float('height')->nullable(); // Fixed typo here
             $table->float('width')->nullable();
             $table->float('depth')->nullable();
             $table->string('chant')->nullable();
+            $table->integer('family_id');
+            $table->integer('article_id');
+
+            $table->foreign('family_id')
+                ->references('cbMarq')
+                ->on('F_FAMILLE')
+                ->onDelete('cascade');
+
+            $table->foreign('article_id')
+                ->references('cbMarq')
+                ->on('F_ARTICLE')
+                ->onDelete('cascade');
+
             $table->timestamps();
         });
     }

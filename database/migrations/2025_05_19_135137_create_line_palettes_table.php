@@ -1,5 +1,7 @@
 <?php
 
+use App\Models\Line;
+use App\Models\Palette;
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
@@ -11,10 +13,11 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::create('article_families', function (Blueprint $table) {
+        Schema::create('line_palettes', function (Blueprint $table) {
             $table->id();
-            $table->string('code')->unique();
-            $table->string('description')->nullable();
+            $table->foreignIdFor(Line::class);
+            $table->foreignIdFor(Palette::class);
+            $table->integer('quantity');
             $table->timestamps();
         });
     }
@@ -24,6 +27,6 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::dropIfExists('article_families');
+        Schema::dropIfExists('line_palettes');
     }
 };

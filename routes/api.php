@@ -69,6 +69,8 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post("docentetes/complation", [DocenteteController::class, 'complation']);
     Route::post('palettes/generate', [PaletteController::class, 'generate']);
     Route::post('palettes/scan', [PaletteController::class, 'scan']);
+    Route::post('palettes/confirm', [PaletteController::class, 'confirm']);
+     Route::post('palettes/detach', [PaletteController::class, 'detach']);
 });
 
 Route::post('/login', [AuthController::class, 'login']);
