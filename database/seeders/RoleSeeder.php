@@ -20,7 +20,7 @@ class RoleSeeder extends Seeder
         $roles = [
             ["name" => "supper_admin", 'guard_name' => "web"],
             ["name" => "admin", 'guard_name' => "web"],
-            ["name" => "preparateur", 'guard_name' => "web"],
+            ["name" => "preparation", 'guard_name' => "web"],
             ["name" => "preparation_cuisine", 'guard_name' => "web"],
             ["name" => "preparation_trailer", 'guard_name' => "web"],
             ["name" => "fabrication", 'guard_name' => "web"],

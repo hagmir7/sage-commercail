@@ -79,11 +79,13 @@ class PaletteController extends Controller
         }
 
         if ($document->palettes()->exists()) {
-            $palette = $document->palettes()
-                ->with('lines', function ($query) {
-                    return $query->with('article_stock');
-                })
-                ->first();
+            $query = $document->palettes()->with('lines.article_stock');
+
+            if (!empty($request->palette)) {
+                $palette = $query->where('code', $request->palette)->first();
+            } else {
+                $palette = $query->first();
+            }
         } else {
             $palette = Palette::create([
                 'code'        => $this->generatePaletteCode(),
@@ -92,12 +94,46 @@ class PaletteController extends Controller
                 'company_id'  => auth()->user()->company_id ?? 1,
                 'user_id'     => auth()->id(),
             ]);
-
-            // Corrected: Load relationships after creation
-            $palette->load(['lines.article_stock']);
+            $palette->load('lines.article_stock');
         }
 
-        return response()->json($palette, 201);
+        $allPalettes = $document->palettes()->with('lines.article_stock')->get();
+
+        return response()->json([
+            "palette" => $palette,
+            "palettes" => $allPalettes,
+        ], 201);
+    }
+
+
+
+    public function create(Request $request)
+    {
+
+        $validator = Validator::make($request->all(), [
+            'document_id' => 'required|exists:documents,piece'
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json(['errors' => $validator->errors()], 422);
+        }
+
+
+        $document =  Document::where('piece', $request->document_id)->first();
+        if (!$document) {
+            return response()->json(['errors' => ['document_id' => "Document is not exits"]]);
+        }
+
+        $palette = Palette::create([
+            'code'        => $this->generatePaletteCode(),
+            'type'        => 'Livraison',
+            'document_id' => $document->id,
+            'company_id'  => auth()->user()->company_id ?? 1,
+            'user_id'     => auth()->id(),
+        ]);
+        $palette->load(['lines.article_stock']);
+
+        return response()->json($palette);
     }
 
 
@@ -140,9 +176,7 @@ class PaletteController extends Controller
 
         $palette = Palette::where("code", $request->palette)->first();
 
-
-        // return response(['line_id' => $line->document_id, 'palette_id' => $palette->document_id]);
-        if($line->document_id !== $palette->document_id){
+        if ($line->document_id !== $palette->document_id) {
             return response()->json(['errors' => ["document" => "The document is not exits"]], 500);
         }
 
@@ -180,13 +214,9 @@ class PaletteController extends Controller
         return response()->json(['data' => $palette]);
     }
 
-    /**
-     * Update the specified resource in storage.
-     *
-     * @param  \Illuminate\Http\Request  $request
-     * @param  int  $id
-     * @return \Illuminate\Http\Response
-     */
+
+
+
     public function update(Request $request, $id)
     {
         $validator = Validator::make($request->all(), [
@@ -205,12 +235,8 @@ class PaletteController extends Controller
         return response()->json(['data' => $palette, 'message' => 'Palette updated successfully']);
     }
 
-    /**
-     * Remove the specified resource from storage.
-     *
-     * @param  int  $id
-     * @return \Illuminate\Http\Response
-     */
+
+
     public function destroy($id)
     {
         $palette = Palette::findOrFail($id);

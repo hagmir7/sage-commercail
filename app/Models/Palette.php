@@ -8,6 +8,8 @@ class Palette extends Model
 {
     protected $fillable = ['code', 'company_id', 'position_id', 'document_id', 'type', 'user_id'];
 
+    // public $timestamps = false;
+
     public function company()
     {
         return $this->belongsTo(Company::class);

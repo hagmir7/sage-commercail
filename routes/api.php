@@ -71,6 +71,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('palettes/scan', [PaletteController::class, 'scan']);
     Route::post('palettes/confirm', [PaletteController::class, 'confirm']);
      Route::post('palettes/detach', [PaletteController::class, 'detach']);
+    Route::post('palettes/create', [PaletteController::class, 'create']);
 });
 
 Route::post('/login', [AuthController::class, 'login']);
