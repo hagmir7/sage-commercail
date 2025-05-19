@@ -59,20 +59,14 @@ Route::middleware('auth:sanctum')->group(function () {
     // Get user Role and permissions
     Route::get('/user/{id}/permissions', [UserPermissionController::class, 'getUserRolesAndPermissions']);
     Route::get('/user/permissions', [UserPermissionController::class, 'getAuthUserRolesAndPermissions']);
-
-
-
     //
     Route::post("docentete/transfer", [DocenteteController::class, 'transfer']);
     Route::get("docentetes/commercial", [DocenteteController::class, 'commercial']);
     Route::get("docentetes/preparation", [DocenteteController::class, 'preparation']);
     Route::get("docentetes/fabrication", [DocenteteController::class, 'fabrication']);
     Route::get("docentete/{id}", [DocenteteController::class, 'show']);
-
     Route::post("docentetes/start", [DocenteteController::class, 'start']);
     Route::post("docentetes/complation", [DocenteteController::class, 'complation']);
-
-
     Route::post('palettes/generate', [PaletteController::class, 'generate']);
     Route::post('palettes/scan', [PaletteController::class, 'scan']);
 });

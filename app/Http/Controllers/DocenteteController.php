@@ -126,7 +126,7 @@ class DocenteteController extends Controller
             return response()->json(['errors' => $validator->errors()], 422);
         }
 
-        if (!auth()->user()->hasRole("fabrication") ||  !auth()->user()->hasRole("fabrication")) {
+        if (!auth()->user()->hasRole("fabrication") ||  !auth()->user()->hasRole("nontage")) {
             foreach ($request->lines as $line){
                 $line = Line::find($line);
 
@@ -142,6 +142,10 @@ class DocenteteController extends Controller
                     'start' => now(),
                 ]);
             }     
+        }
+        
+        if ($validator->fails()) {
+            return response()->json(['errors' => "Role not autherazed"], 401);
         }
     }
 
@@ -211,7 +215,7 @@ class DocenteteController extends Controller
             $query->select("Nom", 'Hauteur', 'Largeur', 'Profonduer', 'Longueur', 'Couleur',  'Chant', 'Episseur', 'Description', 'AR_Ref');
 
         }, 'line' => function ($query) {
-            $query->select('id', 'company_id', 'docligne_id', 'role_id', 'completed');
+            $query->select('id', 'company_id', 'docligne_id', 'role_id', 'completed', 'complation_date');
         }, 'stock' => function($query){
             $query->select('code', 'qte_inter', 'qte_serie');
         }])
