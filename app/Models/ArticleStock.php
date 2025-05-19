@@ -14,7 +14,6 @@ class ArticleStock extends Model
         'color',
         'qte_inter',
         'qte_serie',
-        'palette_id',
         'family_id',
         'thickness',
         'hieght',
