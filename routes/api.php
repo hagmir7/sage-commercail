@@ -65,6 +65,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get("docentetes/preparation", [DocenteteController::class, 'preparation']);
     Route::get("docentetes/fabrication", [DocenteteController::class, 'fabrication']);
     Route::get("docentete/{id}", [DocenteteController::class, 'show']);
+    Route::get("docentete/validation/{id}", [DocenteteController::class, 'validation']);
     Route::post("docentetes/start", [DocenteteController::class, 'start']);
     Route::post("docentetes/complation", [DocenteteController::class, 'complation']);
     Route::post('palettes/generate', [PaletteController::class, 'generate']);

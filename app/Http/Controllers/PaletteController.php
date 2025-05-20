@@ -167,6 +167,39 @@ class PaletteController extends Controller
     }
 
 
+        public function validation($piece)
+    {
+        $document = Document::where('piece', $piece)->with('lines.palettes')->first();
+
+        if (!$document) {
+            return response()->json(['status' => false, 'message' => 'Document not found'], 404);
+        }
+
+        $invalidLines = [];
+
+        foreach ($document->lines as $line) {
+            $totalPaletteQuantity = $line->palettes->sum(function ($palette) {
+                return $palette->pivot->quantity ?? 0;
+            });
+
+            // Compare with required_quantity
+            if ($totalPaletteQuantity < $line->quantity) {
+                $invalidLines[] = [
+                    'line_id' => $line->id,
+                    'quantity' => $line->quantity,
+                    'total_palette_quantity' => $totalPaletteQuantity
+                ];
+            }
+        }
+
+        if (count($invalidLines)) {
+            return false;
+        }
+
+        return true;
+    }
+
+
     public function confirm(Request $request)
     {
         $validator = Validator::make($request->all(), [
@@ -204,6 +237,15 @@ class PaletteController extends Controller
 
         $line->palettes()->attach($palette->id, ['quantity' => $request->quantity]);
         $palette->load(['lines.article_stock']);
+
+
+        // Update document status if preparation completed
+        if ($this->validation($line?->document?->piece)) {
+            $line->document->update([
+                'completed' => true
+            ]);
+        }
+
         return response()->json($palette, 201);
     }
 
@@ -268,6 +310,7 @@ class PaletteController extends Controller
     }
 
 
+
     public function detach(Request $request)
     {
 
@@ -291,7 +334,10 @@ class PaletteController extends Controller
 
         $palette->load(['lines.article_stock']);
 
-
+        // Update document status if preparation completed
+        $line->document->update([
+            'completed' => false
+        ]);
         return response()->json($palette);
     }
 }

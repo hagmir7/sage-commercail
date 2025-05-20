@@ -143,7 +143,7 @@ class DocenteteController extends Controller
     public function commercial(Request $request)
     {
         // dd($user_roles);
-        $query = Docentete::query()
+        $query = Docentete::with('document')
             ->select([
                 'DO_Reliquat',
                 'DO_Piece',
@@ -174,11 +174,50 @@ class DocenteteController extends Controller
                     ->orWhere('DO_Tiers', 'like', "%$search%");
             });
         }
-
-
         $results = $query->paginate(20);
 
         return response()->json($results);
+    }
+
+
+    public function validation($piece)
+    {
+        $document = Document::where('piece', $piece)->with('lines.palettes')->first();
+
+        if (!$document) {
+            return response()->json(['status' => false, 'message' => 'Document not found'], 404);
+        }
+
+        $invalidLines = [];
+
+        foreach ($document->lines as $line) {
+            // Sum all quantities from pivot table for this line
+            $totalPaletteQuantity = $line->palettes->sum(function ($palette) {
+                return $palette->pivot->quantity ?? 0;
+            });
+
+            // Compare with required_quantity
+            if ($totalPaletteQuantity < $line->quantity) {
+                $invalidLines[] = [
+                    'line_id' => $line->id,
+                    'quantity' => $line->quantity,
+                    'total_palette_quantity' => $totalPaletteQuantity
+                ];
+            }
+        }
+
+        if (count($invalidLines)) {
+            return response()->json([
+                'status' => false,
+                'message' => 'Some lines do not meet the required quantity from palettes.',
+                'invalid_lines' => $invalidLines
+            ]);
+        }
+
+        return response()->json([
+            'status' => true,
+            'message' => 'All lines have sufficient palette quantities.'
+        ]);
     }
 
 
@@ -211,9 +250,6 @@ class DocenteteController extends Controller
         }])
             ->select("DO_Piece", "AR_Ref", 'DL_Design', 'DL_Qte', "Nom", "Hauteur", "Largeur", "Profondeur", "Langeur", "Couleur", "Chant", "Episseur", "cbMarq")
             ->where('DO_Piece', $id);
-
-
-
 
 
         if (auth()->user()->hasRole(['preparateur'])) {
