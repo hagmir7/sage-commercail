@@ -180,7 +180,76 @@ class DocenteteController extends Controller
     }
 
 
-    public function validation($piece)
+    public function validation(Request $request)
+    {
+        $query = Docentete::with('document')
+            ->select([
+                'DO_Reliquat',
+                'DO_Piece',
+                'DO_Ref',
+                'DO_Tiers',
+                'cbMarq',
+                \DB::raw("CONVERT(VARCHAR(10), DO_Date, 111) AS DO_Date"),
+                \DB::raw("CONVERT(VARCHAR(10), DO_DateLivr, 111) AS DO_DateLivr"),
+                'DO_Expedit'
+            ])
+            ->whereHas('document', function ($query) {
+                $query->where('completed', 1);
+            })
+            ->orderByDesc("DO_Date")
+            ->where('DO_Domaine', 0)
+            ->where('DO_Statut', 1);
+
+
+
+        if ($request->has('status')) {
+            $query->where('DO_Type', $request->status);
+        } else {
+            $query->where('DO_Type', 2);
+        }
+
+        if ($request->has('search') && $request->search !== '') {
+            $search = $request->search;
+            $query->where(function ($q) use ($search) {
+                $q->where('DO_Reliquat', 'like', "%$search%")
+                    ->orWhere('DO_Piece', 'like', "%$search%")
+                    ->orWhere('DO_Ref', 'like', "%$search%")
+                    ->orWhere('DO_Tiers', 'like', "%$search%");
+            });
+        }
+        $results = $query->paginate(20);
+
+        return response()->json($results);
+    }
+
+
+    public function validate(Request $request, $piece){
+        $validator = Validator::make($request->all(), [
+            'lines' => "required|array"
+        ]);
+
+        if($validator->fails()){
+            return response()->json(["errors" => $validator->errors()], 500);
+        }
+
+        $document = Document::where('piece', $piece)->first();
+
+        if(!$document){
+            return response()->json(["error" => "Document is not definded"], 404);
+        }
+
+        foreach($request->lines as $line){
+            $line = Line::find($line);
+            $line->update([
+                'validated' => true
+            ]);
+        }
+
+        return response()->json(["message" => "Lines are verifide"]);
+    }
+
+
+    public function competedPalettes($piece)
     {
         $document = Document::where('piece', $piece)->with('lines.palettes')->first();
 
@@ -226,7 +295,7 @@ class DocenteteController extends Controller
 
     public function show($id)
     {
-        $docentete = Docentete::select(
+        $docentete = Docentete::with('document')->select(
             "DO_Piece",
             "DO_Ref",
 
@@ -244,7 +313,7 @@ class DocenteteController extends Controller
         $docligne = Docligne::with(['article' => function ($query) {
             $query->select("Nom", 'Hauteur', 'Largeur', 'Profonduer', 'Longueur', 'Couleur',  'Chant', 'Episseur', 'Description', 'AR_Ref');
         }, 'line' => function ($query) {
-            $query->select('id', 'company_id', 'docligne_id', 'role_id', 'completed', 'complation_date');
+            $query->with('palettes')->select('id', 'company_id', 'docligne_id', 'role_id', 'completed', 'complation_date', 'validated');
         }, 'stock' => function($query){
             $query->select('code', 'qte_inter', 'qte_serie');
         }])

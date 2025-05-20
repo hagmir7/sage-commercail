@@ -332,12 +332,16 @@ class PaletteController extends Controller
 
         $line->palettes()->detach($palette->id);
 
-        $palette->load(['lines.article_stock']);
-
         // Update document status if preparation completed
         $line->document->update([
             'completed' => false
         ]);
+
+        $palette->load(['lines.article_stock']);
+
+
+
+
         return response()->json($palette);
     }
 }
