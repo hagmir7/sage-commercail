@@ -15,14 +15,15 @@ class UserSeeder extends Seeder
     public function run(): void
     {
         if (!User::where("email", "admin@admin.com")->first()) {
-            User::factory()->create([
-                'name' => 'ADMIN',
+            $user = User::factory()->create([
+                'name' => 'admin',
                 'full_name' => "Hassan Agmir",
                 'email' => 'admin@admin.com',
                 'phone' => '0648382674',
                 'password' => Hash::make("password"),
                 'email_verified_at' => now(),
             ]);
+            $user->assignRole("supper_admin");
         }
 
         if (!User::where("email", "preparation@admin.com")->first()) {
@@ -52,8 +53,8 @@ class UserSeeder extends Seeder
 
          if (!User::where("email", "montage@admin.com")->first()) {
             User::factory()->create([
-                'name' => 'Said Montage',
-                'full_name' => "Adil Adil",
+                'name' => 'said',
+                'full_name' => "Said Montage",
                 'email' => 'montage@admin.com',
                 'phone' => '1234567890',
                 'password' => Hash::make("password"),
@@ -77,7 +78,7 @@ class UserSeeder extends Seeder
         if (!User::where("email", "peinture@admin.com")->first()) {
             User::factory()->create([
                 'name' => 'nordin',
-                'full_name' => "Nordin Seri",
+                'full_name' => "Nordin Serie",
                 'email' => 'peinture@admin.com',
                 'phone' => '1234567890',
                 'password' => Hash::make("password"),
@@ -95,7 +96,7 @@ class UserSeeder extends Seeder
                 'phone' => '1234567890',
                 'password' => Hash::make("password"),
                 'email_verified_at' => now(),
-                'company_id' => 2
+                'company_id' => 1
             ]);
         }
 

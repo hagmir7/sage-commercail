@@ -38,6 +38,8 @@ Route::get('/users', function (Request $request) {
     return User::all();
 });
 
+Route::get("progress/{piece}", [DocenteteController::class, 'progress']);
+
 
 Route::middleware('auth:sanctum')->group(function () {
     Route::post('/logout', [AuthController::class, 'logout']);
@@ -68,14 +70,17 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get("docentetes/fabrication", [DocenteteController::class, 'fabrication']);
     Route::get("docentete/{id}", [DocenteteController::class, 'show']);
 
+
     Route::post("docentetes/start", [DocenteteController::class, 'start']);
     Route::post('palettes/validate/{piece}', [DocenteteController::class, 'validate']);
     Route::post("docentetes/complation", [DocenteteController::class, 'complation']);
+    Route::get("docentetes/reset/{piece}", [DocenteteController::class, 'reset']);
     Route::post('palettes/generate', [PaletteController::class, 'generate']);
     Route::post('palettes/scan', [PaletteController::class, 'scan']);
     Route::post('palettes/confirm', [PaletteController::class, 'confirm']);
-     Route::post('palettes/detach', [PaletteController::class, 'detach']);
+    Route::post('palettes/detach', [PaletteController::class, 'detach']);
     Route::post('palettes/create', [PaletteController::class, 'create']);
+
 
 
     // Test

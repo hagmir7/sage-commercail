@@ -27,7 +27,7 @@ class DocenteteController extends Controller
         $documents = Document::whereHas("lines", function ($query) use ($user_roles) {
             $line = $query->where("company_id", auth()->user()->company_id);
 
-            $common = array_intersect($user_roles->toArray(), ['fabrication', 'montage', 'preparation_cuisine']);
+            $common = array_intersect($user_roles->toArray(), ['fabrication', 'montage', 'preparation_cuisine', 'preparation_trailer', 'magasinier']);
             if (!empty($common)) {
                 $line = $query->whereIn("role_id", $user_roles->keys());
             }
@@ -336,8 +336,9 @@ class DocenteteController extends Controller
                 $query->where('company_id', auth()->user()->company_id);
             });
 
-        } elseif (auth()->user()->hasRole(['fabrication', 'montage'])) {
+        } elseif (auth()->user()->hasRole(['fabrication', 'montage', 'preparation_cuisine', 'preparation_trailer', 'magasinier'])) {
             $user_roles = auth()->user()->roles()->pluck('id');
+
             $docligne->whereHas('line', function ($query) use ($user_roles) {
                 $query->where('company_id', auth()->user()->company_id)
                     ->whereIn('role_id', $user_roles);
@@ -369,6 +370,29 @@ class DocenteteController extends Controller
 
         return response()->json($document);
     }
+
+    public function reset($piece)
+    {
+        $document = Document::where("piece", $piece)->first();
+
+        if (!$document) {
+            return response()->json(['error' => "Document does not exist"], 404);
+        }
+
+        foreach($document->lines as $line){
+            $line->delete();
+        }
+
+
+        if (!auth()->user()->hasRole("commercial")) {
+            return response()->json(['error' => "Unauthorized"], 403);
+        }
+
+        $document->delete();
+
+        return response()->json(['message' => "Réinitialisé avec succès"], 200);
+    }
+
 
 
 
@@ -471,6 +495,7 @@ class DocenteteController extends Controller
                             UPDATE F_DOCLIGNE
                             SET Nom = '" . addslashes($article->Nom) . "',
                                 Hauteur = " . ($article->Hauteur !== null ? floatval($article->Hauteur) : "NULL") . ",
+                                Couleur = " . ($article->Couleur !== null ? floatval($article->Couleur) : "NULL") . ",
                                 Largeur = " . ($article->Largeur !== null ? floatval($article->Largeur) : "NULL") . ",
                                 Profondeur = " . ($article->Profondeur !== null && $article->Profondeur !== '' ? floatval($article->Profondeur) : "NULL") . ",
                                 Chant = '" . addslashes($article->Chant) . "',
@@ -546,6 +571,35 @@ class DocenteteController extends Controller
             $this->roleTransfer($request);
         }
     }
+
+    public function progress($piece)
+    {
+        $document = Document::with(['docentete.doclignes', 'lines.palettes'])->where("piece", $piece)->first();
+
+        if (!$document) {
+            return response()->json(["error" => "Document not found"], 404);
+        }
+
+        $required_qte = $document->lines->sum("quantity") ?? 0;
+
+        $current_qte = 0;
+        foreach ($document->lines as $line) {
+            foreach ($line->palettes as $palette) {
+                $current_qte += $palette->pivot->quantity;
+            }
+        }
+
+        $progress = $required_qte > 0 ? round(($current_qte / $required_qte) * 100, 2) : 0;
+
+        return response()->json([
+            'current_qte' => $current_qte,
+            'required_qte' => $required_qte,
+            'progress' => intval($progress)
+        ]);
+    }
+
+
+
 
 
     public function fabrication(Request $request)
