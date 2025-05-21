@@ -155,6 +155,7 @@ class PaletteController extends Controller
                 return $palette->pivot->quantity;
             });
 
+           
             // return response()->json(['message' => $totalQte]);
 
             return response()->json($line);
@@ -167,7 +168,7 @@ class PaletteController extends Controller
     }
 
 
-        public function validation($piece)
+  public function validation($piece)
     {
         $document = Document::where('piece', $piece)->with('lines.palettes')->first();
 
@@ -178,6 +179,7 @@ class PaletteController extends Controller
         $invalidLines = [];
 
         foreach ($document->lines as $line) {
+            // $line->update(['status_id' => 11 ]);
             $totalPaletteQuantity = $line->palettes->sum(function ($palette) {
                 return $palette->pivot->quantity ?? 0;
             });
@@ -213,41 +215,40 @@ class PaletteController extends Controller
         }
 
         $line = Line::find($request->line);
-
         $palette = Palette::where("code", $request->palette)->first();
 
+        // Ensure relationships are loaded
+        $line->load(['palettes', 'document']);
 
-        // Calculate total qte from the pivot for this line
         $line_qte =  $line->quantity;
         $totalQte = $line->palettes->sum(function ($palette) {
             return $palette->pivot->quantity;
         });
 
-
-        if(intval($line_qte) < ($totalQte + intval($request->quantity))){
-            return response()->json(['message' => $totalQte, 'cur' => intval($line_qte), 'rq'=> intval($request->quantity)], 500);
+        if (intval($line_qte) < ($totalQte + intval($request->quantity))) {
+            return response()->json(['message' => "Quantity is not valid"], 500);
         }
 
-
-
-
         if ($line->document_id !== $palette->document_id) {
-            return response()->json(['errors' => ["document" => "The document is not exits"]], 500);
+            return response()->json(['errors' => ["document" => "The document does not match"]], 404);
         }
 
         $line->palettes()->attach($palette->id, ['quantity' => $request->quantity]);
+        $line->update(['status_id' => 8]);
         $palette->load(['lines.article_stock']);
 
-
-        // Update document status if preparation completed
-        if ($this->validation($line?->document?->piece)) {
+        // Confirm validation
+        if ($this->validation($line->document->piece)) {
             $line->document->update([
-                'completed' => true
+                'completed' => true,
             ]);
         }
 
-        return response()->json($palette, 201);
+        
+
+        return response()->json($palette);
     }
+
 
 
     public function store(Request $request)
@@ -318,8 +319,6 @@ class PaletteController extends Controller
             'line' => 'required|exists:lines,id',
             'palette' => 'required|exists:palettes,code'
         ]);
-
-
 
         // return response()->json(['data' => $request->palette]);
 

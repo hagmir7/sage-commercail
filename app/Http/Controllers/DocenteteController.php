@@ -8,6 +8,7 @@ use App\Models\Docentete;
 use App\Models\Docligne;
 use App\Models\Document;
 use App\Models\Line;
+use App\Models\Role;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
@@ -83,16 +84,20 @@ class DocenteteController extends Controller
             return response()->json(['errors' => $validator->errors()], 422);
         }
 
+        $user = auth()->user();
+
         foreach ($request->lines as $line) {
             $line = Line::find($line);
+
             $line->update([
                 'completed' => true,
                 'role_id' => $line->next_role_id || null,
+                'status_id' => $line->next_role_id ? 7 : ($user->hasRole("fabrication") ? 4 : 6) // 4 For Fabrication & 6 for Montage
             ]);
 
-            if (auth()->user()->hasRole('fabrication')) {
+            if ($user->hasRole('fabrication')) {
                 $action = Action::where("line_id", $line->id)->where('action_type_id', 4); // Action for fabrication
-            } elseif (auth()->user()->hasRole('montage')) {
+            } elseif ($user->hasRole('montage')) {
                 $action = Action::where("line_id", $line->id)->where('action_type_id', 5); // Action for fabrication
             }
 
@@ -120,23 +125,29 @@ class DocenteteController extends Controller
             return response()->json(['errors' => $validator->errors()], 422);
         }
 
-        if (!auth()->user()->hasRole("fabrication") ||  !auth()->user()->hasRole("montage")) {
+        $user = auth()->user();
+
+        if (!$user->hasRole("fabrication") ||  !$user->hasRole("montage")) {
             foreach ($request->lines as $line){
                 $line = Line::find($line);
 
                 $line->update([
-                    'complation_date' => $request->complation_date
+                    'complation_date' => $request->complation_date,
+                    'status_id' => $user->hasRole("fabrication") ? 3 : 5 // 3 For Fabrication & 5 for Montage
                 ]);
 
                 Action::create([
                     'user_id' => auth()->id(),
-                    'action_type_id' =>  auth()->user()->hasRole("fabrication") ? 4 : 5,
+                    'action_type_id' =>  $user->hasRole("fabrication") ? 4 : 5,
                     'line_id' => $line->id,
                     'description' => "Fabrication",
                     'start' => now(),
                 ]);
             }
+            return response()->json(['message' => "Date updated successfully"]);
         }
+
+        return response()->json(['error' => "Your Have no access"], 500);
     }
 
 
@@ -298,7 +309,6 @@ class DocenteteController extends Controller
         $docentete = Docentete::with('document')->select(
             "DO_Piece",
             "DO_Ref",
-
             "DO_Tiers",
             "DO_Expedit",
             "cbMarq",
@@ -312,8 +322,7 @@ class DocenteteController extends Controller
 
         $docligne = Docligne::with(['article' => function ($query) {
             $query->select("Nom", 'Hauteur', 'Largeur', 'Profonduer', 'Longueur', 'Couleur',  'Chant', 'Episseur', 'Description', 'AR_Ref');
-        }, 'line' => function ($query) {
-            $query->with('palettes')->select('id', 'company_id', 'docligne_id', 'role_id', 'completed', 'complation_date', 'validated');
+        }, 'line' => function ($query) { $query->with('palettes')->select('id', 'company_id', 'docligne_id', 'role_id', 'completed', 'complation_date', 'validated','status_id');
         }, 'stock' => function($query){
             $query->select('code', 'qte_inter', 'qte_serie');
         }])
@@ -326,6 +335,7 @@ class DocenteteController extends Controller
             $docligne->whereHas('line', function ($query) {
                 $query->where('company_id', auth()->user()->company_id);
             });
+
         } elseif (auth()->user()->hasRole(['fabrication', 'montage'])) {
             $user_roles = auth()->user()->roles()->pluck('id');
             $docligne->whereHas('line', function ($query) use ($user_roles) {
@@ -345,17 +355,52 @@ class DocenteteController extends Controller
 
 
 
+    public function showTest($id)
+    {
+        $document = Document::with([
+            'lines' => function ($query) {
+                $query->with(['palettes', 'docligne'])
+                    ->select('id', 'document_id', 'ref', 'name', 'quantity', 'design', 'role_id', 'complation_date', 'status_id', 'company_id');
+            }
+        ])
+            ->where('piece', $id)
+            ->select('id', 'piece', 'ref', 'expedition', 'client_id', 'status_id')
+            ->first();
+
+        return response()->json($document);
+    }
+
+
+
+
+
 
     // Transfer to Role (Fabrication, Montage, Preparation)
     public function roleTransfer($request)
     {
         DB::beginTransaction();
+
+
+        $role = Role::find($request->transfer);
+
+
+        if ($role->name  == 'fabrication') {
+            $status = 3;
+        } elseif ($role->name  == 'montage') {
+            $status = 5;
+        } elseif ($role->name  == 'magasinier') {
+            $status = 7; // Preparation
+        } elseif ($role->name  == "preparation_cuisine" || $role->name == "preparation_trailer") {
+            $status = 7;
+        }
+
         try {
             $lines = Line::whereIn("id", $request->lines)->get();
 
             foreach ($lines as $line) {
                 $line->update([
-                    'role_id' => intval($request->transfer)
+                    'role_id' => intval($request->transfer),
+                    'status_id' => $status
                 ]);
             }
 

@@ -7,7 +7,7 @@ use Illuminate\Database\Eloquent\Model;
 class Document extends Model
 {
 
-    protected $fillable = ['docentete_id', 'piece', 'type', 'ref', 'expedition', 'transfer_by', 'completed', 'client_id'];
+    protected $fillable = ['docentete_id', 'piece', 'type', 'ref', 'expedition', 'transfer_by', 'completed', 'client_id', 'status_id'];
 
     // protected $dateFormat = 'Y-d-m H:i:s.v';
 
@@ -21,7 +21,7 @@ class Document extends Model
     }
 
     public function lines(){
-        return $this->hasMany(Line::class);
+        return $this->hasMany(Line::class, 'document_id', 'id');
     }
 
 

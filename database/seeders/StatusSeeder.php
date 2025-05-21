@@ -24,6 +24,7 @@ class StatusSeeder extends Seeder
             'Préparé',
             'Contrôle',
             'Contrôlé',
+            'Validé',
             'Prêt',
             'À livrer',
             'Livré'

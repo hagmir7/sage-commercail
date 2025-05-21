@@ -21,7 +21,8 @@ class Line extends Model
         'received',
         'complation_date',
         'completed',
-        'validated'
+        'validated',
+        'status_id'
     ];
 
 
