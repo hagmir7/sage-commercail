@@ -169,7 +169,6 @@ class DocenteteController extends Controller
 
 
         if (!empty($request->status)) {
-            return response()->json($request->status);
             $query->whereHas('document.status', function ($query) use ($request) {
                 $query->where('id', $request->status);
             });
