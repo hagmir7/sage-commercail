@@ -51,7 +51,7 @@ class DocenteteController extends Controller
             ->where('DO_Domaine', 0)
             ->where('DO_Statut', 1);
         if ($request->has('status')) {
-            $query->where('DO_Type', $request->status);
+            $query->where('DO_Type', $request->type);
         } else {
             $query->where('DO_Type', 2);
         }
@@ -153,21 +153,31 @@ class DocenteteController extends Controller
     {
         // dd($user_roles);
         $query = Docentete::with('document.status')
-            ->select([
-                'DO_Reliquat',
-                'DO_Piece',
-                'DO_Ref',
-                'DO_Tiers',
-                'cbMarq',
-                \DB::raw("CONVERT(VARCHAR(10), DO_Date, 111) AS DO_Date"),
-                \DB::raw("CONVERT(VARCHAR(10), DO_DateLivr, 111) AS DO_DateLivr"),
-                'DO_Expedit'
-            ])
-            ->orderByDesc("DO_Date")
-            ->where('DO_Domaine', 0)
-            ->where('DO_Statut', 1);
-        if ($request->has('status')) {
-            $query->where('DO_Type', $request->status);
+        ->select([
+            'DO_Reliquat',
+            'DO_Piece',
+            'DO_Ref',
+            'DO_Tiers',
+            'cbMarq',
+            \DB::raw("CONVERT(VARCHAR(10), DO_Date, 111) AS DO_Date"),
+            \DB::raw("CONVERT(VARCHAR(10), DO_DateLivr, 111) AS DO_DateLivr"),
+            'DO_Expedit'
+        ])
+        ->orderByDesc("DO_Date")
+        ->where('DO_Domaine', 0)
+        ->where('DO_Statut', 1);
+
+
+        if (!empty($request->status)) {
+            return response()->json($request->status);
+            $query->whereHas('document.status', function ($query) use ($request) {
+                $query->where('id', $request->status);
+            });
+        }
+
+
+        if ($request->has('type')) {
+            $query->where('DO_Type', $request->type);
         } else {
             $query->where('DO_Type', 2);
         }
@@ -189,7 +199,7 @@ class DocenteteController extends Controller
 
     public function validation(Request $request)
     {
-        $query = Docentete::with('document')
+        $query = Docentete::with('document.status')
             ->select([
                 'DO_Reliquat',
                 'DO_Piece',
@@ -210,7 +220,7 @@ class DocenteteController extends Controller
 
 
         if ($request->has('status')) {
-            $query->where('DO_Type', $request->status);
+            $query->where('DO_Type', $request->type);
         } else {
             $query->where('DO_Type', 2);
         }
@@ -246,7 +256,7 @@ class DocenteteController extends Controller
             'status_id' => 11,
             'validated_by' => auth()->id()
         ]);
-        
+
         return response()->json(["message" => "Le document est validé avec succès"]);
     }
 
@@ -417,7 +427,7 @@ class DocenteteController extends Controller
             // Update status
             if ($lines->isNotEmpty()) {
                 $lines[0]->document->update([
-                    'status_id' => 2
+                    'status_id' => $status == 7 ? 7 : 2
                 ]);
             }
 
@@ -638,7 +648,7 @@ class DocenteteController extends Controller
 
 
         if ($request->has('status')) {
-            $query->where('DO_Type', $request->status);
+            $query->where('DO_Type', $request->type);
         } else {
             $query->where('DO_Type', 2);
         }
