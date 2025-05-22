@@ -82,6 +82,8 @@ class SellController extends Controller
 
 
 
+    private $queryRec = "SELECT * FROM F_DOCLIGNE WHERE DO_Piece = @theDopiece;";
+
     public function recData(string $oldReference, string $newReference, string $scte, string $fournisseur)
     {
         $results = DB::select($this->queryRec, [

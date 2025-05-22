@@ -35,7 +35,7 @@ class DocenteteController extends Controller
             return $line;
         });
 
-        $query = Docentete::query()
+        $query = Docentete::with('document.status')
             ->select([
                 'DO_Reliquat',
                 'DO_Piece',
@@ -50,8 +50,6 @@ class DocenteteController extends Controller
             ->orderByDesc("DO_Date")
             ->where('DO_Domaine', 0)
             ->where('DO_Statut', 1);
-
-
         if ($request->has('status')) {
             $query->where('DO_Type', $request->status);
         } else {
@@ -90,7 +88,7 @@ class DocenteteController extends Controller
             $line = Line::find($line);
 
             $line->update([
-                'completed' => true,
+                'status' => 11, // validated
                 'role_id' => $line->next_role_id || null,
                 'status_id' => $line->next_role_id ? 7 : ($user->hasRole("fabrication") ? 4 : 6) // 4 For Fabrication & 6 for Montage
             ]);
@@ -154,7 +152,7 @@ class DocenteteController extends Controller
     public function commercial(Request $request)
     {
         // dd($user_roles);
-        $query = Docentete::with('document')
+        $query = Docentete::with('document.status')
             ->select([
                 'DO_Reliquat',
                 'DO_Piece',
@@ -168,8 +166,6 @@ class DocenteteController extends Controller
             ->orderByDesc("DO_Date")
             ->where('DO_Domaine', 0)
             ->where('DO_Statut', 1);
-
-
         if ($request->has('status')) {
             $query->where('DO_Type', $request->status);
         } else {
@@ -205,7 +201,7 @@ class DocenteteController extends Controller
                 'DO_Expedit'
             ])
             ->whereHas('document', function ($query) {
-                $query->where('completed', 1);
+                $query->where('status_id', 8);
             })
             ->orderByDesc("DO_Date")
             ->where('DO_Domaine', 0)
@@ -234,29 +230,24 @@ class DocenteteController extends Controller
     }
 
 
-    public function validate(Request $request, $piece){
-        $validator = Validator::make($request->all(), [
-            'lines' => "required|array"
-        ]);
-
-        if($validator->fails()){
-            return response()->json(["errors" => $validator->errors()], 500);
+    public function validate(Request $request, $piece)
+    {
+        if (!$request->user()->hasRole('preparation')) {
+            return response()->json(["error" => "L'utilisateur n'est pas autorisé"], 401);
         }
 
         $document = Document::where('piece', $piece)->first();
 
-        if(!$document){
-            return response()->json(["error" => "Document is not definded"], 404);
+        if (!$document) {
+            return response()->json(["error" => "Le document n'existe pas"], 404);
         }
 
-        foreach($request->lines as $line){
-            $line = Line::find($line);
-            $line->update([
-                'validated' => true
-            ]);
-        }
-
-        return response()->json(["message" => "Lines are verifide"]);
+        $document->update([
+            'status_id' => 11,
+            'validated_by' => auth()->id()
+        ]);
+        
+        return response()->json(["message" => "Le document est validé avec succès"]);
     }
 
 
@@ -306,24 +297,26 @@ class DocenteteController extends Controller
 
     public function show($id)
     {
-        $docentete = Docentete::with('document')->select(
-            "DO_Piece",
-            "DO_Ref",
-            "DO_Tiers",
-            "DO_Expedit",
-            "cbMarq",
-            "Type",
-            "DO_Reliquat",
-            DB::raw("CONVERT(VARCHAR(10), DO_Date, 111) AS DO_Date"),
-            DB::raw("CONVERT(VARCHAR(10), DO_DateLivr, 111) AS DO_DateLivr")
-        )
+        $docentete = Docentete::with('document.status')
+            ->select(
+                "DO_Piece",
+                "DO_Ref",
+                "DO_Tiers",
+                "DO_Expedit",
+                "cbMarq",
+                "Type",
+                "DO_Reliquat",
+                DB::raw("CONVERT(VARCHAR(10), DO_Date, 111) AS DO_Date"),
+                DB::raw("CONVERT(VARCHAR(10), DO_DateLivr, 111) AS DO_DateLivr")
+            )
             ->where('DO_Piece', $id)
             ->firstOrFail();
 
         $docligne = Docligne::with(['article' => function ($query) {
             $query->select("Nom", 'Hauteur', 'Largeur', 'Profonduer', 'Longueur', 'Couleur',  'Chant', 'Episseur', 'Description', 'AR_Ref');
-        }, 'line' => function ($query) { $query->with('palettes')->select('id', 'company_id', 'docligne_id', 'role_id', 'completed', 'complation_date', 'validated','status_id');
-        }, 'stock' => function($query){
+        }, 'line' => function ($query) {
+            $query->with(['palettes', 'status'])->select('id', 'company_id', 'docligne_id', 'role_id', 'complation_date', 'validated', 'status_id');
+        }, 'stock' => function ($query) {
             $query->select('code', 'qte_inter', 'qte_serie');
         }])
             ->select("DO_Piece", "AR_Ref", 'DL_Design', 'DL_Qte', "Nom", "Hauteur", "Largeur", "Profondeur", "Langeur", "Couleur", "Chant", "Episseur", "cbMarq")
@@ -421,6 +414,13 @@ class DocenteteController extends Controller
         try {
             $lines = Line::whereIn("id", $request->lines)->get();
 
+            // Update status
+            if ($lines->isNotEmpty()) {
+                $lines[0]->document->update([
+                    'status_id' => 2
+                ]);
+            }
+
             foreach ($lines as $line) {
                 $line->update([
                     'role_id' => intval($request->transfer),
@@ -471,7 +471,7 @@ class DocenteteController extends Controller
                     'ref' => $docentete->DO_Ref,
                     'client_id' => $docentete->DO_Tiers,
                     'expedition' => $docentete->DO_Expedit,
-                    'completed' => false,
+                    'validated_by' => null,
                 ]
             );
 

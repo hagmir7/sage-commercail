@@ -21,7 +21,8 @@ Document
  - DO_Tiers
  - DO_Expedition
  - transfer_by
- - completed
+ - validate_by
+ - controlled_by
 
 
 Line

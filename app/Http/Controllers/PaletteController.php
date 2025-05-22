@@ -205,7 +205,7 @@ class PaletteController extends Controller
     public function confirm(Request $request)
     {
         $validator = Validator::make($request->all(), [
-            'quantity' => 'required|int|max:1000|min:1',
+            'quantity' => 'required|integer|max:1000|min:1',
             'line' => 'required|exists:lines,id',
             'palette' => 'required|exists:palettes,code'
         ]);
@@ -217,16 +217,15 @@ class PaletteController extends Controller
         $line = Line::find($request->line);
         $palette = Palette::where("code", $request->palette)->first();
 
-        // Ensure relationships are loaded
         $line->load(['palettes', 'document']);
 
-        $line_qte =  $line->quantity;
+        $line_qte = $line->quantity;
         $totalQte = $line->palettes->sum(function ($palette) {
             return $palette->pivot->quantity;
         });
 
         if (intval($line_qte) < ($totalQte + intval($request->quantity))) {
-            return response()->json(['message' => "Quantity is not valid"], 500);
+            return response()->json(['message' => "Quantity is not valid"], 422);
         }
 
         if ($line->document_id !== $palette->document_id) {
@@ -237,17 +236,30 @@ class PaletteController extends Controller
         $line->update(['status_id' => 8]);
         $palette->load(['lines.article_stock']);
 
-        // Confirm validation
         if ($this->validation($line->document->piece)) {
             $line->document->update([
-                'completed' => true,
+                'status_id' => 8
+            ]);
+        } elseif ($line->document->status_id != 7) {
+            $line->document->update([
+                'status_id' => 7
             ]);
         }
 
-        
-
         return response()->json($palette);
     }
+
+    public function documentPalettes($piece){
+        $document = Document::with(['status', 'palettes' => function($query){
+            $query->with('user')->withCount("lines");
+        }])->where('piece', $piece)->first();
+        if (!$document) {
+            return response()->json(['message' => 'No documents found.'], 404);
+        }
+        return response()->json($document);
+    }
+
+
 
 
 
@@ -278,8 +290,6 @@ class PaletteController extends Controller
         $palette = Palette::with(['position', 'company'])->findOrFail($id);
         return response()->json(['data' => $palette]);
     }
-
-
 
 
     public function update(Request $request, $id)
@@ -331,16 +341,15 @@ class PaletteController extends Controller
 
         $line->palettes()->detach($palette->id);
 
-        // Update document status if preparation completed
+        // Update document status if preparation validated_by
+        $line->update([
+            'status_id' => 7
+        ]);
         $line->document->update([
-            'completed' => false
+            'status_id' => 7,
         ]);
 
         $palette->load(['lines.article_stock']);
-
-
-
-
         return response()->json($palette);
     }
 }

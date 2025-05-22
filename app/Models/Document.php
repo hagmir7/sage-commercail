@@ -3,11 +3,12 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class Document extends Model
 {
 
-    protected $fillable = ['docentete_id', 'piece', 'type', 'ref', 'expedition', 'transfer_by', 'completed', 'client_id', 'status_id'];
+    protected $fillable = ['docentete_id', 'piece', 'type', 'ref', 'expedition', 'transfer_by', 'controlled_by', 'validated_by', 'client_id', 'status_id'];
 
     // protected $dateFormat = 'Y-d-m H:i:s.v';
 
@@ -32,5 +33,10 @@ class Document extends Model
 
     public function palettes(){
         return $this->hasMany(Palette::class);
+    }
+
+    public function status(): BelongsTo
+    {
+        return $this->belongsTo(Status::class, 'status_id', 'id');
     }
 }

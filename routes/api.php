@@ -1,8 +1,8 @@
 <?php
 
-use App\Http\Controllers\API\ArticleFamilyController;
-use App\Http\Controllers\API\CompanyController;
-use App\Http\Controllers\API\PositionController;
+// use App\Http\Controllers\ArticleFamilyController;
+// use App\Http\Controllers\CompanyController;
+// use App\Http\Controllers\PositionController;
 use App\Http\Controllers\ArticleController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\ClientController;
@@ -39,7 +39,7 @@ Route::get('/users', function (Request $request) {
 });
 
 Route::get("progress/{piece}", [DocenteteController::class, 'progress']);
-
+Route::get('palettes/document/{piece}', [PaletteController::class, 'documentPalettes']);
 
 Route::middleware('auth:sanctum')->group(function () {
     Route::post('/logout', [AuthController::class, 'logout']);
@@ -72,9 +72,14 @@ Route::middleware('auth:sanctum')->group(function () {
 
 
     Route::post("docentetes/start", [DocenteteController::class, 'start']);
-    Route::post('palettes/validate/{piece}', [DocenteteController::class, 'validate']);
+
     Route::post("docentetes/complation", [DocenteteController::class, 'complation']);
+    
     Route::get("docentetes/reset/{piece}", [DocenteteController::class, 'reset']);
+
+    Route::post('palettes/validate/{piece}', [DocenteteController::class, 'validate']);
+   
+  
     Route::post('palettes/generate', [PaletteController::class, 'generate']);
     Route::post('palettes/scan', [PaletteController::class, 'scan']);
     Route::post('palettes/confirm', [PaletteController::class, 'confirm']);
@@ -98,19 +103,19 @@ Route::post('/user/update/{id}', [UserController::class, 'update']);
 // Pallets
 Route::prefix('v1')->group(function () {
     // Companies
-    Route::apiResource('companies', CompanyController::class);
+    // Route::apiResource('companies', CompanyController::class);
 
     // Depots
     Route::apiResource('depots', DepotController::class);
 
     // Positions
-    Route::apiResource('positions', PositionController::class);
+    // Route::apiResource('positions', PositionController::class);
 
     // Palettes
     Route::apiResource('palettes', PaletteController::class);
 
     // Article Families
-    Route::apiResource('article-families', ArticleFamilyController::class);
+    // Route::apiResource('article-families', ArticleFamilyController::class);
 
     // Articles
     Route::apiResource('articles', ArticleController::class);
