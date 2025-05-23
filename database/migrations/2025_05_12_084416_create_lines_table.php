@@ -5,6 +5,7 @@ use App\Models\Docligne;
 use App\Models\Document;
 use App\Models\Palette;
 use App\Models\Role;
+use App\Models\Status;
 use App\Models\User;
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
@@ -35,6 +36,7 @@ return new class extends Migration
             $table->foreignIdFor(Role::class)->nullable();
             $table->foreignIdFor(Role::class, 'next_role_id')->nullable();
             $table->foreignIdFor(User::class, 'received')->nullable();
+            $table->foreignIdFor(Status::class)->default(1);
             $table->timestamps();
         });
     }

@@ -18,6 +18,7 @@ return new class extends Migration
             $table->foreignIdFor(Line::class);
             $table->foreignIdFor(Palette::class);
             $table->integer('quantity');
+            $table->dateTime('controlled_at')->nullable();
             $table->timestamps();
         });
     }

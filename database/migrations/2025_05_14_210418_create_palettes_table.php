@@ -23,8 +23,10 @@ return new class extends Migration
             $table->enum('type', ["Livraison", 'Stock'])->nullable();
             $table->foreignIdFor(Document::class)->nullable();
             $table->foreignIdFor(User::class);
+             $table->boolean('controlled')->default(false);
             $table->timestamps();
             $table->unique(['code', 'company_id']);
+
         });
     }
 

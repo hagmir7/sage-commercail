@@ -6,7 +6,7 @@ use Illuminate\Database\Eloquent\Model;
 
 class Palette extends Model
 {
-    protected $fillable = ['code', 'company_id', 'position_id', 'document_id', 'type', 'user_id'];
+    protected $fillable = ['code', 'company_id', 'position_id', 'document_id', 'type', 'user_id', 'controlled'];
 
     // public $timestamps = false;
 
@@ -25,14 +25,14 @@ class Palette extends Model
         return $this->hasMany(Article::class);
     }
 
-    public function documen(){
+    public function document(){
         return $this->belongsTo(Document::class);
     }
 
 
     public function lines()
     {
-        return $this->belongsToMany(Line::class, 'line_palettes')->withPivot('quantity');
+        return $this->belongsToMany(Line::class, 'line_palettes')->withPivot(['quantity', 'controlled_at']);
     }
 
     public function user(){

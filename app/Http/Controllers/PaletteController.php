@@ -285,11 +285,54 @@ class PaletteController extends Controller
      * @param  int  $id
      * @return \Illuminate\Http\Response
      */
-    public function show($id)
+    public function show($code)
     {
-        $palette = Palette::with(['position', 'company'])->findOrFail($id);
-        return response()->json(['data' => $palette]);
+        $palette = Palette::with(['lines.article_stock', 'document', 'user'])->where('code', $code)->first();
+        if (!$palette) {
+            return response()->json(['error' => "Palette not found"], 404);
+        }
+
+        $allConfirmed = !$palette->lines()->wherePivotNull('controlled_at')->exists();
+
+        if ($allConfirmed) {
+            $palette->update(['controlled' => true]);
+        }
+
+        return response()->json($palette);
     }
+    
+
+    public function controller($code, $lineId)
+    {
+        return DB::transaction(function () use ($code, $lineId) {
+            $palette = Palette::with('document.palettes.lines')->where('code', $code)->firstOrFail();
+            $palette->lines()->updateExistingPivot(intval($lineId), ['controlled_at' => now()]);
+
+            $allConfirmed = !$palette->lines()->wherePivotNull('controlled_at')->exists();
+
+            if ($allConfirmed) {
+                $palette->update(['controlled' => true]);
+            }
+
+
+            $palettes = $palette->document->palettes;
+
+            $controlled = $palettes->every(function ($docPalette) {
+                return !$docPalette->lines()->wherePivotNull('controlled_at')->exists();
+            });
+
+            if ($controlled) {
+                $palette->document->update([
+                    'status_id' => 10,
+                    'controlled_by' => auth()->id()
+                ]);
+            }
+
+            return response()->json(['message' => "Article confirmed successfully"]);
+        });
+    }
+
+
 
 
     public function update(Request $request, $id)

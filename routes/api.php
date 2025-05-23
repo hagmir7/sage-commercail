@@ -8,6 +8,7 @@ use App\Http\Controllers\AuthController;
 use App\Http\Controllers\ClientController;
 use App\Http\Controllers\DepotController;
 use App\Http\Controllers\DocenteteController;
+use App\Http\Controllers\DocumentController;
 use App\Http\Controllers\PaletteController;
 use App\Http\Controllers\PermissionController;
 use App\Http\Controllers\RoleController;
@@ -31,6 +32,7 @@ Route::get('/user', function (Request $request) {
 Route::get("client/{client}", [ClientController::class, 'show']);
 Route::get("article/{article}", [ArticleController::class, 'show']);
 
+Route::get('document/{piece}', [DocumentController::class, 'checkControlled']);
 
 
 
@@ -74,23 +76,24 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post("docentetes/start", [DocenteteController::class, 'start']);
 
     Route::post("docentetes/complation", [DocenteteController::class, 'complation']);
-    
+    // http://localhost:8000/api/palettes/PB00000020 
     Route::get("docentetes/reset/{piece}", [DocenteteController::class, 'reset']);
 
     Route::post('palettes/validate/{piece}', [DocenteteController::class, 'validate']);
-   
-  
     Route::post('palettes/generate', [PaletteController::class, 'generate']);
     Route::post('palettes/scan', [PaletteController::class, 'scan']);
     Route::post('palettes/confirm', [PaletteController::class, 'confirm']);
     Route::post('palettes/detach', [PaletteController::class, 'detach']);
     Route::post('palettes/create', [PaletteController::class, 'create']);
+    Route::get('palettes/{code}', [PaletteController::class, 'show']);
+    Route::get('palettes/{code}/line/{lineId}', [PaletteController::class, 'controller']);
 
 
 
     // Test
     // Route::get("docentete/validation/{id}", [DocenteteController::class, 'validation']);
 });
+
 
 Route::post('/login', [AuthController::class, 'login']);
 

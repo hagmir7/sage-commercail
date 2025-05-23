@@ -58,7 +58,7 @@ class Line extends Model
 
 
     public function palettes(){
-        return $this->belongsToMany(Palette::class, 'line_palettes')->withPivot('quantity');
+        return $this->belongsToMany(Palette::class, 'line_palettes')->withPivot(['quantity', 'controlled_at']);
     }
 
     public function status(){
