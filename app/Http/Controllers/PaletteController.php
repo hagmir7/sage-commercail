@@ -179,7 +179,6 @@ class PaletteController extends Controller
         $invalidLines = [];
 
         foreach ($document->lines as $line) {
-            // $line->update(['status_id' => 11 ]);
             $totalPaletteQuantity = $line->palettes->sum(function ($palette) {
                 return $palette->pivot->quantity ?? 0;
             });
@@ -200,6 +199,9 @@ class PaletteController extends Controller
 
         return true;
     }
+
+
+
 
 
     public function confirm(Request $request)

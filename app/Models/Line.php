@@ -20,7 +20,6 @@ class Line extends Model
         'next_role_id',
         'received',
         'complation_date',
-        'completed',
         'validated',
         'status_id'
     ];

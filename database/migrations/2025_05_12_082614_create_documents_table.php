@@ -21,7 +21,6 @@ return new class extends Migration
             $table->string('type');
             $table->string('ref');
             $table->integer('expedition');
-            $table->boolean('completed')->default(false);
             $table->string('client_id', 17);
             $table->foreignIdFor(User::class, 'transfer_by')->constrained('users')->onDelete('cascade');
             $table->foreign('docentete_id')->references('cbMarq')->on('F_DOCENTETE')->onDelete('cascade');
