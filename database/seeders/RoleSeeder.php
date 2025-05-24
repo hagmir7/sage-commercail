@@ -28,7 +28,7 @@ class RoleSeeder extends Seeder
             ["name" => "magasinier", 'guard_name' => "web"],
             ["name" => "commercial", 'guard_name' => "web"],
             ["name" => "expedition", 'guard_name' => "web"],
-            ["name" => "contrôle", 'guard_name' => "web"],
+            ["name" => "controleur", 'guard_name' => "web"],
         ];
 
         foreach ($roles as $roleData) {

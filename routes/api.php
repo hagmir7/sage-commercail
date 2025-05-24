@@ -32,7 +32,12 @@ Route::get('/user', function (Request $request) {
 Route::get("client/{client}", [ClientController::class, 'show']);
 Route::get("article/{article}", [ArticleController::class, 'show']);
 
-Route::get('document/{piece}', [DocumentController::class, 'checkControlled']);
+Route::prefix('documents')->controller(DocumentController::class)->group(function () {
+    Route::get('/', 'list');
+    Route::get('/{piece}', 'checkControlled');
+    Route::get('/progress/{piece}', 'progress');
+});
+
 
 
 
@@ -76,7 +81,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post("docentetes/start", [DocenteteController::class, 'start']);
 
     Route::post("docentetes/complation", [DocenteteController::class, 'complation']);
-    // http://localhost:8000/api/palettes/PB00000020 
+    // http://localhost:8000/api/palettes/PB00000020
     Route::get("docentetes/reset/{piece}", [DocenteteController::class, 'reset']);
 
     Route::post('palettes/validate/{piece}', [DocenteteController::class, 'validate']);

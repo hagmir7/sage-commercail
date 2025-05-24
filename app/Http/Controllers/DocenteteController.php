@@ -51,6 +51,16 @@ class DocenteteController extends Controller
             ->orderByDesc("DO_Date")
             ->where('DO_Domaine', 0)
             ->where('DO_Statut', 1);
+
+        // $user = auth()->user();
+
+        // if ($user->hasRole('preparation_cuisine') || $user->hasRole('preparation_trailer')) {
+        //     $query->whereHas('document', function ($doc) {
+        //         $doc->where('status_id', 7);
+        //     });
+        // }
+
+
         if ($request->has('status')) {
             $query->where('DO_Type', $request->type);
         } else {
@@ -224,7 +234,7 @@ class DocenteteController extends Controller
                 'DO_Expedit'
             ])
             ->whereHas('document', function ($query) {
-                $query->where('status_id', 8);
+                $query->whereIn('status_id', [8, 9, 10]);
             })
             ->orderByDesc("DO_Date")
             ->where('DO_Domaine', 0)
@@ -362,10 +372,13 @@ public function show($id)
 
     // Apply role-based filtering more efficiently
     if (in_array('preparateur', $userRoles)) {
+
         $docligneQuery->whereHas('line', function ($query) use ($userCompanyId) {
             $query->where('company_id', $userCompanyId);
         });
+
     } elseif (array_intersect(['fabrication', 'montage', 'preparation_cuisine', 'preparation_trailer', 'magasinier'], $userRoles)) {
+
         $docligneQuery->whereHas('line', function ($query) use ($userCompanyId, $userRoleIds) {
             $query->where('company_id', $userCompanyId)
                   ->whereIn('role_id', $userRoleIds);
@@ -418,10 +431,6 @@ public function show($id)
 
         return response()->json(['message' => "Réinitialisé avec succès"], 200);
     }
-
-
-
-
 
 
 

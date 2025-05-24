@@ -1,7 +1,6 @@
 <?php
 
 namespace App\Http\Controllers;
-use Illuminate\Support\Facades\DB;
 
 
 use Illuminate\Http\Request;
@@ -46,6 +45,25 @@ class SellController extends Controller
             ->where('DO_Piece', $p));
 
             }
+
+
+    private function genererPiece(): string
+    {
+        $currentYear = date('y');
+        $result = DB::selectOne("
+                    SELECT MAX(CAST(SUBSTRING(DO_Piece, 6, LEN(DO_Piece) - 5) AS INT)) AS max_ref
+                    FROM F_DOCENTETE WHERE DO_Type = 13;
+                ");
+
+        if ($result && $result->max_ref !== null) {
+            $maxReference = (int)$result->max_ref + 1;
+            $nouvelleReference = sprintf("%sBLX%06d", $currentYear, $maxReference);
+            return $nouvelleReference;
+        } else {
+            return $currentYear . 'BLX000001';
+        }
+    }
+
 
 
     public function createDoc(string $doPieceGen, string $doPiece, string $fournisseur, string $scte)

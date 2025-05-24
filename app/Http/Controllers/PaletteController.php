@@ -155,7 +155,7 @@ class PaletteController extends Controller
                 return $palette->pivot->quantity;
             });
 
-           
+
             // return response()->json(['message' => $totalQte]);
 
             return response()->json($line);
@@ -239,12 +239,20 @@ class PaletteController extends Controller
         $palette->load(['lines.article_stock']);
 
         if ($this->validation($line->document->piece)) {
-            $line->document->update([
-                'status_id' => 8
+            $document =  $line->document;
+            $document->update([
+                'status_id' => 8 ,// Etat Préparé
             ]);
+
+            foreach($document->lines as $line){
+                $line->update([
+                    'role_id' => null,
+                ]);
+            }
+
         } elseif ($line->document->status_id != 7) {
             $line->document->update([
-                'status_id' => 7
+                'status_id' => 7 // Etat Preparaion
             ]);
         }
 
@@ -260,8 +268,6 @@ class PaletteController extends Controller
         }
         return response()->json($document);
     }
-
-
 
 
 
@@ -302,7 +308,7 @@ class PaletteController extends Controller
 
         return response()->json($palette);
     }
-    
+
 
     public function controller($code, $lineId)
     {
@@ -319,17 +325,21 @@ class PaletteController extends Controller
 
             $palettes = $palette->document->palettes;
 
-            $controlled = $palettes->every(function ($docPalette) {
+            $allControlled = $palettes->every(function ($docPalette) {
                 return !$docPalette->lines()->wherePivotNull('controlled_at')->exists();
             });
 
-            if ($controlled) {
+            if ($allControlled) {
                 $palette->document->update([
                     'status_id' => 10,
                     'controlled_by' => auth()->id()
                 ]);
+                foreach($palette->document->lines as $line){
+                    $line->update([
+                        'status_id' => 10,
+                    ]);
+                }
             }
-
             return response()->json(['message' => "Article confirmed successfully"]);
         });
     }
