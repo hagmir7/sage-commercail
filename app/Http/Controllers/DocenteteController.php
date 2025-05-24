@@ -52,14 +52,6 @@ class DocenteteController extends Controller
             ->where('DO_Domaine', 0)
             ->where('DO_Statut', 1);
 
-        // $user = auth()->user();
-
-        // if ($user->hasRole('preparation_cuisine') || $user->hasRole('preparation_trailer')) {
-        //     $query->whereHas('document', function ($doc) {
-        //         $doc->where('status_id', 7);
-        //     });
-        // }
-
 
         if ($request->has('status')) {
             $query->where('DO_Type', $request->type);
@@ -83,6 +75,8 @@ class DocenteteController extends Controller
     }
 
 
+
+    // Complation Fabriation & Montage
     public function complation(Request $request)
     {
         $validator = Validator::make($request->all(), [
@@ -99,23 +93,21 @@ class DocenteteController extends Controller
             $line = Line::find($line);
 
             $line->update([
-                'status' => 11, // validated
-                'role_id' => $line->next_role_id || null,
-                'status_id' => $line->next_role_id ? 7 : ($user->hasRole("fabrication") ? 4 : 6) // 4 For Fabrication & 6 for Montage
+                'role_id' => $line->next_role_id ? $line->next_role_id : null,
+                'next_role_id' => null,
+                // 4 End of Fabrication & 6 for Montage
+                'status_id' => $line->next_role_id ? 7 : ($user->hasRole("fabrication") ? 4 : 6)
             ]);
 
-            if ($user->hasRole('fabrication')) {
-                $action = Action::where("line_id", $line->id)->where('action_type_id', 4); // Action for fabrication
-            } elseif ($user->hasRole('montage')) {
-                $action = Action::where("line_id", $line->id)->where('action_type_id', 5); // Action for fabrication
-            }
-
-            try {
-                $action->update(['end' => now()]);
-            } catch (\Throwable $th) {
-                //throw $th;
-            }
+            $line->update([
+                'next_role_id' => null,
+            ]);
         }
+
+        $line = Line::find($request->lines[0]);
+        $line->document->update([
+            'status_id' => 7
+        ]);
 
         return response()->json($request->all(), 200);
     }
@@ -367,11 +359,12 @@ public function show($id)
             $query->select('code', 'qte_inter', 'qte_serie');
         }
     ])
+
     ->select("DO_Piece", "AR_Ref", 'DL_Design', 'DL_Qte', "Nom", "Hauteur", "Largeur", "Profondeur", "Langeur", "Couleur", "Chant", "Episseur", "cbMarq")
     ->where('DO_Piece', $id);
 
     // Apply role-based filtering more efficiently
-    if (in_array('preparateur', $userRoles)) {
+    if (in_array('preparation', $userRoles)) {
 
         $docligneQuery->whereHas('line', function ($query) use ($userCompanyId) {
             $query->where('company_id', $userCompanyId);
@@ -439,9 +432,15 @@ public function show($id)
     {
         DB::beginTransaction();
 
+        $request_roles = explode(',', $request->roles);
 
-        $role = Role::find($request->transfer);
-
+        if(count($request_roles) == 1){
+            $role = Role::find($request_roles[0]);
+            $next_role = false;
+        }else{
+            $role = Role::find($request_roles[0]);
+            $next_role = $request_roles[1];
+        }
 
         if ($role->name  == 'fabrication') {
             $status = 3;
@@ -465,8 +464,9 @@ public function show($id)
 
             foreach ($lines as $line) {
                 $line->update([
-                    'role_id' => intval($request->transfer),
-                    'status_id' => $status
+                    'role_id' => intval($request->roles),
+                    'status_id' => $status,
+                    'next_role_id' => $next_role
                 ]);
             }
 
@@ -563,7 +563,7 @@ public function show($id)
                         'design' => $currentDocligne->DL_Design,
                         'quantity' => $currentDocligne->DL_Qte,
                         'dimensions' => $currentDocligne->item,
-                        'company_id' => $request->transfer,
+                        'company_id' => $request->company,
                         'document_id' => $document->id,
 
                     ]);
@@ -587,11 +587,9 @@ public function show($id)
     public function transfer(Request $request)
     {
         $user = auth()->user();
-
-
         if ($user->hasRole("commercial")) {
             $validator = Validator::make($request->all(), [
-                'transfer' => 'required|integer|exists:companies,id',
+                'company' => 'required|integer|exists:companies,id',
                 'lines' => 'required|array'
             ]);
 
@@ -602,7 +600,7 @@ public function show($id)
             $this->transferCompany($request);
         } else {
             $validator = Validator::make($request->all(), [
-                'transfer' => 'required|integer|exists:roles,id',
+                'roles' => 'required',
                 'lines' => 'required|array'
             ]);
 
