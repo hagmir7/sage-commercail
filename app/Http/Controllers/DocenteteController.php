@@ -561,6 +561,7 @@ public function show($id)
                     ], [
                         'docligne_id' => $currentDocligne->cbMarq,
                         'tiers' => $currentDocligne->CT_Num,
+                        'name' => $currentDocligne?->Nom,
                         'ref' => $currentDocligne->AR_Ref,
                         'design' => $currentDocligne->DL_Design,
                         'quantity' => $currentDocligne->DL_Qte,
