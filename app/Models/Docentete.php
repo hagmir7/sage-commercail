@@ -15,8 +15,9 @@ class Docentete extends Model
 
     protected $dateFormat = 'Y-d-m H:i:s.v';
 
-    const CREATED_AT = 'cbCreation';
-    const UPDATED_AT = 'cbModification';
+    // const CREATED_AT = 'cbCreation';
+    // const UPDATED_AT = 'cbModification';
+    public $timestamps = false;
 
     protected $guarded = [];
 
@@ -41,5 +42,5 @@ class Docentete extends Model
         return $this->hasOne(Document::class, 'docentete_id', 'cbMarq');
     }
 
- 
+
 }

@@ -12,6 +12,7 @@ use App\Http\Controllers\DocumentController;
 use App\Http\Controllers\PaletteController;
 use App\Http\Controllers\PermissionController;
 use App\Http\Controllers\RoleController;
+use App\Http\Controllers\SellController;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\UserPermissionController;
 use App\Models\Docentete;
@@ -39,6 +40,7 @@ Route::prefix('documents')->controller(DocumentController::class)->group(functio
 });
 
 
+Route::get("calculator/{piece}", [SellController::class, 'calculator']);
 
 
 Route::get('/users', function (Request $request) {
@@ -72,6 +74,7 @@ Route::middleware('auth:sanctum')->group(function () {
 
     Route::get("docentete/validation", [DocenteteController::class, 'validation']);
     Route::post("docentete/transfer", [DocenteteController::class, 'transfer']);
+    Route::get("docentete/shipping", [DocenteteController::class, 'shipping']);
     Route::get("docentetes/commercial", [DocenteteController::class, 'commercial']);
     Route::get("docentetes/preparation", [DocenteteController::class, 'preparation']);
     Route::get("docentetes/fabrication", [DocenteteController::class, 'fabrication']);
