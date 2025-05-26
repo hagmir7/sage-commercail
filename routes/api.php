@@ -42,6 +42,8 @@ Route::prefix('documents')->controller(DocumentController::class)->group(functio
 
 Route::get("calculator/{piece}", [SellController::class, 'calculator']);
 
+Route::get("preparation/{piece}/{companyId}", [PaletteController::class, 'validationCompany']);
+
 
 Route::get('/users', function (Request $request) {
     return User::all();

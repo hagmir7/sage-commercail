@@ -39,3 +39,64 @@ JOIN sys.columns c ON c.object_id = t.object_id
 WHERE p.database_id = DB_ID() -- uniquement la base en cours
     AND p.last_user_update IS NOT NULL
 ORDER BY p.last_user_update DESC;
+
+
+
+
+--- 
+
+
+BACKUP DATABASE SAGE100GPAO 
+TO DISK = 'C:\Dev\SAGE100GPAO_backup.bak' 
+WITH COMPRESSION, STATS = 10;
+
+
+--- Restore backup
+
+USE master;
+ALTER DATABASE STILEMOBILI SET SINGLE_USER WITH ROLLBACK IMMEDIATE;
+
+RESTORE DATABASE STILEMOBILI
+FROM DISK = 'C:\STILEMOBILI_backup_2025_05_08_133425_6685767.bak'
+WITH REPLACE;
+
+ALTER DATABASE STILEMOBILI SET MULTI_USER;
+
+--- inital SAGE
+sp_change_users_login 'update_one', 'user_cbase', 'APPL_CBASE';
+
+
+
+
+
+
+----- Remove sql server logs
+USE SAGE100GPAO;
+DBCC SHRINKFILE (N'Sage100GP_Log', 1024); -- Shrink to 1GB
+
+
+
+
+USE SAGE100GPAO;
+DBCC SHRINKFILE (N'Sage100GP_Log', 10240); -- Shrink to 10GB first
+
+
+
+DBCC OPENTRAN(SAGE100GPAO);
+
+
+SELECT name, size/128.0 AS CurrentSizeMB, 
+    growth/128.0 AS GrowthIncrementMB,
+    is_percent_growth
+FROM sys.database_files
+WHERE name = 'Sage100GP_Log';
+
+
+
+ALTER DATABASE SAGE100GPAO 
+MODIFY FILE (NAME = 'Sage100GP_Log', FILEGROWTH = 256MB);
+
+
+---- Add Primary key
+ALTER TABLE [SAGE100GPAO].[dbo].[T_EVT_MACHINE_EC]
+ADD id INT IDENTITY(1,1);

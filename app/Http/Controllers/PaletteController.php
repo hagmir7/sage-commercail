@@ -12,6 +12,8 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
 
+use function Pest\Laravel\json;
+
 class PaletteController extends Controller
 {
     /**
@@ -78,8 +80,8 @@ class PaletteController extends Controller
             return response()->json(['error' => 'Document not found.'], 404);
         }
 
-        if ($document->palettes()->exists()) {
-            $query = $document->palettes()->with('lines.article_stock');
+        if ($document->palettes()->where('company_id', auth()->user()->company_id)->exists()) {
+            $query = $document->palettes()->with('lines.article_stock')->where('company_id', auth()->user()->company_id);
 
             if (!empty($request->palette)) {
                 $palette = $query->where('code', $request->palette)->first();
@@ -97,7 +99,9 @@ class PaletteController extends Controller
             $palette->load('lines.article_stock');
         }
 
-        $allPalettes = $document->palettes()->with('lines.article_stock')->get();
+
+        $allPalettes = $document->palettes()->with('lines.article_stock')
+            ->where('company_id', auth()->user()->company_id)->get();
 
         return response()->json([
             "palette" => $palette,
@@ -120,6 +124,7 @@ class PaletteController extends Controller
 
 
         $document =  Document::where('piece', $request->document_id)->first();
+
         if (!$document) {
             return response()->json(['errors' => ['document_id' => "Document is not exits"]]);
         }
@@ -150,14 +155,6 @@ class PaletteController extends Controller
 
         try {
             $line = Line::with('docligne')->find($request->line);
-            // Calculate total qte from the pivot for this line
-            $totalQte = $line->palettes->sum(function ($palette) {
-                return $palette->pivot->quantity;
-            });
-
-
-            // return response()->json(['message' => $totalQte]);
-
             return response()->json($line);
         } catch (\Exception $e) {
             return response()->json([
@@ -167,42 +164,7 @@ class PaletteController extends Controller
         }
     }
 
-
-  public function validation($piece)
-    {
-        $document = Document::where('piece', $piece)->with('lines.palettes')->first();
-
-        if (!$document) {
-            return response()->json(['status' => false, 'message' => 'Document not found'], 404);
-        }
-
-        $invalidLines = [];
-
-        foreach ($document->lines as $line) {
-            $totalPaletteQuantity = $line->palettes->sum(function ($palette) {
-                return $palette->pivot->quantity ?? 0;
-            });
-
-            // Compare with required_quantity
-            if ($totalPaletteQuantity < $line->quantity) {
-                $invalidLines[] = [
-                    'line_id' => $line->id,
-                    'quantity' => $line->quantity,
-                    'total_palette_quantity' => $totalPaletteQuantity
-                ];
-            }
-        }
-
-        if (count($invalidLines)) {
-            return false;
-        }
-
-        return true;
-    }
-
-
-
-
+  
 
     public function confirm(Request $request)
     {
@@ -216,44 +178,59 @@ class PaletteController extends Controller
             return response()->json(['errors' => $validator->errors()], 422);
         }
 
+
         $line = Line::find($request->line);
         $palette = Palette::where("code", $request->palette)->first();
 
         $line->load(['palettes', 'document']);
 
         $line_qte = $line->quantity;
+
         $totalQte = $line->palettes->sum(function ($palette) {
             return $palette->pivot->quantity;
         });
 
+        // Check if th euser inter the correct quantity
         if (intval($line_qte) < ($totalQte + intval($request->quantity))) {
             return response()->json(['message' => "Quantity is not valid"], 422);
         }
 
+        // Check if the scand line is for current Document
         if ($line->document_id !== $palette->document_id) {
             return response()->json(['errors' => ["document" => "The document does not match"]], 404);
         }
 
+        // Ensert Line to a palette
         $line->palettes()->attach($palette->id, ['quantity' => $request->quantity]);
+
+        // Update The line status
         $line->update(['status_id' => 8]);
         $palette->load(['lines.article_stock']);
 
-        if ($this->validation($line->document->piece)) {
-            $document =  $line->document;
+        if ($line->document->validation()) {
+            // If the document is valid
+            $document = $line->document;
             $document->update([
-                'status_id' => 8 ,// Etat Préparé
+                'status_id' => 8, // Etat Préparé
             ]);
 
-            foreach($document->lines as $line){
+            // Reset role_id for each line
+            foreach ($document->lines as $line) {
                 $line->update([
                     'role_id' => null,
                 ]);
             }
-
         } elseif ($line->document->status_id != 7) {
+            // If the document is not valid and status is not already 7
             $line->document->update([
-                'status_id' => 7 // Etat Preparaion
+                'status_id' => 7, 
             ]);
+        }
+
+        $document = $line->document;
+
+        if ($document->validationCompany(auth()->user()->company_id)) {
+            $document->companies()->attach(auth()->user()->company_id, ['status_id' => 8, 'updated_at' => now()]);
         }
 
         return response()->json($palette);

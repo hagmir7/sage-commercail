@@ -107,6 +107,7 @@ class DocenteteController extends Controller
         }
 
         $line = Line::find($request->lines[0]);
+
         $line->document->update([
             'status_id' => 7
         ]);
@@ -214,9 +215,11 @@ class DocenteteController extends Controller
     }
 
 
+
+    // Validation and Controller List
     public function validation(Request $request)
     {
-        $query = Docentete::with('document.status')
+       $query = Docentete::with('document.status')
             ->select([
                 'DO_Reliquat',
                 'DO_Piece',
@@ -227,8 +230,8 @@ class DocenteteController extends Controller
                 \DB::raw("CONVERT(VARCHAR(10), DO_DateLivr, 111) AS DO_DateLivr"),
                 'DO_Expedit'
             ])
-            ->whereHas('document', function ($query) {
-                $query->whereIn('status_id', [8, 9, 10]);
+            ->whereHas('document.lines', function ($query) {
+                $query->whereIn('status_id', [8, 9, 10])->where("company_id", auth()->user()->company_id);
             })
             ->orderByDesc("DO_Date")
             ->where('DO_Domaine', 0)
@@ -257,6 +260,7 @@ class DocenteteController extends Controller
     }
 
 
+    // Validate the Document
     public function validate(Request $request, $piece)
     {
         if (!$request->user()->hasRole('preparation')) {
@@ -264,7 +268,7 @@ class DocenteteController extends Controller
         }
 
         $document = Document::where('piece', $piece)->first();
-
+        
         if (!$document) {
             return response()->json(["error" => "Le document n'existe pas"], 404);
         }
@@ -326,68 +330,68 @@ class DocenteteController extends Controller
 
 
 
-public function show($id)
-{
-    // Cache user info to avoid repeated queries
-    $user = auth()->user();
-    $userCompanyId = $user->company_id;
-    $userRoles = $user->roles()->pluck('name')->toArray();
-    $userRoleIds = $user->roles()->pluck('id')->toArray();
+    public function show($id)
+    {
+        // Cache user info to avoid repeated queries
+        $user = auth()->user();
+        $userCompanyId = $user->company_id;
+        $userRoles = $user->roles()->pluck('name')->toArray();
+        $userRoleIds = $user->roles()->pluck('id')->toArray();
 
-    // Optimize the main query with eager loading
-    $docentete = Docentete::with(['document.status'])
-        ->select(
-            "DO_Piece",
-            "DO_Ref",
-            "DO_Tiers",
-            "DO_Expedit",
-            "cbMarq",
-            "Type",
-            "DO_Reliquat",
-            DB::raw("CONVERT(VARCHAR(10), DO_Date, 111) AS DO_Date"),
-            DB::raw("CONVERT(VARCHAR(10), DO_DateLivr, 111) AS DO_DateLivr")
-        )
-        ->where('DO_Piece', $id)
-        ->firstOrFail();
+        // Optimize the main query with eager loading
+        $docentete = Docentete::with(['document.status'])
+            ->select(
+                "DO_Piece",
+                "DO_Ref",
+                "DO_Tiers",
+                "DO_Expedit",
+                "cbMarq",
+                "Type",
+                "DO_Reliquat",
+                DB::raw("CONVERT(VARCHAR(10), DO_Date, 111) AS DO_Date"),
+                DB::raw("CONVERT(VARCHAR(10), DO_DateLivr, 111) AS DO_DateLivr")
+            )
+            ->where('DO_Piece', $id)
+            ->firstOrFail();
 
-    // Build the docligne query with optimized eager loading
-    $docligneQuery = Docligne::with([
-        'article' => function ($query) {
-            $query->select("AR_Ref", "Nom", 'Hauteur', 'Largeur', 'Profonduer', 'Longueur', 'Couleur', 'Chant', 'Episseur', 'Description');
-        },
-        'line.palettes',
-        'line.status',
-        'stock' => function ($query) {
-            $query->select('code', 'qte_inter', 'qte_serie');
+        // Build the docligne query with optimized eager loading
+        $docligneQuery = Docligne::with([
+            'article' => function ($query) {
+                $query->select("AR_Ref", "Nom", 'Hauteur', 'Largeur', 'Profonduer', 'Longueur', 'Couleur', 'Chant', 'Episseur', 'Description');
+            },
+            'line.palettes',
+            'line.status',
+            'stock' => function ($query) {
+                $query->select('code', 'qte_inter', 'qte_serie');
+            }
+        ])
+
+        ->select("DO_Piece", "AR_Ref", 'DL_Design', 'DL_Qte', "Nom", "Hauteur", "Largeur", "Profondeur", "Langeur", "Couleur", "Chant", "Episseur", "cbMarq")
+        ->where('DO_Piece', $id);
+
+        // Apply role-based filtering more efficiently
+        if (in_array('preparation', $userRoles)) {
+
+            $docligneQuery->whereHas('line', function ($query) use ($userCompanyId) {
+                $query->where('company_id', $userCompanyId);
+            });
+
+        } elseif (array_intersect(['fabrication', 'montage', 'preparation_cuisine', 'preparation_trailer', 'magasinier'], $userRoles)) {
+
+            $docligneQuery->whereHas('line', function ($query) use ($userCompanyId, $userRoleIds) {
+                $query->where('company_id', $userCompanyId)
+                    ->whereIn('role_id', $userRoleIds);
+            });
         }
-    ])
 
-    ->select("DO_Piece", "AR_Ref", 'DL_Design', 'DL_Qte', "Nom", "Hauteur", "Largeur", "Profondeur", "Langeur", "Couleur", "Chant", "Episseur", "cbMarq")
-    ->where('DO_Piece', $id);
+        // Execute with chunk processing for large datasets
+        $doclignes = $docligneQuery->get();
 
-    // Apply role-based filtering more efficiently
-    if (in_array('preparation', $userRoles)) {
-
-        $docligneQuery->whereHas('line', function ($query) use ($userCompanyId) {
-            $query->where('company_id', $userCompanyId);
-        });
-
-    } elseif (array_intersect(['fabrication', 'montage', 'preparation_cuisine', 'preparation_trailer', 'magasinier'], $userRoles)) {
-
-        $docligneQuery->whereHas('line', function ($query) use ($userCompanyId, $userRoleIds) {
-            $query->where('company_id', $userCompanyId)
-                  ->whereIn('role_id', $userRoleIds);
-        });
+        return response()->json([
+            'docentete' => $docentete,
+            'doclignes' => $doclignes
+        ], 200);
     }
-
-    // Execute with chunk processing for large datasets
-    $doclignes = $docligneQuery->get();
-
-    return response()->json([
-        'docentete' => $docentete,
-        'doclignes' => $doclignes
-    ], 200);
-}
 
 
     public function showTest($id)
@@ -445,13 +449,13 @@ public function show($id)
         }
 
         if ($role->name  == 'fabrication') {
-            $status = 3;
+            $status = 3; // Fabrication
         } elseif ($role->name  == 'montage') {
-            $status = 5;
+            $status = 5; // Montage
         } elseif ($role->name  == 'magasinier') {
             $status = 7; // Preparation
         } elseif ($role->name  == "preparation_cuisine" || $role->name == "preparation_trailer") {
-            $status = 7;
+            $status = 7; // Preparation
         }
 
         try {
@@ -459,7 +463,8 @@ public function show($id)
 
             // Update status
             if ($lines->isNotEmpty()) {
-                $lines[0]->document->update([
+                $document = $lines[0]->document;
+                $document->update([
                     'status_id' => $status == 7 ? 7 : 2
                 ]);
             }

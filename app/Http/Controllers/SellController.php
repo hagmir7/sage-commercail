@@ -12,8 +12,6 @@ use Illuminate\Http\Request;
 class SellController extends Controller
 {
 
-
-
     function generateHeure()
     {
         $now = now();
@@ -50,40 +48,44 @@ class SellController extends Controller
 
     public function calculator($piece){
 
-        $document = Docentete::where('DO_Piece', $piece)
+        $docentete = Docentete::where('DO_Piece', $piece)
             ->select('DO_Domaine', 'DO_Type', 'DO_Piece', 'DO_Ref', 'DO_Tiers', 'DO_TotalHTNet', 'DO_NetAPayer')
-            ->get();
+            ->first();
 
 
-        $lines = Docligne::where('DO_Piece', $piece)
+        $doclignes = Docligne::where('DO_Piece', $piece)
+            ->whereHas("line", function($line){
+                $line->where('company_id', 1);
+            })
             ->select('DO_Domaine', 'DO_Type', 'CT_Num', 'DO_Piece', 'DO_Ref', 'DL_Design', 'DL_MontantHT', 'DL_MontantTTC', 'DL_PrixUnitaire', 'DL_Taxe1')
             ->get();
 
-        $totalTTC = $lines->sum('DL_MontantTTC');
-        $totalHT = $lines->sum('DL_MontantHT');
+        $totalTTC = $doclignes->sum('DL_MontantTTC');
+        $totalHT = $doclignes->sum('DL_MontantHT');
 
 
 
-        $result = $this->createDocumentFromTemplate(
-            $this->generatePiece(),
-            "REF Test",
-            'FR001',
-            $this->generateHeure(),
-            $totalHT,
-            $totalTTC,
-            $piece
-        );
+        // $result = $this->createDocumentFromTemplate(
+        //     $this->generatePiece(),
+        //     "REF Test",
+        //     'FR001',
+        //     $this->generateHeure(),
+        //     $totalHT,
+        //     $totalTTC,
+        //     $piece
+        // );
 
-        return response()->json($result);
+        // return response()->json($result);
 
 
         return response()->json([
-            'document' => $document,
+            'docentete' => $docentete,
             'totalHT' => $totalHT,
             'totalTTC' => $totalTTC,
             'houre' => $this->generateHeure(),
+            'ref' => $docentete->DO_Piece,
             'last_document' => $this->generatePiece(),
-            'lines' => $lines,
+            'doclignes' => $doclignes,
         ]);
     }
 
