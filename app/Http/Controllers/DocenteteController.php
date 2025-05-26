@@ -27,18 +27,17 @@ class DocenteteController extends Controller
 
         $documents = Document::whereHas("lines", function ($query) use ($user_roles) {
             $line = $query->where("company_id", auth()->user()->company_id)
-                ->whereIn('status_id', [1, 2, 3, 4, 5, 6, 7]);
+                ->whereIn('status_id', [1, 2, 3, 4, 5, 6, 7, 8, 9]);
 
             $common = array_intersect($user_roles->toArray(), ['fabrication', 'montage', 'preparation_cuisine', 'preparation_trailer', 'magasinier']);
             if (!empty($common)) {
                 $line = $query->whereIn("role_id", $user_roles->keys());
-
             }
 
             return $line;
         });
 
-        $query = Docentete::with('document.status')
+        $query = Docentete::with(['document.status', 'document.companies'])
             ->select([
                 'DO_Reliquat',
                 'DO_Piece',
@@ -268,21 +267,34 @@ class DocenteteController extends Controller
         }
 
         $document = Document::where('piece', $piece)->first();
-        
+
         if (!$document) {
             return response()->json(["error" => "Le document n'existe pas"], 404);
         }
 
-        $document->update([
-            'status_id' => 11,
-            'validated_by' => auth()->id()
-        ]);
+        DB::transaction(function () use ($document) {
+            foreach ($document->lines->where('company_id', auth()->user()->company_id) as $line) {
+                $line->update(['status_id' => 11]);
+            }
 
-        foreach($document->lines as $line){
-            $line->update(['status_id' => 11]);
-        }
+            $allLinesValidated = $document->lines
+                ->every(fn($line) => $line->status_id == 11);
 
-        return response()->json(["message" => "Le document est validé avec succès"]);
+            if ($allLinesValidated) {
+                $document->update([
+                    'status_id' => 11,
+                    'validated_by' => auth()->id()
+                ]);
+            }
+
+            $document->companies()->updateExistingPivot(auth()->user()->company_id, [
+                'status_id' => 11,
+                'validated_by' => auth()->id(),
+                'validated_at' => now()
+            ]);
+
+            return response()->json(["message" => "Le document est validé avec succès"]);
+        });
     }
 
 

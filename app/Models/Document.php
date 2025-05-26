@@ -45,7 +45,7 @@ class Document extends Model
 
     public function companies()
     {
-        return $this->belongsToMany(Company::class, 'document_companies');
+        return $this->belongsToMany(Company::class, 'document_companies')->withPivot(['status_id']);
     }
 
 
