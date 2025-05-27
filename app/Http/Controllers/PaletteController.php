@@ -165,6 +165,8 @@ class PaletteController extends Controller
 
 
 
+
+
     public function confirm(Request $request)
     {
         $validator = Validator::make($request->all(), [
@@ -177,62 +179,76 @@ class PaletteController extends Controller
             return response()->json(['errors' => $validator->errors()], 422);
         }
 
-
         $line = Line::find($request->line);
         $document = $line->document;
-
         $palette = Palette::where("code", $request->palette)->first();
 
         $line->load(['palettes', 'document']);
 
-        $totalQte = $line->palettes->sum(function ($palette) {
-            return $palette->pivot->quantity;
-        });
+        try {
+            DB::transaction(function () use ($document, $request, $line, $palette) {
+                $totalQte = $line->palettes->sum(function ($palette) {
+                    return $palette->pivot->quantity;
+                });
 
-        // Check if th user insert the correct quantity
-        if (intval($line->quantity) < ($totalQte + intval($request->quantity))) {
-            return response()->json(['message' => "Quantity is not valid"], 422);
+                if (intval($line->quantity) < ($totalQte + intval($request->quantity))) {
+                    throw new \Exception("Quantity is not valid", 422);
+                }
+
+                if ($line->document_id !== $palette->document_id) {
+                    throw new \Exception("The document does not match", 404);
+                }
+
+                $line->palettes()->attach($palette->id, ['quantity' => $request->quantity]);
+
+                $line->update(['status_id' => 8]);
+
+                $palette->load(['lines.article_stock']);
+
+                // Check if all line with status_id 8 (Prepare)
+                if ($document->validation()) {
+                    $document->update(['status_id' => 8]);
+
+                    foreach ($document->lines as $lineItem) {
+                        $lineItem->update(['role_id' => null]);
+                    }
+                    // 
+                } elseif ($document->status_id != 7) {
+                    $document->update(['status_id' => 7]);
+                }
+
+                if ($document->validationCompany(auth()->user()->company_id)) {
+                    
+                   $companyId = auth()->user()->company_id;
+
+                    $alreadyAttached = $document->companies()->where('companies.id', $companyId)->exists();
+
+                    if (!$alreadyAttached) {
+
+                        $document->companies()->attach($companyId, [
+                            'status_id' => 8,
+                            'updated_at' => now()
+                        ]);
+
+                        $lines = $document->lines->where("company_id", $companyId);
+
+                        foreach ($lines as $lineItem) {
+                            $lineItem->update(['role_id' => null]);
+                        }
+                    }
+
+                }
+            });
+
+            return response()->json($palette);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'message' => $e->getMessage()
+            ], $e->getCode() ?: 500);
         }
-
-        // Check if the current line is for current Document
-        if ($line->document_id !== $palette->document_id) {
-            return response()->json(['errors' => ["document" => "The document does not match"]], 404);
-        }
-
-        // Ensert Line to a palette
-        $line->palettes()->attach($palette->id, ['quantity' => $request->quantity]);
-
-        // Update The line status
-        $line->update(['status_id' => 8]);
-        $palette->load(['lines.article_stock']);
-
-        if ($document->validation()) {
-            // If the document is valid
-            $document->update([
-                'status_id' => 8, // Etat Préparé
-            ]);
-
-            // Reset role_id for each line
-            foreach ($document->lines as $line) {
-                $line->update([
-                    'role_id' => null,
-                ]);
-            }
-        } elseif ($document->status_id != 7) {
-            // If the document is not valid and status is not already 7
-            $document->update([
-                'status_id' => 7,
-            ]);
-        }
-
-
-        // Change status for documen company status
-        if ($document->validationCompany(auth()->user()->company_id)) {
-            $document->companies()->attach(auth()->user()->company_id, ['status_id' => 8, 'updated_at' => now()]);
-        }
-
-        return response()->json($palette);
     }
+
 
     public function documentPalettes($piece)
     {
@@ -301,9 +317,6 @@ class PaletteController extends Controller
 
             $palette->load('lines'); // Refresh relationship after update
 
-            $allControlled = $palette->lines->every(function ($line) {
-                return $line->pivot->controlled_at !== null;
-            });
 
             $user_company = auth()->user()->company_id;
 
@@ -314,9 +327,11 @@ class PaletteController extends Controller
                 });
 
             if ($allControlledCompany) {
+                
                 $palette->document->companies()->updateExistingPivot($user_company, [
                     'status_id' => 10,
-                    'controlled_by' => auth()->id()
+                    'controlled_by' => auth()->id(),
+                    'controlled_at' => now()
                 ]);
 
                 foreach ($palette->document->lines->where('company_id', $user_company) as $line) {
@@ -324,6 +339,7 @@ class PaletteController extends Controller
                         'status_id' => 10,
                     ]);
                 }
+
             } else {
                 $palette->document->companies()->updateExistingPivot($user_company, [
                     'status_id' => 9,
@@ -331,12 +347,7 @@ class PaletteController extends Controller
                 ]);
             }
 
-            if ($allControlled) {
-                $palette->document->update([
-                    'status_id' => 10,
-                    'controlled_by' => auth()->id()
-                ]);
-            }
+
 
             return response()->json(['message' => "Article confirmed successfully"]);
         });
@@ -399,9 +410,14 @@ class PaletteController extends Controller
         $line->update([
             'status_id' => 7
         ]);
-        $line->document->update([
-            'status_id' => 7,
-        ]);
+
+
+        if (!$line->document->status_id) {
+            $line->document->update([
+                'status_id' => 7,
+            ]);
+        }
+
 
         $palette->load(['lines.article_stock']);
         return response()->json($palette);

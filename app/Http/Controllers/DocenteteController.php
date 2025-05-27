@@ -33,7 +33,6 @@ class DocenteteController extends Controller
             if (!empty($common)) {
                 $line = $query->whereIn("role_id", $user_roles->keys());
             }
-
             return $line;
         });
 
@@ -218,7 +217,7 @@ class DocenteteController extends Controller
     // Validation and Controller List
     public function validation(Request $request)
     {
-       $query = Docentete::with('document.status')
+       $query = Docentete::with(['document.status', 'document.companies'])
             ->select([
                 'DO_Reliquat',
                 'DO_Piece',
@@ -351,7 +350,7 @@ class DocenteteController extends Controller
         $userRoleIds = $user->roles()->pluck('id')->toArray();
 
         // Optimize the main query with eager loading
-        $docentete = Docentete::with(['document.status'])
+        $docentete = Docentete::with(['document.status', 'document.companies'])
             ->select(
                 "DO_Piece",
                 "DO_Ref",
