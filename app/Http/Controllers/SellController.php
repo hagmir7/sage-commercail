@@ -21,18 +21,15 @@ class SellController extends Controller
 
 
 
-    public function generatePiece(){
-
+    public function generatePiece()
+    {
         $last_piece = Docentete::select('DO_Piece')
             ->where('DO_Type', '13')
             ->where('DO_Piece', 'LIKE', '%BLX%')
             ->orderByDesc('DO_Piece')
             ->first()
             ?->DO_Piece ?? '25BLX000000';
-
-
         preg_match('/^([A-Z0-9]+)(\d{6})$/i', $last_piece, $matches);
-
         if (count($matches) === 3) {
             $prefix = $matches[1];
             $number = (int)$matches[2];
@@ -41,7 +38,6 @@ class SellController extends Controller
         } else {
             $new_piece = '25BLX000001';
         }
-
         return $new_piece;
     }
 
@@ -49,20 +45,14 @@ class SellController extends Controller
     private function dl_no_generate(): int
     {
         $result = 0;
-
         $maxNo = DB::table('F_DOCLIGNE')->max('DL_No');
-
         if (!is_null($maxNo)) {
             $result = (int)$maxNo + 1;
         } else {
-            $result = 1; // Start from 1 if the table is empty
+            $result = 1;
         }
-
         return $result;
     }
-
-
-
 
 
     public function calculator($piece)
@@ -71,7 +61,6 @@ class SellController extends Controller
         $docentete = Docentete::where('DO_Piece', $piece)
             ->select('DO_Domaine', 'DO_Type', 'DO_Piece', 'DO_Ref', 'DO_Tiers', 'DO_TotalHTNet', 'DO_NetAPayer')
             ->first();
-
 
         // Fetch document lines
         $doclignes = Docligne::where('DO_Piece', $piece)
@@ -100,52 +89,74 @@ class SellController extends Controller
 
         // Generate new piece
         $new_piece = $this->generatePiece();
-        $dl_no = $this->dl_no_generate();
         $ct_num = 'FR00' . auth()->user()->company_id;
 
         // Create document header
-
-        // $new_docentete = $this->createDocumentFromTemplate(
-        //     $new_piece,
-        //     $piece,
-        //     $ct_num,
-        //     $this->generateHeure(),
-        //     $totalHT,
-        //     $totalTTC,
-        //     $piece
-        // );
-
+        $this->createDocumentFromTemplate(
+            $new_piece,
+            $piece,
+            $ct_num,
+            $this->generateHeure(),
+            $totalHT,
+            $totalTTC,
+            $piece
+        );
 
         // Create document lines
         $result = [];
-        foreach ($doclignes as $index => $line) {
+        foreach ($doclignes as $line) {
             $do_date = now();
             $do_ref = $new_piece;
+            $dl_no = $this->dl_no_generate(); // Generate unique $dl_no for each line
 
-            // $created_line = $this->createDocumentLineFromTemplate(
-            //     $ct_num,
-            //     $do_date,
-            //     $new_piece,
-            //     $do_ref,
-            //     $ct_num,
-            //     $dl_no,
-            //     $new_piece,
-            //     $line->AR_Ref,
-            //     $line->DL_Ligne
-            // );
+            $this->createDocumentLineFromTemplate(
+                $ct_num,
+                $new_piece,
+                $do_date,
+                $do_ref,
+                $ct_num,
+                $dl_no,
+                $line->AR_Ref,
+                intval($line->DL_Ligne),
+                $piece
+            );
 
             $result[] = [
                 "ct_num" => $ct_num,
-                'd_date' => $do_date,
                 'new_piece' => $new_piece,
+                'd_date' => $do_date,
                 'do_ref' => $do_ref,
                 'ref_fournisseur' => $ct_num,
                 'dl_no' => $dl_no,
-                'doPiece' => $new_piece,
                 'AR_Ref' => $line->AR_Ref,
-                'DL_Ligne' => $line->DL_Ligne,
-                'created_line' => $created_line
+                'DL_Ligne' => intval($line->DL_Ligne),
             ];
+        }
+
+        try {
+            DB::beginTransaction();
+
+            // Disable triggers before the insert
+            DB::connection('sqlsrv')->unprepared("
+                SET NOCOUNT ON;
+                SET XACT_ABORT ON;
+                DISABLE TRIGGER ALL ON F_DOCENTETE;
+            ");
+
+            // Insert the document
+
+
+            // Commit the transaction
+            DB::commit();
+        } catch (\Exception $e) {
+            // Rollback the transaction if any error occurs
+            DB::rollBack();
+
+            // Re-throw the exception after rollback
+            throw $e;
+        } finally {
+            // Ensure triggers are always re-enabled
+
         }
 
         return response()->json([
@@ -354,7 +365,17 @@ class SellController extends Controller
             ";
 
             $result = DB::insert($query, [
-                $doPiece, $doRef ,$doTiers ,$doTiers ,$doTiers ,$doHeure ,$mtEntrer ,$mtEntrerTTC ,$mtEntrerTTC ,$mtEntrerTTC ,$sourcePiece
+                $doPiece,
+                $doRef,
+                $doTiers,
+                $doTiers,
+                $doTiers,
+                $doHeure,
+                $mtEntrer,
+                $mtEntrerTTC,
+                $mtEntrerTTC,
+                $mtEntrerTTC,
+                $sourcePiece
             ]);
 
             return $result;
@@ -398,46 +419,67 @@ class SellController extends Controller
 
     public function createDocumentLineFromTemplate(
         string $ctNum,
+        string $doPiece,
         string $doDate,
-        string $maVariable,
         string $doRef,
         string $afRefFourniss,
         int $DO_NO,
-        string $doPiece,
         string $refArticle,
-        int $ligne
+        int $ligne,
+        string $piece
     ) {
+        // Define constants for clarity
+        $DO_DOMAINE_SALES = 1;
+        $DO_TYPE_CUSTOM = 13;
+        $TAXE_STANDARD = 20;
+
         try {
-            // Get source document line data
-            $sourceDocLine = Docligne::where('DO_Domaine', 0)
-                ->where('DO_Type', 2)
-                ->where('DO_Piece', $doPiece)
-                ->where('AR_Ref', $refArticle)
-                ->where('DL_Ligne', $ligne)
-                ->first();
+            // Retrieve source document line
+            $sourceDocLine = Docligne::where([
+                ['DO_Domaine', '=', 0],
+                ['DO_Type', '=', 2],
+                ['DO_Piece', '=', $piece],
+                ['AR_Ref', '=', $refArticle],
+                ['DL_Ligne', '=', $ligne],
+            ])->first();
 
             if (!$sourceDocLine) {
-                throw new \Exception("Source document line not found");
+                throw new \Exception("Source document line not found.");
             }
 
             // Calculate prices with discount and margin
-            $basePrice = $sourceDocLine->DL_PrixUnitaire;
-            $discount = $sourceDocLine->DL_Remise01REM_Valeur / 100;
-            $calculatedPrice = round($basePrice * (1 - round($discount, 2)) * 0.92, 2);
+            $basePrice = (float) $sourceDocLine->DL_PrixUnitaire;
+            $discountRate = (float) ($sourceDocLine->DL_Remise01REM_Valeur ?? 0) / 100;
+            $priceAfterDiscount = $basePrice * (1 - $discountRate);
+            $calculatedPrice = round($priceAfterDiscount * 0.92, 2);
             $calculatedPriceTTC = round($calculatedPrice * 1.2, 2);
+            $quantity = (float) $sourceDocLine->DL_QteBL;
 
-            // Prepare data for insertion
-            return DB::transaction(function () use ($ctNum, $doDate, $maVariable, $doRef, $afRefFourniss, $DO_NO, $sourceDocLine, $calculatedPrice, $calculatedPriceTTC) {
+            return DB::transaction(function () use (
+                $ctNum,
+                $doPiece,
+                $doDate,
+                $doRef,
+                $afRefFourniss,
+                $DO_NO,
+                $sourceDocLine,
+                $calculatedPrice,
+                $calculatedPriceTTC,
+                $DO_DOMAINE_SALES,
+                $DO_TYPE_CUSTOM,
+                $TAXE_STANDARD,
+                $quantity
+            ) {
                 $insertData = [
-                    'DO_Domaine' => 1,
-                    'DO_Type' => 13,
+                    'DO_Domaine' => $DO_DOMAINE_SALES,
+                    'DO_Type' => $DO_TYPE_CUSTOM,
                     'CT_Num' => $ctNum,
-                    'DO_Piece' => $doDate,
+                    'DO_Piece' => $doPiece,
                     'DL_PieceBC' => '',
                     'DL_PieceBL' => '',
-                    'DO_Date' => $maVariable,
-                    'DL_DateBC' => $maVariable,
-                    'DL_DateBL' => $maVariable,
+                    'DO_Date' => $doDate,
+                    'DL_DateBC' => $doDate,
+                    'DL_DateBL' => $doDate,
                     'DL_Ligne' => $sourceDocLine->DL_Ligne,
                     'DO_Ref' => $doRef,
                     'DL_TNomencl' => 0,
@@ -445,9 +487,9 @@ class SellController extends Controller
                     'DL_TRemExep' => 0,
                     'AR_Ref' => $sourceDocLine->AR_Ref,
                     'DL_Design' => $sourceDocLine->DL_Design,
-                    'DL_Qte' => $sourceDocLine->DL_QteBL,
-                    'DL_QteBC' => $sourceDocLine->DL_QteBL,
-                    'DL_QteBL' => $sourceDocLine->DL_QteBL,
+                    'DL_Qte' => $quantity,
+                    'DL_QteBC' => $quantity,
+                    'DL_QteBL' => $quantity,
                     'DL_PoidsNet' => 0,
                     'DL_PoidsBrut' => 0,
                     'DL_Remise01REM_Valeur' => 0,
@@ -458,10 +500,10 @@ class SellController extends Controller
                     'DL_Remise03REM_Type' => 0,
                     'DL_PrixUnitaire' => $calculatedPrice,
                     'DL_PUBC' => 0,
-                    'DL_QteDE' => $sourceDocLine->DL_QteBL,
-                    'EU_Qte' => $sourceDocLine->DL_QteBL,
-                    'EU_Enumere' => $sourceDocLine->EU_Enumere,
-                    'DL_Taxe1' => 20,
+                    'DL_QteDE' => $quantity,
+                    'EU_Qte' => $quantity,
+                    'EU_Enumere' => $sourceDocLine->EU_Enumere ?? '',
+                    'DL_Taxe1' => $TAXE_STANDARD,
                     'DL_TypeTaux1' => 0,
                     'DL_Taxe2' => 0,
                     'DL_TypeTaux2' => 0,
@@ -488,8 +530,8 @@ class SellController extends Controller
                     'DL_Valorise' => 1,
                     'DL_NonLivre' => 0,
                     'AC_RefClient' => '',
-                    'DL_MontantHT' => $sourceDocLine->DL_QteBL * $calculatedPrice,
-                    'DL_MontantTTC' => $sourceDocLine->DL_QteBL * $calculatedPriceTTC,
+                    'DL_MontantHT' => round($quantity * $calculatedPrice, 2),
+                    'DL_MontantTTC' => round($quantity * $calculatedPriceTTC, 2),
                     'DL_FactPoids' => 0,
                     'DL_No' => $DO_NO,
                     'DL_TypeTaxe1' => 0,
@@ -505,25 +547,36 @@ class SellController extends Controller
                     'PF_Num' => '',
                     'DL_PieceOFProd' => 0,
                     'DL_PieceDE' => '',
-                    'DL_DateDE' => $maVariable,
+                    'DL_DateDE' => $doDate,
                     'DL_Operation' => '',
                     'DL_NoSousTotal' => 0,
                     'CA_No' => 0,
-                    'DO_DocType' => 13,
+                    'DO_DocType' => $DO_TYPE_CUSTOM,
                     'DL_CodeTaxe1' => 'D20',
-                    'cbCreationUser' => '69C8CD64-D06F-4097-9CAC-E488AC2610F9'
+                    'cbCreationUser' => '69C8CD64-D06F-4097-9CAC-E488AC2610F9',
                 ];
 
-                // Create new document line record
+                DB::connection('sqlsrv')->unprepared("
+                    SET NOCOUNT ON;
+                    SET XACT_ABORT ON;
+                    DISABLE TRIGGER ALL ON F_DOCLIGNE;
+                ");
+
                 $newDocLine = Docligne::create($insertData);
+
+                DB::connection('sqlsrv')->unprepared("
+                    ENABLE TRIGGER ALL ON F_DOCLIGNE;
+                ");
+
                 return $newDocLine->id ?? true;
             });
-
         } catch (\Exception $e) {
             \Log::error('Error creating document line from template: ' . $e->getMessage());
             return false;
         }
     }
+
+
 
 
     /**
@@ -587,122 +640,9 @@ class SellController extends Controller
             ]);
 
             return $result;
-
         } catch (\Exception $e) {
             \Log::error('Error executing raw document line creation query: ' . $e->getMessage());
             return false;
         }
     }
-
-    /**
-     * Batch create multiple document lines from template
-     *
-     * @param array $lines Array of line parameters
-     * @return array Results array with success/failure for each line
-     */
-    public function createMultipleDocumentLines(array $lines): array
-    {
-        $results = [];
-
-        foreach ($lines as $index => $line) {
-            try {
-                $result = $this->createDocumentLineFromTemplate(
-                    $line['ct_num'],
-                    $line['do_date'],
-                    $line['ma_variable'],
-                    $line['do_ref'],
-                    $line['af_ref_fourniss'],
-                    $line['dl_no'],
-                    $line['do_piece'],
-                    $line['ref_article'],
-                    $line['ligne']
-                );
-
-                $results[$index] = [
-                    'success' => (bool)$result,
-                    'id' => $result,
-                    'line_data' => $line
-                ];
-
-            } catch (\Exception $e) {
-                $results[$index] = [
-                    'success' => false,
-                    'error' => $e->getMessage(),
-                    'line_data' => $line
-                ];
-            }
-        }
-
-        return $results;
-    }
-
-
-
-    public function storeDoclign(Request $request)
-    {
-
-        $result = $this->createDocumentLineFromTemplate(
-            $request->ct_num,
-            $request->do_date,
-            $request->ma_variable,
-            $request->do_ref,
-            $request->af_ref_fourniss,
-            $request->dl_no,
-            $request->do_piece,
-            $request->ref_article,
-            $request->ligne
-        );
-
-        if ($result) {
-            return response()->json([
-                'success' => true,
-                'message' => 'Document line created successfully',
-                'id' => $result
-            ], 201);
-        }
-
-        return response()->json([
-            'success' => false,
-            'message' => 'Failed to create document line'
-        ], 500);
-    }
-
-    /**
-     * Controller method to hanligne multiple lines HTTP request
-     *
-     * @param Request $request
-     * @return \Illuminate\Http\JsonResponse
-     */
-    public function storeBatch(Request $request)
-    {
-        $request->validate([
-            'lines' => 'required|array|min:1',
-            'lines.*.ct_num' => 'required|string',
-            'lines.*.do_date' => 'required|string',
-            'lines.*.ma_variable' => 'required|string',
-            'lines.*.do_ref' => 'required|string',
-            'lines.*.af_ref_fourniss' => 'required|string',
-            'lines.*.dl_no' => 'required|integer',
-            'lines.*.do_piece' => 'required|string',
-            'lines.*.ref_article' => 'required|string',
-            'lines.*.ligne' => 'required|integer'
-        ]);
-
-        $results = $this->createMultipleDocumentLines($request->lines);
-
-        $successCount = count(array_filter($results, fn($r) => $r['success']));
-        $totalCount = count($results);
-
-        return response()->json([
-            'success' => $successCount > 0,
-            'message' => "Successfully created {$successCount}/{$totalCount} document lines",
-            'results' => $results,
-            'summary' => [
-                'total' => $totalCount,
-                'success' => $successCount,
-                'failed' => $totalCount - $successCount
-            ]
-        ], $successCount > 0 ? 201 : 500);
-    }
-
 }

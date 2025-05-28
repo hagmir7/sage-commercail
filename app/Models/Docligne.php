@@ -13,7 +13,7 @@ class Docligne extends Model
 
     protected $guarded = [];
 
-    protected $dateFormat = 'Y-d-m H:i:s.v';
+    // protected $dateFormat = 'Y-d-m H:i:s.v';
 
     const CREATED_AT = 'cbCreation';
     const UPDATED_AT = 'cbModification';

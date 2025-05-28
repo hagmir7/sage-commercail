@@ -19,7 +19,7 @@ class Document extends Model
     // Relations
     public function docentete()
     {
-        return $this->belongsTo(Docentete::class, 'docentete_id');
+        return $this->belongsTo(Docentete::class, 'docentete_id', 'cbMarq');
     }
 
     public function lines()

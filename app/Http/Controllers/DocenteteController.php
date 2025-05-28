@@ -13,6 +13,9 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Carbon;
+use App\Http\Controllers\SellController;
+
+
 
 class DocenteteController extends Controller
 {
@@ -251,6 +254,37 @@ class DocenteteController extends Controller
     }
 
 
+
+    public function updateDocStatus($docentete)
+    {
+        DB::connection('sqlsrv')->beginTransaction();
+
+        try {
+            DB::connection('sqlsrv')->unprepared("
+                SET NOCOUNT ON;
+                SET XACT_ABORT ON;
+                DISABLE TRIGGER ALL ON F_DOCENTETE;
+            ");
+
+            $docentete->update(['DO_Statut' => 2]);
+
+            DB::connection('sqlsrv')->unprepared("
+                ENABLE TRIGGER ALL ON F_DOCENTETE;
+            ");
+
+            DB::connection('sqlsrv')->commit();
+
+        } catch (\Exception $e) {
+            DB::connection('sqlsrv')->rollBack();
+            DB::connection('sqlsrv')->unprepared("
+                ENABLE TRIGGER ALL ON F_DOCENTETE;
+            ");
+
+            throw $e; // or handle it as needed
+        }
+    }
+
+
     // Validate the Document
     public function validate(Request $request, $piece)
     {
@@ -277,6 +311,10 @@ class DocenteteController extends Controller
                     'status_id' => 11,
                     'validated_by' => auth()->id()
                 ]);
+
+                // Update Docentete Status
+                $this->updateDocStatus($document?->docentete);
+
             }
 
             $document->companies()->updateExistingPivot(auth()->user()->company_id, [
@@ -284,6 +322,9 @@ class DocenteteController extends Controller
                 'validated_by' => auth()->id(),
                 'validated_at' => now()
             ]);
+
+            $sellController = new SellController();
+            $sellController->calculator($document?->docentete->DO_Piece);
 
             return response()->json(["message" => "Le document est validé avec succès"]);
         });
