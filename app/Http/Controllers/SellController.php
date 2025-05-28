@@ -46,46 +46,116 @@ class SellController extends Controller
     }
 
 
-    public function calculator($piece){
+    private function dl_no_generate(): int
+    {
+        $result = 0;
 
+        $maxNo = DB::table('F_DOCLIGNE')->max('DL_No');
+
+        if (!is_null($maxNo)) {
+            $result = (int)$maxNo + 1;
+        } else {
+            $result = 1; // Start from 1 if the table is empty
+        }
+
+        return $result;
+    }
+
+
+
+
+
+    public function calculator($piece)
+    {
+        // Fetch document header
         $docentete = Docentete::where('DO_Piece', $piece)
             ->select('DO_Domaine', 'DO_Type', 'DO_Piece', 'DO_Ref', 'DO_Tiers', 'DO_TotalHTNet', 'DO_NetAPayer')
             ->first();
 
 
+        // Fetch document lines
         $doclignes = Docligne::where('DO_Piece', $piece)
-            ->whereHas("line", function($line){
-                $line->where('company_id', 1);
+            ->whereHas("line", function ($line) {
+                $line->where('company_id', auth()->user()->company_id);
             })
-            ->select('DO_Domaine', 'DO_Type', 'CT_Num', 'DO_Piece', 'DO_Ref', 'DL_Design', 'DL_MontantHT', 'DL_MontantTTC', 'DL_PrixUnitaire', 'DL_Taxe1')
+            ->select(
+                'DO_Domaine',
+                'DL_Ligne',
+                'AR_Ref',
+                'DO_Type',
+                'CT_Num',
+                'DO_Piece',
+                'DO_Ref',
+                'DL_Design',
+                'DL_MontantHT',
+                'DL_MontantTTC',
+                'DL_PrixUnitaire',
+                'DL_Taxe1'
+            )
             ->get();
 
+        // Calculate totals
         $totalTTC = $doclignes->sum('DL_MontantTTC');
         $totalHT = $doclignes->sum('DL_MontantHT');
 
+        // Generate new piece
+        $new_piece = $this->generatePiece();
+        $dl_no = $this->dl_no_generate();
+        $ct_num = 'FR00' . auth()->user()->company_id;
 
+        // Create document header
 
-        // $result = $this->createDocumentFromTemplate(
-        //     $this->generatePiece(),
-        //     "REF Test",
-        //     'FR001',
+        // $new_docentete = $this->createDocumentFromTemplate(
+        //     $new_piece,
+        //     $piece,
+        //     $ct_num,
         //     $this->generateHeure(),
         //     $totalHT,
         //     $totalTTC,
         //     $piece
         // );
 
-        // return response()->json($result);
 
+        // Create document lines
+        $result = [];
+        foreach ($doclignes as $index => $line) {
+            $do_date = now();
+            $do_ref = $new_piece;
+
+            // $created_line = $this->createDocumentLineFromTemplate(
+            //     $ct_num,
+            //     $do_date,
+            //     $new_piece,
+            //     $do_ref,
+            //     $ct_num,
+            //     $dl_no,
+            //     $new_piece,
+            //     $line->AR_Ref,
+            //     $line->DL_Ligne
+            // );
+
+            $result[] = [
+                "ct_num" => $ct_num,
+                'd_date' => $do_date,
+                'new_piece' => $new_piece,
+                'do_ref' => $do_ref,
+                'ref_fournisseur' => $ct_num,
+                'dl_no' => $dl_no,
+                'doPiece' => $new_piece,
+                'AR_Ref' => $line->AR_Ref,
+                'DL_Ligne' => $line->DL_Ligne,
+                'created_line' => $created_line
+            ];
+        }
 
         return response()->json([
+            'result' => $result,
             'docentete' => $docentete,
             'totalHT' => $totalHT,
             'totalTTC' => $totalTTC,
             'houre' => $this->generateHeure(),
             'ref' => $docentete->DO_Piece,
-            'last_document' => $this->generatePiece(),
-            'doclignes' => $doclignes,
+            'last_document' => $new_piece
         ]);
     }
 
@@ -103,7 +173,7 @@ class SellController extends Controller
         try {
             // Get source document data
             $sourceDocument = Docentete::where('DO_Domaine', 0)
-                ->where('DO_Type', 3)
+                // ->where('DO_Type', 3)
                 ->where('DO_Piece', $sourcePiece)
                 ->first();
 
@@ -357,102 +427,104 @@ class SellController extends Controller
             $calculatedPriceTTC = round($calculatedPrice * 1.2, 2);
 
             // Prepare data for insertion
-            $insertData = [
-                'DO_Domaine' => 1,
-                'DO_Type' => 13,
-                'CT_Num' => $ctNum,
-                'DO_Piece' => $doDate,
-                'DL_PieceBC' => '',
-                'DL_PieceBL' => '',
-                'DO_Date' => $maVariable,
-                'DL_DateBC' => $maVariable,
-                'DL_DateBL' => $maVariable,
-                'DL_Ligne' => $sourceDocLine->DL_Ligne,
-                'DO_Ref' => $doRef,
-                'DL_TNomencl' => 0,
-                'DL_TRemPied' => 0,
-                'DL_TRemExep' => 0,
-                'AR_Ref' => $sourceDocLine->AR_Ref,
-                'DL_Design' => $sourceDocLine->DL_Design,
-                'DL_Qte' => $sourceDocLine->DL_QteBL,
-                'DL_QteBC' => $sourceDocLine->DL_QteBL,
-                'DL_QteBL' => $sourceDocLine->DL_QteBL,
-                'DL_PoidsNet' => 0,
-                'DL_PoidsBrut' => 0,
-                'DL_Remise01REM_Valeur' => 0,
-                'DL_Remise01REM_Type' => 0,
-                'DL_Remise02REM_Valeur' => 0,
-                'DL_Remise02REM_Type' => 0,
-                'DL_Remise03REM_Valeur' => 0,
-                'DL_Remise03REM_Type' => 0,
-                'DL_PrixUnitaire' => $calculatedPrice,
-                'DL_PUBC' => 0,
-                'DL_QteDE' => $sourceDocLine->DL_QteBL,
-                'EU_Qte' => $sourceDocLine->DL_QteBL,
-                'EU_Enumere' => $sourceDocLine->EU_Enumere,
-                'DL_Taxe1' => 20,
-                'DL_TypeTaux1' => 0,
-                'DL_Taxe2' => 0,
-                'DL_TypeTaux2' => 0,
-                'CO_No' => 0,
-                'AG_No1' => 0,
-                'AG_No2' => 0,
-                'DL_PrixRU' => 0,
-                'DL_CMUP' => 0,
-                'DL_MvtStock' => 1,
-                'DT_No' => 0,
-                'AF_RefFourniss' => $afRefFourniss,
-                'DL_TTC' => 0,
-                'DE_No' => 1,
-                'DL_NoRef' => 1,
-                'DL_TypePL' => 0,
-                'DL_PUDevise' => $calculatedPrice,
-                'DL_PUTTC' => $calculatedPriceTTC,
-                'DO_DateLivr' => '1753-01-01 00:00:00',
-                'CA_Num' => '',
-                'DL_Taxe3' => 0,
-                'DL_TypeTaux3' => 0,
-                'DL_TypeTaxe3' => 0,
-                'DL_Frais' => 0,
-                'DL_Valorise' => 1,
-                'DL_NonLivre' => 0,
-                'AC_RefClient' => '',
-                'DL_MontantHT' => $sourceDocLine->DL_QteBL * $calculatedPrice,
-                'DL_MontantTTC' => $sourceDocLine->DL_QteBL * $calculatedPriceTTC,
-                'DL_FactPoids' => 0,
-                'DL_No' => $DO_NO,
-                'DL_TypeTaxe1' => 0,
-                'DL_TypeTaxe2' => 0,
-                'DL_Escompte' => 0,
-                'DL_PiecePL' => '',
-                'DL_DatePL' => '1753-01-01 00:00:00',
-                'DL_QtePL' => 0,
-                'DL_NoColis' => '',
-                'DL_NoLink' => 0,
-                'DL_QteRessource' => 0,
-                'DL_DateAvancement' => '1753-01-01 00:00:00',
-                'PF_Num' => '',
-                'DL_PieceOFProd' => 0,
-                'DL_PieceDE' => '',
-                'DL_DateDE' => $maVariable,
-                'DL_Operation' => '',
-                'DL_NoSousTotal' => 0,
-                'CA_No' => 0,
-                'DO_DocType' => 13,
-                'DL_CodeTaxe1' => 'D20',
-                'cbCreationUser' => '69C8CD64-D06F-4097-9CAC-E488AC2610F9'
-            ];
+            return DB::transaction(function () use ($ctNum, $doDate, $maVariable, $doRef, $afRefFourniss, $DO_NO, $sourceDocLine, $calculatedPrice, $calculatedPriceTTC) {
+                $insertData = [
+                    'DO_Domaine' => 1,
+                    'DO_Type' => 13,
+                    'CT_Num' => $ctNum,
+                    'DO_Piece' => $doDate,
+                    'DL_PieceBC' => '',
+                    'DL_PieceBL' => '',
+                    'DO_Date' => $maVariable,
+                    'DL_DateBC' => $maVariable,
+                    'DL_DateBL' => $maVariable,
+                    'DL_Ligne' => $sourceDocLine->DL_Ligne,
+                    'DO_Ref' => $doRef,
+                    'DL_TNomencl' => 0,
+                    'DL_TRemPied' => 0,
+                    'DL_TRemExep' => 0,
+                    'AR_Ref' => $sourceDocLine->AR_Ref,
+                    'DL_Design' => $sourceDocLine->DL_Design,
+                    'DL_Qte' => $sourceDocLine->DL_QteBL,
+                    'DL_QteBC' => $sourceDocLine->DL_QteBL,
+                    'DL_QteBL' => $sourceDocLine->DL_QteBL,
+                    'DL_PoidsNet' => 0,
+                    'DL_PoidsBrut' => 0,
+                    'DL_Remise01REM_Valeur' => 0,
+                    'DL_Remise01REM_Type' => 0,
+                    'DL_Remise02REM_Valeur' => 0,
+                    'DL_Remise02REM_Type' => 0,
+                    'DL_Remise03REM_Valeur' => 0,
+                    'DL_Remise03REM_Type' => 0,
+                    'DL_PrixUnitaire' => $calculatedPrice,
+                    'DL_PUBC' => 0,
+                    'DL_QteDE' => $sourceDocLine->DL_QteBL,
+                    'EU_Qte' => $sourceDocLine->DL_QteBL,
+                    'EU_Enumere' => $sourceDocLine->EU_Enumere,
+                    'DL_Taxe1' => 20,
+                    'DL_TypeTaux1' => 0,
+                    'DL_Taxe2' => 0,
+                    'DL_TypeTaux2' => 0,
+                    'CO_No' => 0,
+                    'AG_No1' => 0,
+                    'AG_No2' => 0,
+                    'DL_PrixRU' => 0,
+                    'DL_CMUP' => 0,
+                    'DL_MvtStock' => 1,
+                    'DT_No' => 0,
+                    'AF_RefFourniss' => $afRefFourniss,
+                    'DL_TTC' => 0,
+                    'DE_No' => 1,
+                    'DL_NoRef' => 1,
+                    'DL_TypePL' => 0,
+                    'DL_PUDevise' => $calculatedPrice,
+                    'DL_PUTTC' => $calculatedPriceTTC,
+                    'DO_DateLivr' => '1753-01-01 00:00:00',
+                    'CA_Num' => '',
+                    'DL_Taxe3' => 0,
+                    'DL_TypeTaux3' => 0,
+                    'DL_TypeTaxe3' => 0,
+                    'DL_Frais' => 0,
+                    'DL_Valorise' => 1,
+                    'DL_NonLivre' => 0,
+                    'AC_RefClient' => '',
+                    'DL_MontantHT' => $sourceDocLine->DL_QteBL * $calculatedPrice,
+                    'DL_MontantTTC' => $sourceDocLine->DL_QteBL * $calculatedPriceTTC,
+                    'DL_FactPoids' => 0,
+                    'DL_No' => $DO_NO,
+                    'DL_TypeTaxe1' => 0,
+                    'DL_TypeTaxe2' => 0,
+                    'DL_Escompte' => 0,
+                    'DL_PiecePL' => '',
+                    'DL_DatePL' => '1753-01-01 00:00:00',
+                    'DL_QtePL' => 0,
+                    'DL_NoColis' => '',
+                    'DL_NoLink' => 0,
+                    'DL_QteRessource' => 0,
+                    'DL_DateAvancement' => '1753-01-01 00:00:00',
+                    'PF_Num' => '',
+                    'DL_PieceOFProd' => 0,
+                    'DL_PieceDE' => '',
+                    'DL_DateDE' => $maVariable,
+                    'DL_Operation' => '',
+                    'DL_NoSousTotal' => 0,
+                    'CA_No' => 0,
+                    'DO_DocType' => 13,
+                    'DL_CodeTaxe1' => 'D20',
+                    'cbCreationUser' => '69C8CD64-D06F-4097-9CAC-E488AC2610F9'
+                ];
 
-            // Create new document line record
-            $newDocLine = Docligne::create($insertData);
-
-            return $newDocLine->id ?? true;
+                // Create new document line record
+                $newDocLine = Docligne::create($insertData);
+                return $newDocLine->id ?? true;
+            });
 
         } catch (\Exception $e) {
             \Log::error('Error creating document line from template: ' . $e->getMessage());
             return false;
         }
     }
+
 
     /**
      * Alternative method using Query Builder for direct SQL execution

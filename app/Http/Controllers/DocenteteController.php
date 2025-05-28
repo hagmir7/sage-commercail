@@ -103,13 +103,6 @@ class DocenteteController extends Controller
                 'next_role_id' => null,
             ]);
         }
-
-        $line = Line::find($request->lines[0]);
-
-        $line->document->update([
-            'status_id' => 7
-        ]);
-
         return response()->json($request->all(), 200);
     }
 

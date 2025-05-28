@@ -40,7 +40,6 @@ Route::prefix('documents')->controller(DocumentController::class)->group(functio
 });
 
 
-Route::get("calculator/{piece}", [SellController::class, 'calculator']);
 
 Route::get("preparation/{piece}/{companyId}", [PaletteController::class, 'validationCompany']);
 
@@ -50,7 +49,7 @@ Route::get('/users', function (Request $request) {
 });
 
 Route::get("progress/{piece}", [DocenteteController::class, 'progress']);
-Route::get('palettes/document/{piece}', [PaletteController::class, 'documentPalettes']);
+
 
 Route::middleware('auth:sanctum')->group(function () {
     Route::post('/logout', [AuthController::class, 'logout']);
@@ -97,6 +96,12 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('palettes/create', [PaletteController::class, 'create']);
     Route::get('palettes/{code}', [PaletteController::class, 'show']);
     Route::get('palettes/{code}/line/{lineId}', [PaletteController::class, 'controller']);
+
+
+    // 
+    Route::get('palettes/document/{piece}', [PaletteController::class, 'documentPalettes']);
+    
+    Route::get("calculator/{piece}", [SellController::class, 'calculator']);
 
 
 

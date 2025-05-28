@@ -12,8 +12,6 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
 
-use function Pest\Laravel\json;
-
 class PaletteController extends Controller
 {
     /**
@@ -230,11 +228,11 @@ class PaletteController extends Controller
                             'updated_at' => now()
                         ]);
 
-                        $lines = $document->lines->where("company_id", $companyId);
+                        // $lines = $document->lines->where("company_id", $companyId);
 
-                        foreach ($lines as $lineItem) {
-                            $lineItem->update(['role_id' => null]);
-                        }
+                        // foreach ($lines as $lineItem) {
+                        //     $lineItem->update(['role_id' => null]);
+                        // }
                     }
 
                 }
@@ -252,12 +250,19 @@ class PaletteController extends Controller
 
     public function documentPalettes($piece)
     {
-        $document = Document::with(['status', 'palettes' => function ($query) {
-            $query->with('user')->withCount("lines");
-        }])->where('piece', $piece)->first();
+       $document = Document::with([
+            'status',
+            'palettes' => function ($query) {
+                $query->with('user')
+                    ->where('company_id', auth()->user()->company_id)
+                    ->withCount('lines');
+            }
+        ])->where('piece', $piece)->first();
+
         if (!$document) {
             return response()->json(['message' => 'No documents found.'], 404);
         }
+
         return response()->json($document);
     }
 
@@ -417,6 +422,10 @@ class PaletteController extends Controller
                 'status_id' => 7,
             ]);
         }
+
+        $palette->document->companies()->updateExistingPivot(auth()->user()->company_id, [
+            'status_id' => 7,
+        ]);
 
 
         $palette->load(['lines.article_stock']);
