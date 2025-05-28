@@ -207,16 +207,12 @@ class PaletteController extends Controller
                 if ($document->validation()) {
                     $document->update(['status_id' => 8]);
 
-                    foreach ($document->lines as $lineItem) {
-                        $lineItem->update(['role_id' => null]);
-                    }
-                    // 
                 } elseif ($document->status_id != 7) {
                     $document->update(['status_id' => 7]);
                 }
 
                 if ($document->validationCompany(auth()->user()->company_id)) {
-                    
+
                    $companyId = auth()->user()->company_id;
 
                     $alreadyAttached = $document->companies()->where('companies.id', $companyId)->exists();
@@ -227,12 +223,6 @@ class PaletteController extends Controller
                             'status_id' => 8,
                             'updated_at' => now()
                         ]);
-
-                        // $lines = $document->lines->where("company_id", $companyId);
-
-                        // foreach ($lines as $lineItem) {
-                        //     $lineItem->update(['role_id' => null]);
-                        // }
                     }
 
                 }
@@ -332,7 +322,7 @@ class PaletteController extends Controller
                 });
 
             if ($allControlledCompany) {
-                
+
                 $palette->document->companies()->updateExistingPivot($user_company, [
                     'status_id' => 10,
                     'controlled_by' => auth()->id(),
