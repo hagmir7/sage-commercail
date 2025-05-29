@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Document;
 use Illuminate\Http\Request;
 use DateTime;
+use Illuminate\Support\Facades\DB;
 
 class DocumentController extends Controller
 {
@@ -161,4 +162,24 @@ public function longList()
     }
 
 
+    // Document (PL) a livree
+    public function ready()
+    {
+        $documents = Document::whereHas('docentete', function ($query) {
+            $query->where('DO_Statut', 2)
+                ->where('DO_Domaine', 0)
+                ->where('DO_Type', 2);
+        })
+            ->with([
+                'docentete' => function ($query) {
+                    $query->select('cbMarq', 'DO_Piece', 'DO_Type', 'DO_DateLivr', 'DO_Statut', 'DO_TotalHTNet', 'DO_TotalTTC');
+                },
+                'status'
+            ])
+            ->select('id', 'docentete_id', 'piece', 'type', 'ref', 'expedition', 'client_id', 'status_id')
+            ->withCount('lines')
+            ->get();
+
+        return response()->json($documents);
+    }
 }

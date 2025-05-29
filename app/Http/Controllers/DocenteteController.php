@@ -454,6 +454,9 @@ class DocenteteController extends Controller
         return response()->json($document);
     }
 
+
+
+    // Reset Document (Réinitialiser le document)
     public function reset($piece)
     {
         $document = Document::where("piece", $piece)->first();
@@ -637,6 +640,7 @@ class DocenteteController extends Controller
     }
 
 
+    // Transfer funciton controller
     public function transfer(Request $request)
     {
         $user = auth()->user();
@@ -665,6 +669,7 @@ class DocenteteController extends Controller
         }
     }
 
+    // Document list with pregress
     public function progress($piece)
     {
         $document = Document::with(['docentete.doclignes', 'lines.palettes'])->where("piece", $piece)->first();
@@ -693,8 +698,7 @@ class DocenteteController extends Controller
 
 
 
-
-
+    //
     public function fabrication(Request $request)
     {
 
@@ -754,66 +758,50 @@ class DocenteteController extends Controller
 
 
 
-
+    // Expidition List document
     public function shipping(Request $request)
     {
-        // dd($user_roles);
-
-        // SELECT DO_Reliquat, DO_Piece, DO_Ref, DO_Tiers, DO_Expedit, CONVERT(VARCHAR(10), DO_Date, 111) AS DO_Date, CONVERT(VARCHAR(10), DO_DateLivr, 111) AS DO_DateLivr
-        // FROM F_DOCENTETE WHERE DO_Domaine = 0 AND DO_Type = 3 AND DO_Statut = 0
-        $query = Docentete::with('document.status')
-            ->select([
-                'DO_Reliquat',
-                'DO_Piece',
-                'DO_Ref',
-                'DO_Tiers',
-                'cbMarq',
-                \DB::raw("CONVERT(VARCHAR(10), DO_Date, 111) AS DO_Date"),
-                \DB::raw("CONVERT(VARCHAR(10), DO_DateLivr, 111) AS DO_DateLivr"),
-                'DO_Expedit'
+        $documents = Document::whereHas('docentete', function ($query) {
+            $query->where('DO_Statut', 0)
+                ->where('DO_Domaine', 0)
+                ->where('DO_Type', 3);
+        })
+            ->with([
+                'docentete' => function ($query) {
+                    $query->select( 'cbMarq', 'DO_Piece', 'DO_Type', 'DO_DateLivr', 'DO_Statut', 'DO_TotalHTNet', 'DO_TotalTTC');
+                },
+                'status'
             ])
-            ->orderByDesc("DO_Date")
-            ->where('DO_Domaine', 0)
-            ->where('DO_Type', 3)
-            ->where('DO_Statut', 0);
+            ->select('id', 'docentete_id', 'piece', 'type', 'ref', 'expedition', 'client_id', 'status_id')
+            ->withCount('lines');
 
-
-        if (!empty($request->status)) {
-            $query->whereHas('document.status', function ($query) use ($request) {
-                $query->where('id', $request->status);
-            });
-        }
-
-        if ($request->filled('date')) {
-            $dates = explode(',', $request->date);
-
-            // Parse and format
-            $start = Carbon::parse(urldecode($dates[0]))->format('Y-m-d');
-            $end = Carbon::parse(urldecode($dates[1]))->format('Y-m-d');
-
-            $query->whereHas('document', function ($query) use ($start, $end) {
-                $query->whereBetween('created_at', [$start, $end]);
-            });
-        }
-
-
-
-        // if ($request->has('type')) {
-        //     $query->where('DO_Type', $request->type);
-        // } else {
-        //     $query->where('DO_Type', 2);
-        // }
-
-        if ($request->has('search') && $request->search !== '') {
+        // Apply search filter if provided
+        if ($request->filled('search')) {
             $search = $request->search;
-            $query->where(function ($q) use ($search) {
-                $q->where('DO_Reliquat', 'like', "%$search%")
-                    ->orWhere('DO_Piece', 'like', "%$search%")
-                    ->orWhere('DO_Ref', 'like', "%$search%")
-                    ->orWhere('DO_Tiers', 'like', "%$search%");
+            $documents->where(function ($q) use ($search) {
+                $q->where('piece', 'like', "%$search%")
+                    ->orWhere('ref', 'like', "%$search%")
+                    ->orWhere('client_id', 'like', "%$search%");
             });
         }
-        $results = $query->paginate(20);
+
+        // Apply date filter if provided
+        if ($request->filled('date')) {
+            try {
+                $dates = explode(',', $request->date);
+                $start = Carbon::parse(urldecode($dates[0]))->startOfDay();
+                $end = Carbon::parse(urldecode($dates[1]))->endOfDay();
+
+                $documents->whereBetween('created_at', [$start, $end]);
+            } catch (\Exception $e) {
+                return response()->json([
+                    'error' => 'Invalid date format provided.'
+                ], 422);
+            }
+        }
+
+        // Paginate results
+        $results = $documents->paginate(20);
 
         return response()->json($results);
     }

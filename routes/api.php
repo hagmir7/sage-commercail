@@ -35,8 +35,9 @@ Route::get("article/{article}", [ArticleController::class, 'show']);
 
 Route::prefix('documents')->controller(DocumentController::class)->group(function () {
     Route::get('/', 'list');
-    Route::get('/{piece}', 'checkControlled');
+    Route::get('/ready', 'ready');
     Route::get('/progress/{piece}', 'progress');
+    Route::get('/{piece}', 'checkControlled');
 });
 
 
@@ -98,9 +99,9 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('palettes/{code}/line/{lineId}', [PaletteController::class, 'controller']);
 
 
-    // 
+    //
     Route::get('palettes/document/{piece}', [PaletteController::class, 'documentPalettes']);
-    
+
     Route::get("calculator/{piece}", [SellController::class, 'calculator']);
 
 
