@@ -185,6 +185,11 @@ Department:
 
 ----------------------------
 
+
+
+
+
+
 SELECT
     DO_Reliquat,
     DO_Piece,
@@ -257,3 +262,24 @@ SELECT * FROM F_COMPTET WHERE CT_Num = 'FR001';
 
 
 
+---------------- Stock
+
+
+
+
+Article
+    - Ref
+    - condition
+    - code_supplier
+    - qr_code
+
+Emplacement
+    - code
+
+Palette
+ - code
+ - art_ref
+ - qte
+ - user_id
+ - company_id
+ - emplacement_id
