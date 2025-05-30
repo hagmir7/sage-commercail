@@ -124,26 +124,25 @@ class SellController extends Controller
             );
 
 
-              DB::table('F_DOCLIGNEEMPL')->insert([
+            DB::table('F_DOCLIGNEEMPL')->insert([
                 'DL_No'            => $dl_no,
                 'DP_No'            => 1,
-                'DL_Qte'           => $qte,
+                'DL_Qte'           => $line->DL_Qte,
                 'DL_QteAControler' => 0,
                 'cbCreationUser'   => '69C8CD64-D06F-4097-9CAC-E488AC2610F9',
             ]);
 
 
             // Incrémentation des stocks
+            $qte = floatval($line->DL_Qte ?? 0);
+
             DB::table('F_ARTSTOCK')
                 ->where('AR_Ref', $line->AR_Ref)
                 ->update([
-                    'AS_QteSto'   => DB::raw('AS_QteSto + ' . $line->DL_Qte),
-                    'AS_MontSto'  => DB::raw('AS_MontSto + (' . $lastPrice . ' * ' . $line->DL_Qte . ')'),
+                    'AS_QteSto'  => DB::raw("AS_QteSto + {$qte}"),
+                    'AS_MontSto' => DB::raw("AS_MontSto + (0 * {$qte})"),
                 ]);
 
-           
-
-            
 
 
             $result[] = [
