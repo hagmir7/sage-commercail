@@ -102,12 +102,14 @@ class SellController extends Controller
             $piece
         );
 
+   
+
         // Create document lines
         $result = [];
         foreach ($doclignes as $line) {
             $do_date = now();
             $do_ref = $new_piece;
-            $dl_no = $this->dl_no_generate(); // Generate unique $dl_no for each line
+            $dl_no = $this->dl_no_generate();
 
             $this->createDocumentLineFromTemplate(
                 $ct_num,
@@ -120,6 +122,29 @@ class SellController extends Controller
                 intval($line->DL_Ligne),
                 $piece
             );
+
+
+              DB::table('F_DOCLIGNEEMPL')->insert([
+                'DL_No'            => $dl_no,
+                'DP_No'            => 1,
+                'DL_Qte'           => $qte,
+                'DL_QteAControler' => 0,
+                'cbCreationUser'   => '69C8CD64-D06F-4097-9CAC-E488AC2610F9',
+            ]);
+
+
+            // Incrémentation des stocks
+            DB::table('F_ARTSTOCK')
+                ->where('AR_Ref', $line->AR_Ref)
+                ->update([
+                    'AS_QteSto'   => DB::raw('AS_QteSto + ' . $line->DL_Qte),
+                    'AS_MontSto'  => DB::raw('AS_MontSto + (' . $lastPrice . ' * ' . $line->DL_Qte . ')'),
+                ]);
+
+           
+
+            
+
 
             $result[] = [
                 "ct_num" => $ct_num,
@@ -386,32 +411,6 @@ class SellController extends Controller
     }
 
 
-    public function storeDocentete(Request $request)
-    {
-
-        $result = $this->createDocumentFromTemplate(
-            $request->do_piece,
-            $request->do_ref,
-            $request->do_tiers,
-            $request->do_heure,
-            $request->mt_entrer,
-            $request->mt_entrer_ttc,
-            $request->source_piece
-        );
-
-        if ($result) {
-            return response()->json([
-                'success' => true,
-                'message' => 'Document created successfully',
-                'id' => $result
-            ], 201);
-        }
-
-        return response()->json([
-            'success' => false,
-            'message' => 'Failed to create document'
-        ], 500);
-    }
 
 
 

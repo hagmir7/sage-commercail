@@ -579,30 +579,6 @@ class DocenteteController extends Controller
                 if (!$currentDocligne) {
                     throw new \Exception("Invalid line: {$lineId}");
                 }
-                if ($currentDocligne->AR_Ref && $currentDocligne->AR_Ref !== 'SP000001') {
-                    $article = Article::find($currentDocligne->AR_Ref);
-
-                    if ($article) {
-
-                        DB::connection('sqlsrv')->unprepared("
-                            SET NOCOUNT ON;
-                            SET XACT_ABORT ON;
-                            DISABLE TRIGGER ALL ON F_DOCLIGNE;
-
-                            UPDATE F_DOCLIGNE
-                            SET Nom = '" . addslashes($article->Nom) . "',
-                                Hauteur = " . ($article->Hauteur !== null ? floatval($article->Hauteur) : "NULL") . ",
-                                Couleur = " . ($article->Couleur !== null ? floatval($article->Couleur) : "NULL") . ",
-                                Largeur = " . ($article->Largeur !== null ? floatval($article->Largeur) : "NULL") . ",
-                                Profondeur = " . ($article->Profondeur !== null && $article->Profondeur !== '' ? floatval($article->Profondeur) : "NULL") . ",
-                                Chant = '" . addslashes($article->Chant) . "',
-                                Episseur = " . ($article->Episseur !== null ? floatval($article->Episseur) : "NULL") . "
-                            WHERE cbMarq = '" . addslashes($lineId) . "';
-
-                            ENABLE TRIGGER ALL ON F_DOCLIGNE;
-                        ");
-                    }
-                }
 
                 if (!$currentDocligne) {
                     throw new \Exception("Invalid line: {$lineId}");
@@ -761,14 +737,24 @@ class DocenteteController extends Controller
     // Expidition List document
     public function shipping(Request $request)
     {
+        $documents = Document::with('docentete')
+            ->whereHas('docentete', function ($query) {
+                $query->where('DO_Domaine', 0)
+                    ->where('DO_Type', 3);
+            })
+            ->orderByDesc('created_at')
+            ->get();
+        return response()->json($documents);
+
+
         $documents = Document::whereHas('docentete', function ($query) {
-            $query->where('DO_Statut', 0)
+            $query->where('DO_Statut', 2)
                 ->where('DO_Domaine', 0)
                 ->where('DO_Type', 3);
         })
             ->with([
                 'docentete' => function ($query) {
-                    $query->select( 'cbMarq', 'DO_Piece', 'DO_Type', 'DO_DateLivr', 'DO_Statut', 'DO_TotalHTNet', 'DO_TotalTTC');
+                    $query->select('cbMarq', 'DO_Piece', 'DO_Type', 'DO_DateLivr', 'DO_Statut', 'DO_TotalHTNet', 'DO_TotalTTC');
                 },
                 'status'
             ])
