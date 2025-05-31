@@ -16,18 +16,24 @@ return new class extends Migration
         Schema::create('article_stocks', function (Blueprint $table) {
             $table->id();
             $table->string('code')->unique();
+            $table->string('code_supplier')->nullable()->unique();
+            $table->string('qr_code')->nullable()->unique();
             $table->text('description');
             $table->string('name')->nullable();
             $table->string('color')->nullable();
-            $table->integer('qte_inter')->default(0);
-            $table->integer('qte_serie')->default(0);
+            $table->float('qte_inter')->default(0);
+            $table->float('qte_serie')->default(0);
+            $table->float('quantity')->default(0);
+            $table->float('stock_min')->default(0);
+            $table->float('price')->default();
             $table->float('thickness')->nullable();
-            $table->float('height')->nullable(); // Fixed typo here
+            $table->float('height')->nullable();
             $table->float('width')->nullable();
             $table->float('depth')->nullable();
             $table->string('chant')->nullable();
             $table->integer('family_id');
             $table->integer('article_id');
+            $table->string('condition')->nullable();
 
             $table->foreign('family_id')
                 ->references('cbMarq')

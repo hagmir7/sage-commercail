@@ -1,5 +1,6 @@
 <?php
 
+use App\Models\ArticleStock;
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
@@ -13,7 +14,7 @@ return new class extends Migration
     {
         Schema::create('article_emplacement', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('article_id')->constrained()->onDelete('cascade');
+            $table->foreignIdFor(ArticleStock::class);
             $table->foreignId('emplacement_id')->constrained()->onDelete('cascade');
             $table->integer('quantity')->default(0);
             $table->timestamps();

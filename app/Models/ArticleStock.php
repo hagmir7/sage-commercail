@@ -13,12 +13,17 @@ class ArticleStock extends Model
         'name',
         'color',
         'article_id',
+        'qr_code',
+        'quantity',
         'qte_inter',
+        'stock_min',
         'qte_serie',
+        'condition',
         'family_id',
         'thickness',
         'height',
         'width',
+        'price',
         'depth',
         'chant'
     ];

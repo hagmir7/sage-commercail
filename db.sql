@@ -24,10 +24,28 @@ FROM [STILEMOBILI].[dbo].[F_ARTICLE];
 
 
 
+INSERT INTO [STILEMOBILI].[dbo].[emplacements]
+ (depot_id, code) SELECT [idDepot],[Intitule] FROM [LOGILINK].[dbo].[T_Emplacement]
 
+
+
+
+UPDATE [STILEMOBILI].[dbo].[depots] SET id = 1 WHERE id = 49;
+UPDATE [STILEMOBILI].[dbo].[depots] SET id = 2 WHERE id = 50;
+UPDATE [STILEMOBILI].[dbo].[depots] SET id = 3 WHERE id = 51;
+UPDATE [STILEMOBILI].[dbo].[depots] SET id = 4 WHERE id = 52;
+UPDATE [STILEMOBILI].[dbo].[depots] SET id = 5 WHERE id = 53;
+UPDATE [STILEMOBILI].[dbo].[depots] SET id = 6 WHERE id = 54;
+UPDATE [STILEMOBILI].[dbo].[depots] SET id = 7 WHERE id = 55;
+UPDATE [STILEMOBILI].[dbo].[depots] SET id = 8 WHERE id = 56;
+UPDATE [STILEMOBILI].[dbo].[depots] SET id = 9 WHERE id = 57;
+UPDATE [STILEMOBILI].[dbo].[depots] SET id = 10 WHERE id = 58;
+UPDATE [STILEMOBILI].[dbo].[depots] SET id = 11 WHERE id = 59;
+UPDATE [STILEMOBILI].[dbo].[depots] SET id = 12 WHERE id = 60;
+UPDATE [STILEMOBILI].[dbo].[depots] SET id = 13 WHERE id = 61;
 ---- show last changed tables
 
-SELECT 
+SELECT
     s.name AS SchemaName,
     t.name AS TableName,
     c.name AS ColumnName,
@@ -43,11 +61,11 @@ ORDER BY p.last_user_update DESC;
 
 
 
---- 
+---
 
 
-BACKUP DATABASE SAGE100GPAO 
-TO DISK = 'C:\Dev\SAGE100GPAO_backup.bak' 
+BACKUP DATABASE SAGE100GPAO
+TO DISK = 'C:\Dev\SAGE100GPAO_backup.bak'
 WITH COMPRESSION, STATS = 10;
 
 
@@ -85,7 +103,7 @@ DBCC SHRINKFILE (N'Sage100GP_Log', 10240); -- Shrink to 10GB first
 DBCC OPENTRAN(SAGE100GPAO);
 
 
-SELECT name, size/128.0 AS CurrentSizeMB, 
+SELECT name, size/128.0 AS CurrentSizeMB,
     growth/128.0 AS GrowthIncrementMB,
     is_percent_growth
 FROM sys.database_files
@@ -93,7 +111,7 @@ WHERE name = 'Sage100GP_Log';
 
 
 
-ALTER DATABASE SAGE100GPAO 
+ALTER DATABASE SAGE100GPAO
 MODIFY FILE (NAME = 'Sage100GP_Log', FILEGROWTH = 256MB);
 
 

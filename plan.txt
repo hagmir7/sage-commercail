@@ -283,3 +283,39 @@ Palette
  - user_id
  - company_id
  - emplacement_id
+
+
+
+
+
+
+
+ Merchandise = Buy and Sell
+Matières Premieres
+Produite Finis
+
+
+
+-> Inventaire
+ - date
+ - totale value
+
+
+-> Stock
+   - code_article
+   - designation
+   - stock_min
+   - quantity
+   - price
+
+
+-> InventoryMovement
+   - code_article
+   - designation
+   - emplacement_id
+   - type (IN, OUT, TRANSFER)
+   - quantity
+   - user_id
+   - date
+
+

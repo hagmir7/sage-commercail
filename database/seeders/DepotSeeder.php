@@ -2,8 +2,8 @@
 
 namespace Database\Seeders;
 
-use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
+use Illuminate\Support\Facades\DB;
 
 class DepotSeeder extends Seeder
 {
@@ -24,7 +24,6 @@ class DepotSeeder extends Seeder
             ['code' => 'DEPOT 9', 'company_id' => 1],
             ['code' => 'DEPOT 10', 'company_id' => 1],
             ['code' => 'FABRICA', 'company_id' => 1],
-            ['code' => 'TRANSFERT EXTERNE', 'company_id' => 3],
             ['code' => 'SERIE MOBLE', 'company_id' => 1],
             ['code' => 'DEPOT SM 1', 'company_id' => 2],
         ]);
