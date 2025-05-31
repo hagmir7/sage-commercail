@@ -32,4 +32,9 @@ class ArticleStock extends Model
     {
         return $this->belongsTo(ArticleFamily::class, 'cbMarq');
     }
+
+    public function palettes()
+    {
+        return $this->belongsToMany(Palette::class)->withPivot('quantity')->withTimestamps();
+    }
 }

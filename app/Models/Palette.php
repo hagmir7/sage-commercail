@@ -6,7 +6,7 @@ use Illuminate\Database\Eloquent\Model;
 
 class Palette extends Model
 {
-    protected $fillable = ['code', 'company_id', 'position_id', 'document_id', 'type', 'user_id', 'controlled'];
+    protected $fillable = ['code', 'company_id', 'emplacement_id', 'document_id', 'type', 'user_id', 'controlled'];
 
     // public $timestamps = false;
 
@@ -20,9 +20,10 @@ class Palette extends Model
         return $this->belongsTo(Position::class);
     }
 
+
     public function articles()
     {
-        return $this->hasMany(Article::class);
+        return $this->belongsToMany(ArticleStock::class)->withPivot('quantity')->withTimestamps();
     }
 
     public function document(){

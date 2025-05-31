@@ -13,8 +13,8 @@ class Depot extends Model
         return $this->belongsTo(Company::class);
     }
 
-    public function positions()
+    public function emplacements()
     {
-        return $this->hasMany(Position::class);
+        return $this->hasMany(Emplacement::class);
     }
 }
