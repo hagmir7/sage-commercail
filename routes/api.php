@@ -9,6 +9,7 @@ use App\Http\Controllers\ClientController;
 use App\Http\Controllers\DepotController;
 use App\Http\Controllers\DocenteteController;
 use App\Http\Controllers\DocumentController;
+use App\Http\Controllers\InventoryController;
 use App\Http\Controllers\PaletteController;
 use App\Http\Controllers\PermissionController;
 use App\Http\Controllers\RoleController;
@@ -104,6 +105,13 @@ Route::middleware('auth:sanctum')->group(function () {
 
     Route::get("calculator/{piece}", [SellController::class, 'calculator']);
 
+
+    Route::post('inventory/insert/{inventory}', [InventoryController::class, 'insert']);
+    Route::post('inventory/create', [InventoryController::class, 'create']);
+    Route::get('inventory/emplacement/{code}', [InventoryController::class, 'scanEmplacmenet']);
+    Route::get('inventory/article/{code}', [InventoryController::class, 'scanArticle']);
+    Route::get('inventory/list', [InventoryController::class, 'list']);
+    Route::get('inventory/{inventory}', [InventoryController::class, 'show']);
 
 
     // Test

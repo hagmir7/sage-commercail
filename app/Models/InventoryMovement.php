@@ -10,10 +10,11 @@ class InventoryMovement extends Model
         'code_article',
         'designation',
         'emplacement_id',
+        'emplacement_code',
+        'inventory_id',
         'type',
         'quantity',
         'user_id',
-        'date',
     ];
 
     public function user()

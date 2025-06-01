@@ -24,6 +24,7 @@ class DepotSeeder extends Seeder
             ['code' => 'DEPOT 9', 'company_id' => 1],
             ['code' => 'DEPOT 10', 'company_id' => 1],
             ['code' => 'FABRICA', 'company_id' => 1],
+            ['code' => 'TRANSFERT EXTERNE', 'company_id' => 1],
             ['code' => 'SERIE MOBLE', 'company_id' => 1],
             ['code' => 'DEPOT SM 1', 'company_id' => 2],
         ]);

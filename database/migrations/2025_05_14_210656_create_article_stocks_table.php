@@ -16,8 +16,6 @@ return new class extends Migration
         Schema::create('article_stocks', function (Blueprint $table) {
             $table->id();
             $table->string('code')->unique();
-            $table->string('code_supplier')->nullable()->unique();
-            $table->string('qr_code')->nullable()->unique();
             $table->text('description');
             $table->string('name')->nullable();
             $table->string('color')->nullable();
@@ -34,6 +32,8 @@ return new class extends Migration
             $table->integer('family_id');
             $table->integer('article_id');
             $table->string('condition')->nullable();
+            $table->string('code_supplier')->nullable();
+            $table->string('qr_code')->nullable();
 
             $table->foreign('family_id')
                 ->references('cbMarq')

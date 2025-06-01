@@ -23,10 +23,11 @@ class UserSeeder extends Seeder
                 'email_verified_at' => now(),
             ]);
             $user->assignRole("supper_admin");
+            $user->assignRole("commercial");
         }
 
         if (!User::where("email", "preparation@admin.com")->first()) {
-            User::factory()->create([
+            $user = User::factory()->create([
                 'name' => 'adil',
                 'full_name' => "Adil Adil",
                 'email' => 'preparation@admin.com',
@@ -35,23 +36,27 @@ class UserSeeder extends Seeder
                 'email_verified_at' => now(),
                 'company_id' => 1
             ]);
+            $user->assignRole("preparation");
+            $user->assignRole("controleur");
         }
 
         if (!User::where("email", "bayou@admin.com")->first()) {
-            User::factory()->create([
+            $user = User::factory()->create([
                 'name' => 'bayou',
                 'full_name' => "Ahmend El Bayou",
                 'email' => 'bayou@admin.com',
                 'phone' => '1234567890',
                 'password' => Hash::make("password"),
                 'email_verified_at' => now(),
-                'company_id' => 1
+                'company_id' => 1,
+
             ]);
+            $user->assignRole("fabrication");
         }
 
 
         if (!User::where("email", "montage@admin.com")->first()) {
-            User::factory()->create([
+            $user = User::factory()->create([
                 'name' => 'said',
                 'full_name' => "Said Montage",
                 'email' => 'montage@admin.com',
@@ -60,10 +65,11 @@ class UserSeeder extends Seeder
                 'email_verified_at' => now(),
                 'company_id' => 1
             ]);
+            $user->assignRole("montage");
         }
 
         if (!User::where("email", "fatima@admin.com")->first()) {
-            User::factory()->create([
+            $user = User::factory()->create([
                 'name' => 'fati',
                 'full_name' => "Fatima Serie",
                 'email' => 'fatima@admin.com',
@@ -72,10 +78,11 @@ class UserSeeder extends Seeder
                 'email_verified_at' => now(),
                 'company_id' => 2
             ]);
+            $user->assignRole("preparation");
         }
 
         if (!User::where("email", "peinture@admin.com")->first()) {
-            User::factory()->create([
+            $user = User::factory()->create([
                 'name' => 'nordin',
                 'full_name' => "Nordin Serie",
                 'email' => 'peinture@admin.com',
@@ -84,11 +91,12 @@ class UserSeeder extends Seeder
                 'email_verified_at' => now(),
                 'company_id' => 2
             ]);
+            $user->assignRole("fabrication");
         }
 
 
         if (!User::where("email", "p1@admin.com")->first()) {
-            User::factory()->create([
+           $user = User::factory()->create([
                 'name' => 'p1',
                 'full_name' => "Ayoub",
                 'email' => 'p1@admin.com',
@@ -97,10 +105,11 @@ class UserSeeder extends Seeder
                 'email_verified_at' => now(),
                 'company_id' => 1
             ]);
+            $user->assignRole("preparation_trailer");
         }
 
         if (!User::where("email", "p2@admin.com")->first()) {
-            User::factory()->create([
+            $user = User::factory()->create([
                 'name' => 'p2',
                 'full_name' => "El ghayat Mohamed",
                 'email' => 'p2@admin.com',
@@ -109,10 +118,11 @@ class UserSeeder extends Seeder
                 'email_verified_at' => now(),
                 'company_id' => 1
             ]);
+            $user->assignRole("preparation_cuisine");
         }
 
         if (!User::where("email", "p3@admin.com")->first()) {
-            User::factory()->create([
+            $user = User::factory()->create([
                 'name' => 'p3',
                 'full_name' => "Abd Razzaq",
                 'email' => 'p3@admin.com',
@@ -121,6 +131,7 @@ class UserSeeder extends Seeder
                 'email_verified_at' => now(),
                 'company_id' => 2
             ]);
+            $user->assignRole("preparation_cuisine");
         }
     }
 }

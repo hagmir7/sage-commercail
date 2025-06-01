@@ -23,7 +23,7 @@ return new class extends Migration
             $table->enum('type', ['IN', 'OUT', 'TRANSFER'])->default('IN');
             $table->integer('quantity');
             $table->foreignIdFor(User::class)->nullable();
-            $table->date('date');
+            $table->string('emplacement_code')->nullable();
             $table->timestamps();
         });
     }

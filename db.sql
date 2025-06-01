@@ -24,10 +24,10 @@ FROM [STILEMOBILI].[dbo].[F_ARTICLE];
 
 
 
-INSERT INTO [STILEMOBILI].[dbo].[emplacements]
- (depot_id, code) SELECT [idDepot],[Intitule] FROM [LOGILINK].[dbo].[T_Emplacement]
-
-
+INSERT INTO [STILEMOBILI].[dbo].[emplacements] (depot_id, code)
+SELECT [idDepot],[Intitule]
+FROM [LOGILINK].[dbo].[T_Emplacement]
+WHERE [idDepot] IN (SELECT id FROM depots)
 
 
 UPDATE [STILEMOBILI].[dbo].[depots] SET id = 1 WHERE id = 49;
