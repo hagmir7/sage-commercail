@@ -195,22 +195,21 @@ public function longList()
             ->orWhere('DL_PieceDE', $piece)
             ->first();
 
-        return $docligne;
+        return $docligne->cbMarq;
     }
 
 
     public function livraison()
     {
-        $documents = Document::where('status_id', 11)->pluck('piece');
-        $resulte = [];
+        $documents = Document::where('status_id', 11)->get();
 
         foreach ($documents as $document) {
-            $cbMarq = $this->history($document);
-            if ($cbMarq !== null) {
-                $resulte[] = $cbMarq;
-            }
+            $document->update([
+                'docentete_id' =>  $this->history($document->piece)
+            ]);
         }
-        return $resulte;
+
+        return $documents;
     }
 
 

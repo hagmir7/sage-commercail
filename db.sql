@@ -134,3 +134,12 @@ SELECT TOP (1000) [DO_Domaine]
       ,[DL_PieceOFProd]
       ,[DL_PieceDE]
   FROM [STILEMOBILI].[dbo].[F_DOCLIGNE] WHERE DO_Type = 6 ORDER BY cbCreation desc;
+
+
+
+
+
+
+
+
+SELECT  SUM(Quantité), [Réf. Article] FROM [LOGILINK].[dbo].[T_Art] GROUP BY "Réf. Article"
