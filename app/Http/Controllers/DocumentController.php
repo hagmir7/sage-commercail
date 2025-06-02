@@ -188,32 +188,31 @@ public function longList()
 
     public function history($piece)
     {
-        $docligne = Docligne::where('DO_Piece', $piece)
+        $docligne = Docligne::whereIn('DO_Type', [3, 5])->where('DO_Piece', $piece)
             ->orWhere('DL_PieceBC', $piece)
             ->orWhere('DL_PieceBL', $piece)
             ->orWhere('DL_PiecePL', $piece)
             ->orWhere('DL_PieceDE', $piece)
             ->first();
 
-        return $docligne->cbMarq;
+        return $docligne;
     }
+
 
     public function livraison()
     {
-        $documents = Document::with('docentete')->get();
+        $documents = Document::where('status_id', 11)->pluck('piece');
+        $resulte = [];
 
         foreach ($documents as $document) {
-            $cbMarq = $this->history(strval($document->piece));
-
+            $cbMarq = $this->history($document);
             if ($cbMarq !== null) {
-                $document->update([
-                    'docentete_id' => strval($cbMarq)
-                ]);
+                $resulte[] = $cbMarq;
             }
         }
-
-        return $documents;
+        return $resulte;
     }
+
 
 
 }
