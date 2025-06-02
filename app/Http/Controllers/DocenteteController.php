@@ -126,7 +126,7 @@ class DocenteteController extends Controller
         $user = auth()->user();
 
         if (!$user->hasRole("fabrication") ||  !$user->hasRole("montage")) {
-            foreach ($request->lines as $line){
+            foreach ($request->lines as $line) {
                 $line = Line::find($line);
 
                 $line->update([
@@ -153,19 +153,19 @@ class DocenteteController extends Controller
     {
         // dd($user_roles);
         $query = Docentete::with('document.status')
-        ->select([
-            'DO_Reliquat',
-            'DO_Piece',
-            'DO_Ref',
-            'DO_Tiers',
-            'cbMarq',
-            \DB::raw("CONVERT(VARCHAR(10), DO_Date, 111) AS DO_Date"),
-            \DB::raw("CONVERT(VARCHAR(10), DO_DateLivr, 111) AS DO_DateLivr"),
-            'DO_Expedit'
-        ])
-        ->orderByDesc("DO_Date")
-        ->where('DO_Domaine', 0)
-        ->where('DO_Statut', 1);
+            ->select([
+                'DO_Reliquat',
+                'DO_Piece',
+                'DO_Ref',
+                'DO_Tiers',
+                'cbMarq',
+                \DB::raw("CONVERT(VARCHAR(10), DO_Date, 111) AS DO_Date"),
+                \DB::raw("CONVERT(VARCHAR(10), DO_DateLivr, 111) AS DO_DateLivr"),
+                'DO_Expedit'
+            ])
+            ->orderByDesc("DO_Date")
+            ->where('DO_Domaine', 0)
+            ->where('DO_Statut', 1);
 
 
         if (!empty($request->status)) {
@@ -213,7 +213,7 @@ class DocenteteController extends Controller
     // Validation and Controller List
     public function validation(Request $request)
     {
-       $query = Docentete::with(['document.status', 'document.companies'])
+        $query = Docentete::with(['document.status', 'document.companies'])
             ->select([
                 'DO_Reliquat',
                 'DO_Piece',
@@ -273,7 +273,6 @@ class DocenteteController extends Controller
             ");
 
             DB::connection('sqlsrv')->commit();
-
         } catch (\Exception $e) {
             DB::connection('sqlsrv')->rollBack();
             DB::connection('sqlsrv')->unprepared("
@@ -314,7 +313,6 @@ class DocenteteController extends Controller
 
                 // Update Docentete Status
                 $this->updateDocStatus($document?->docentete);
-
             }
 
             $document->companies()->updateExistingPivot(auth()->user()->company_id, [
@@ -323,8 +321,11 @@ class DocenteteController extends Controller
                 'validated_at' => now()
             ]);
 
+            // Achate d'article
             $sellController = new SellController();
             $sellController->calculator($document?->docentete->DO_Piece);
+
+
 
             return response()->json(["message" => "Le document est validé avec succès"]);
         });
@@ -372,9 +373,6 @@ class DocenteteController extends Controller
     }
 
 
-
-
-
     public function show($id)
     {
         // Cache user info to avoid repeated queries
@@ -411,8 +409,8 @@ class DocenteteController extends Controller
             }
         ])
 
-        ->select("DO_Piece", "AR_Ref", 'DL_Design', 'DL_Qte', "Nom", "Hauteur", "Largeur", "Profondeur", "Langeur", "Couleur", "Chant", "Episseur", "cbMarq")
-        ->where('DO_Piece', $id);
+            ->select("DO_Piece", "AR_Ref", 'DL_Design', 'DL_Qte', "Nom", "Hauteur", "Largeur", "Profondeur", "Langeur", "Couleur", "Chant", "Episseur", "cbMarq")
+            ->where('DO_Piece', $id);
 
         // Apply role-based filtering more efficiently
         if (in_array('preparation', $userRoles)) {
@@ -420,7 +418,6 @@ class DocenteteController extends Controller
             $docligneQuery->whereHas('line', function ($query) use ($userCompanyId) {
                 $query->where('company_id', $userCompanyId);
             });
-
         } elseif (array_intersect(['fabrication', 'montage', 'preparation_cuisine', 'preparation_trailer', 'magasinier'], $userRoles)) {
 
             $docligneQuery->whereHas('line', function ($query) use ($userCompanyId, $userRoleIds) {
@@ -465,7 +462,7 @@ class DocenteteController extends Controller
             return response()->json(['error' => "Document does not exist"], 404);
         }
 
-        foreach($document->lines as $line){
+        foreach ($document->lines as $line) {
             $line->delete();
         }
 
@@ -488,10 +485,10 @@ class DocenteteController extends Controller
 
         $request_roles = explode(',', $request->roles);
 
-        if(count($request_roles) == 1){
+        if (count($request_roles) == 1) {
             $role = Role::find($request_roles[0]);
             $next_role = false;
-        }else{
+        } else {
             $role = Role::find($request_roles[0]);
             $next_role = $request_roles[1];
         }
@@ -644,6 +641,7 @@ class DocenteteController extends Controller
             $this->roleTransfer($request);
         }
     }
+
 
     // Document list with pregress
     public function progress($piece)

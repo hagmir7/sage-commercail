@@ -65,6 +65,7 @@ class Document extends Model
         return true;
     }
 
+
     public function validationCompany($companyId): bool
     {
         $this->load('lines.palettes');
@@ -81,4 +82,5 @@ class Document extends Model
 
         return true;
     }
+
 }

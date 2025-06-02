@@ -23,7 +23,6 @@ return new class extends Migration
             $table->integer('expedition');
             $table->string('client_id', 17);
             $table->foreignIdFor(User::class, 'transfer_by')->constrained('users')->onDelete('cascade');
-            $table->foreign('docentete_id')->references('cbMarq')->on('F_DOCENTETE')->onDelete('cascade');
             $table->foreignIdFor(User::class, 'validated_by')->nullable();
             $table->foreignIdFor(User::class, 'controlled_by')->nullable();
             $table->foreignIdFor(Status::class)->default(1);

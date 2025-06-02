@@ -118,3 +118,19 @@ MODIFY FILE (NAME = 'Sage100GP_Log', FILEGROWTH = 256MB);
 ---- Add Primary key
 ALTER TABLE [SAGE100GPAO].[dbo].[T_EVT_MACHINE_EC]
 ADD id INT IDENTITY(1,1);
+
+
+
+
+
+/****** Select document line History ******/
+SELECT TOP (1000) [DO_Domaine]
+      ,[DO_Type]
+      ,[CT_Num]
+      ,[DO_Piece]
+      ,[DL_PieceBC]
+      ,[DL_PieceBL]
+      ,[DL_PiecePL]
+      ,[DL_PieceOFProd]
+      ,[DL_PieceDE]
+  FROM [STILEMOBILI].[dbo].[F_DOCLIGNE] WHERE DO_Type = 6 ORDER BY cbCreation desc;

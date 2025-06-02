@@ -79,7 +79,8 @@ class SellController extends Controller
                 'DL_MontantHT',
                 'DL_MontantTTC',
                 'DL_PrixUnitaire',
-                'DL_Taxe1'
+                'DL_Taxe1',
+                'DL_Qte'
             )
             ->get();
 
@@ -134,15 +135,16 @@ class SellController extends Controller
 
 
             // Incrémentation des stocks
-            $qte = floatval($line->DL_Qte ?? 0);
+            $qte = floatval($line->DL_Qte);
 
-            DB::table('F_ARTSTOCK')
+
+            $updated = DB::table('F_ARTSTOCK')
                 ->where('AR_Ref', $line->AR_Ref)
                 ->update([
                     'AS_QteSto'  => DB::raw("AS_QteSto + {$qte}"),
-                    'AS_MontSto' => DB::raw("AS_MontSto + (0 * {$qte})"),
                 ]);
 
+            logger("No rows updated for AR_Ref: {$line->AR_Ref} with qte: {$qte}");
 
 
             $result[] = [

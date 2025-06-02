@@ -2,6 +2,8 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Docentete;
+use App\Models\Docligne;
 use App\Models\Document;
 use Illuminate\Http\Request;
 use DateTime;
@@ -182,4 +184,36 @@ public function longList()
 
         return response()->json($documents);
     }
+
+
+    public function history($piece)
+    {
+        $docligne = Docligne::where('DO_Piece', $piece)
+            ->orWhere('DL_PieceBC', $piece)
+            ->orWhere('DL_PieceBL', $piece)
+            ->orWhere('DL_PiecePL', $piece)
+            ->orWhere('DL_PieceDE', $piece)
+            ->first();
+
+        return $docligne->cbMarq;
+    }
+
+    public function livraison()
+    {
+        $documents = Document::with('docentete')->get();
+
+        foreach ($documents as $document) {
+            $cbMarq = $this->history(strval($document->piece));
+
+            if ($cbMarq !== null) {
+                $document->update([
+                    'docentete_id' => strval($cbMarq)
+                ]);
+            }
+        }
+
+        return $documents;
+    }
+
+
 }

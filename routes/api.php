@@ -42,6 +42,11 @@ Route::prefix('documents')->controller(DocumentController::class)->group(functio
 });
 
 
+Route::get('document/history/{piece}', [DocumentController::class, 'history']);
+
+Route::get('document/livraison', [DocumentController::class, 'livraison']);
+
+
 
 Route::get("preparation/{piece}/{companyId}", [PaletteController::class, 'validationCompany']);
 
