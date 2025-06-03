@@ -186,7 +186,7 @@ public function longList()
     }
 
 
-    public function history($piece)
+    public function history($piece): string
     {
         $docligne = Docligne::whereIn('DO_Type', [3, 5])->where('DO_Piece', $piece)
             ->orWhere('DL_PieceBC', $piece)
@@ -195,23 +195,83 @@ public function longList()
             ->orWhere('DL_PieceDE', $piece)
             ->first();
 
-        return $docligne->cbMarq;
+        return strval($docligne->docentete->cbMarq);
     }
 
 
+    /**
+     * Find the corresponding Docligne entry to convert from a given piece.
+     */
+    public function documentToConvert($piece)
+    {
+        return Docligne::where(function ($query) use ($piece) {
+                $query->whereIn('DO_Type', [3, 5])
+                      ->where('DO_Piece', $piece);
+            })
+            ->orWhere('DL_PieceBC', $piece)
+            ->orWhere('DL_PieceBL', $piece)
+            ->orWhere('DL_PiecePL', $piece)
+            ->orWhere('DL_PieceDE', $piece)
+            ->first();
+    }
+
+    /**
+     * Convert documents by linking them to their corresponding docentete based on related Docligne entries.
+     */
+    public function convertDocument()
+    {
+        Document::with('docentete')
+            ->doesntHave('docentete')
+            ->get()
+            ->each(function ($document) {
+                $doc = $this->documentToConvert($document->piece);
+                $cbMarq = $doc?->docentete?->cbMarq;
+                $doPiece = $doc?->docentete?->DO_Piece;
+                $document->update([
+                    'docentete_id' => $cbMarq ?? $document->docentete_id,
+                    'piece_bl'     => str_contains($doPiece, 'BL') ? $doPiece : $document->piece_bl,
+                    'piece_fa'     => str_contains($doPiece, 'FA') ? $doPiece : $document->piece_fa,
+                ]);
+
+            });
+    }
+
+
+    public function readyDocuments(){
+        $this->convertDocument();
+
+         return Document::with('docentete')
+            ->whereNull('piece_bl')
+            ->whereIn('status_id', [10, 11]) // Controlled or Validated
+            ->get();
+    }
+
+
+
+    /**
+     * Entry point to convert documents and return updated list.
+     */
     public function livraison()
     {
-        $documents = Document::where('status_id', 11)->get();
+        $this->convertDocument();
 
-        foreach ($documents as $document) {
-            $document->update([
-                'docentete_id' =>  $this->history($document->piece)
-            ]);
-        }
+        return Document::with(['docentete' => function ($docentete) {
+            $docentete->select('DO_Type', 'DO_Piece', 'DO_Date', 'DO_DateLivr', 'cbMarq');
+        }, 'status'])
 
-        return $documents;
+            ->whereNotNull('piece_bl')
+            ->whereNull("piece_fa")
+            ->paginate(20);
     }
 
+
+    public function show($piece)
+    {
+        $document = Document::with(['docentete' => function ($docentete) {
+            $docentete->select('DO_Type', 'DO_Piece', 'DO_Date', 'DO_DateLivr', 'cbMarq');
+        }, 'status'])->where('piece', $piece);
+        return $document;
+    }
 
 
 }

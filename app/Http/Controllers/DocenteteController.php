@@ -3,7 +3,6 @@
 namespace App\Http\Controllers;
 
 use App\Models\Action;
-use App\Models\Article;
 use App\Models\Docentete;
 use App\Models\Docligne;
 use App\Models\Document;

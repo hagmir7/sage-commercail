@@ -24,8 +24,7 @@ class StatusSeeder extends Seeder
             ['name' => 'Contrôle',    'color' => '#d35400'], // Dark Orange
             ['name' => 'Contrôlé',    'color' => '#e67e22'], // Bright Orange
             ['name' => 'Validé',      'color' => '#2ecc71'], // Emerald
-            ['name' => 'Prêt',        'color' => '#34495e'], // Navy Blue
-            ['name' => 'À livrer',    'color' => '#e74c3c'], // Red
+            ['name' => 'Livraison',        'color' => '#34495e'], // Navy Blue
             ['name' => 'Livré',       'color' => '#2c3e50'], // Dark Blue
         ];
 
