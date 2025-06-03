@@ -119,6 +119,12 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('inventory/{inventory}', [InventoryController::class, 'show']);
 
 
+    Route::prefix('depots')->controller(DepotController::class)->group(function () {
+        Route::get('/', 'list');
+        Route::get('/{depot}', 'show');
+    });
+
+
     // Test
     // Route::get("docentete/validation/{id}", [DocenteteController::class, 'validation']);
 });
