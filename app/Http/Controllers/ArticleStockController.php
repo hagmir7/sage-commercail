@@ -23,6 +23,16 @@ class ArticleStockController extends Controller
             $query->where('family_id', $request->family_id);
         }
 
+        if ($request->has('search') && $request->search !== '') {
+            $search = $request->search;
+            $query->where(function ($q) use ($search) {
+                $q->where('code', 'like', "%$search%")
+                    ->orWhere('name', 'like', "%$search%")
+                    ->orWhere('description', 'like', "%$search%")
+                    ->orWhere('color', 'like', "%$search%");
+            });
+        }
+
 
         $articles = $query->with(['family'])->paginate(100);
         return response()->json($articles);
