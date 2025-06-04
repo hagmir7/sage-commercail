@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Http\Controllers\API;
+namespace App\Http\Controllers;
 
 use App\Http\Controllers\Controller;
 use App\Models\ArticleStock;
@@ -23,12 +23,9 @@ class ArticleStockController extends Controller
             $query->where('family_id', $request->family_id);
         }
 
-        if ($request->has('palette_id')) {
-            $query->where('palette_id', $request->palette_id);
-        }
 
-        $articles = $query->with(['family', 'palette'])->get();
-        return response()->json(['data' => $articles]);
+        $articles = $query->with(['family'])->paginate(100);
+        return response()->json($articles);
     }
 
     /**

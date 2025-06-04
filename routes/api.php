@@ -3,6 +3,8 @@
 // use App\Http\Controllers\ArticleFamilyController;
 // use App\Http\Controllers\CompanyController;
 // use App\Http\Controllers\PositionController;
+
+use App\Http\Controllers\ArticleStockController;
 use App\Http\Controllers\ArticleController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\ClientController;
@@ -144,24 +146,21 @@ Route::get('/user/{id}', [AuthController::class, 'show']);
 
 Route::post('/user/update/{id}', [UserController::class, 'update']);
 
-// Pallets
-Route::prefix('v1')->group(function () {
-    // Companies
-    // Route::apiResource('companies', CompanyController::class);
+// Companies
+// Route::apiResource('companies', CompanyController::class);
 
-    // Depots
-    Route::apiResource('depots', DepotController::class);
+// Depots
+// Route::apiResource('depots', DepotController::class);
 
-    // Positions
-    // Route::apiResource('positions', PositionController::class);
+// Positions
+// Route::apiResource('positions', PositionController::class);
 
-    // Palettes
-    Route::apiResource('palettes', PaletteController::class);
+// Palettes
+Route::apiResource('palettes', PaletteController::class);
 
-    // Article Families
-    // Route::apiResource('article-families', ArticleFamilyController::class);
+// Article Families
+// Route::apiResource('article-families', ArticleFamilyController::class);
 
-    // Articles
-    Route::apiResource('articles', ArticleController::class);
-});
+// Articles
+Route::apiResource('articles', ArticleStockController::class);
 
