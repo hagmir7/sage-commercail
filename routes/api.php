@@ -44,7 +44,7 @@ Route::prefix('documents')->controller(DocumentController::class)->group(functio
 
 Route::get('document/history/{piece}', [DocumentController::class, 'history']);
 
-Route::get('document/livraison', [DocumentController::class, 'livraison']);
+
 
 
 
@@ -117,6 +117,12 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('inventory/article/{code}', [InventoryController::class, 'scanArticle']);
     Route::get('inventory/list', [InventoryController::class, 'list']);
     Route::get('inventory/{inventory}', [InventoryController::class, 'show']);
+
+
+
+    Route::prefix('document')->controller(DocumentController::class)->group(function () {
+        Route::get('livraison', 'livraison');
+    });
 
 
     Route::prefix('depots')->controller(DepotController::class)->group(function () {

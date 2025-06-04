@@ -229,6 +229,7 @@ public function longList()
                 $doPiece = $doc?->docentete?->DO_Piece;
                 $document->update([
                     'docentete_id' => $cbMarq ?? $document->docentete_id,
+                    'status_id' => str_contains($doPiece, 'BL') ? 12 : $document->status_id,
                     'piece_bl'     => str_contains($doPiece, 'BL') ? $doPiece : $document->piece_bl,
                     'piece_fa'     => str_contains($doPiece, 'FA') ? $doPiece : $document->piece_fa,
                 ]);
@@ -242,7 +243,7 @@ public function longList()
 
          return Document::with('docentete')
             ->whereNull('piece_bl')
-            ->whereIn('status_id', [10, 11]) // Controlled or Validated
+            ->whereIn('status_id', [10, 11])
             ->get();
     }
 
@@ -251,18 +252,46 @@ public function longList()
     /**
      * Entry point to convert documents and return updated list.
      */
-    public function livraison()
+    public function livraison(Request $request)
     {
         $this->convertDocument();
 
-        return Document::with(['docentete' => function ($docentete) {
-            $docentete->select('DO_Type', 'DO_Piece', 'DO_Date', 'DO_DateLivr', 'cbMarq');
-        }, 'status'])
+        $user = auth()->user();
+        $documents = Document::with([
+            'docentete' => fn($query) => $query->select('DO_Type', 'DO_Piece', 'DO_Date', 'DO_DateLivr', 'cbMarq'),
+            'status'
+        ]);
 
-            ->whereNotNull('piece_bl')
-            ->whereNull("piece_fa")
-            ->paginate(20);
+        if ($user->hasRole('commercial')) {
+            $documents->whereNotNull('piece_bl')
+                    ->whereNull('piece_fa');
+        } elseif ($user->hasRole('chargement')) {
+            $documents->where([
+                ['status_id', '=', 11],
+                ['role_id', '=', 1],
+            ]);
+        } elseif ($user->hasRole('preparation')) {
+            $status = $request->input('status');
+            $documents->when($status, 
+                fn($query) => $query->where('status_id', $status),
+                fn($query) => $query->whereIn('status_id', [11, 12])
+            );
+        }
+
+        if ($request->has('search') && $request->search != '') {
+            $search = $request->search;
+            $documents->where(function ($query) use ($search) {
+                $query->where('piece', 'like', "%$search%")
+                    ->orWhere('ref', 'like', "%$search%")
+                    ->orWhere('client_id', 'like', "%$search%")
+                    ->orWhere('piece_bl', "%$search%");
+            });
+        }
+
+        return $documents->paginate(20);
     }
+
+
 
 
     public function show($piece)
