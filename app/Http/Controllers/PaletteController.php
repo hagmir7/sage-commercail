@@ -151,7 +151,11 @@ class PaletteController extends Controller
         }
 
         try {
-            $line = Line::with('docligne')->find($request->line);
+            $line = Line::with(['docligne' => function($query){
+                $query->select("DO_Piece", "cbMarq", "DO_Ref", "CT_Num" ,"Hauteur", "Largeur", "Chant", "Poignée");
+            }, 'article_stock' => function($query){
+                $query->select("code", "name", "height", "width", "depth", "color", "thickness", 'chant');
+            }])->find($request->line);
             return response()->json($line);
         } catch (\Exception $e) {
             return response()->json([
