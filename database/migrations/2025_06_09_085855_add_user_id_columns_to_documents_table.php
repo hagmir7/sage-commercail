@@ -14,6 +14,7 @@ return new class extends Migration
     {
         Schema::table('documents', function (Blueprint $table) {
             $table->foreignIdFor(User::class)->nullable(); // chargement
+            $table->foreignIdFor(User::class, 'delivered_by')->nullable();
         });
     }
 
@@ -24,6 +25,7 @@ return new class extends Migration
     {
         Schema::table('documents', function (Blueprint $table) {
             $table->dropColumn('user_id');
+            $table->dropColumn('delivered_by');
         });
     }
 };

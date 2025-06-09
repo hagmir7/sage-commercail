@@ -8,7 +8,22 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 class Document extends Model
 {
 
-    protected $fillable = ['docentete_id', 'piece', 'type', 'ref', 'expedition', 'transfer_by', 'controlled_by', 'validated_by', 'client_id', 'status_id', 'piece_bl', 'piece_fa', 'user_id'];
+    protected $fillable = [
+        'docentete_id',
+        'piece',
+        'type',
+        'ref',
+        'expedition',
+        'transfer_by',
+        'controlled_by',
+        'validated_by',
+        'client_id',
+        'status_id',
+        'piece_bl',
+        'piece_fa',
+        'user_id',
+        'delivered_by'
+    ];
 
     // protected $dateFormat = 'Y-d-m H:i:s.v';
 
@@ -82,5 +97,4 @@ class Document extends Model
 
         return true;
     }
-
 }

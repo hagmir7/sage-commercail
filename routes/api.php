@@ -41,6 +41,7 @@ Route::prefix('documents')->controller(DocumentController::class)->group(functio
     Route::get('/ready', 'ready');
     Route::get('/progress/{piece}', 'progress');
     Route::get('/{piece}', 'checkControlled');
+    Route::get('chargement/{document}', 'addChargement');
 });
 
 
@@ -80,6 +81,7 @@ Route::middleware('auth:sanctum')->group(function () {
     // Get user Role and permissions
     Route::get('/user/{id}/permissions', [UserPermissionController::class, 'getUserRolesAndPermissions']);
     Route::get('/user/permissions', [UserPermissionController::class, 'getAuthUserRolesAndPermissions']);
+    Route::get('roles/chargement', [RoleController::class, 'chargeRoles']);
     //
 
     Route::get("docentete/validation", [DocenteteController::class, 'validation']);

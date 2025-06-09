@@ -8,6 +8,7 @@ use App\Models\Document;
 use Illuminate\Http\Request;
 use DateTime;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Validator;
 
 class DocumentController extends Controller
 {
@@ -232,7 +233,6 @@ class DocumentController extends Controller
                     'piece_bl'     => str_contains($doPiece, 'BL') ? $doPiece : $document->piece_bl,
                     'piece_fa'     => str_contains($doPiece, 'FA') ? $doPiece : $document->piece_fa,
                 ]);
-
             });
     }
 
@@ -299,6 +299,29 @@ class DocumentController extends Controller
             $docentete->select('DO_Type', 'DO_Piece', 'DO_Date', 'DO_DateLivr', 'cbMarq');
         }, 'status'])->where('piece', $piece);
         return $document;
+    }
+
+
+
+    public function addChargement(Document $document, Request $request)
+    {
+        $validator = Validator::make($request->all(), [
+            'user_id' => 'required|integer|exists:users,id',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'errors' => $validator->errors()
+            ], 422); // HTTP 422 Unprocessable Entity
+        }
+
+        $document->user_id = $request->user_id;
+        $document->save();
+
+        return response()->json([
+            'message' => 'Agent de chargement attribué avec succès',
+            'document' => $document // facultatif si vous voulez renvoyer l'objet mis à jour
+        ]);
     }
 
 

@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Role;
+use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
 
@@ -48,6 +49,13 @@ class RoleController extends Controller
                 'error' => "Role '{$roleName}' not found for the 'web' guard."
             ], 404);
         }
+    }
+
+
+    public function chargeRoles(){
+        return User::role('chargement')
+            ->where('company_id', auth()->user()->company_id)
+            ->select('id AS value', 'full_name AS label')->get();
     }
 }
 
