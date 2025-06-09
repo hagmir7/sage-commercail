@@ -259,15 +259,15 @@ class DocumentController extends Controller
         $documents = Document::with([
             'docentete' => fn($query) => $query->select('DO_Type', 'DO_Piece', 'DO_Date', 'DO_DateLivr', 'cbMarq', 'DO_Statut'),
             'status'
-        ]);
+        ])->withCount('palettes');
 
         if ($user->hasRole('commercial')) {
             $documents->whereNotNull('piece_bl')
                     ->whereNull('piece_fa');
         } elseif ($user->hasRole('chargement')) {
             $documents->where([
-                ['status_id', '=', 11],
-                ['user_id', '=', 1],
+                ['status_id', '=', 12],
+                ['user_id', '=', auth()->id()],
             ]);
         } elseif ($user->hasRole('preparation')) {
             $status = $request->input('status');
@@ -320,7 +320,7 @@ class DocumentController extends Controller
 
         return response()->json([
             'message' => 'Agent de chargement attribué avec succès',
-            'document' => $document // facultatif si vous voulez renvoyer l'objet mis à jour
+            'document' => $document
         ]);
     }
 

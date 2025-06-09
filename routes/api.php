@@ -41,14 +41,11 @@ Route::prefix('documents')->controller(DocumentController::class)->group(functio
     Route::get('/ready', 'ready');
     Route::get('/progress/{piece}', 'progress');
     Route::get('/{piece}', 'checkControlled');
-    Route::get('chargement/{document}', 'addChargement');
+    Route::post('chargement/{document}', 'addChargement');
 });
 
 
 Route::get('document/history/{piece}', [DocumentController::class, 'history']);
-
-
-
 
 
 Route::get("preparation/{piece}/{companyId}", [PaletteController::class, 'validationCompany']);
