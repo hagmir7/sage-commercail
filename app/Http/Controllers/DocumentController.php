@@ -13,7 +13,7 @@ class DocumentController extends Controller
 {
     public function checkControlled($piece)
     {
-        $document = Document::where('piece', $piece)->first();
+        $document = Document::with('palettes')->where('piece', $piece)->first();
         if (!$document) {
             return response()->json(['error' => "Document not found!"], 404);
         }
@@ -55,35 +55,35 @@ class DocumentController extends Controller
     }
 
 
-public function longList()
-{
-    $documents = Document::with(['status', 'lines.palettes'])
-        ->withCount('lines')
-        ->orderByDesc('updated_at')
-        ->get();
+    public function longList()
+    {
+        $documents = Document::with(['status', 'lines.palettes'])
+            ->withCount('lines')
+            ->orderByDesc('updated_at')
+            ->get();
 
-    $documents = $documents->map(function ($document) {
-        $required_qte = $document->lines->sum('quantity') ?? 0;
+        $documents = $documents->map(function ($document) {
+            $required_qte = $document->lines->sum('quantity') ?? 0;
 
-        $current_qte = 0;
-        foreach ($document->lines as $line) {
-            foreach ($line->palettes as $palette) {
-                $current_qte += $palette->pivot->quantity;
+            $current_qte = 0;
+            foreach ($document->lines as $line) {
+                foreach ($line->palettes as $palette) {
+                    $current_qte += $palette->pivot->quantity;
+                }
             }
-        }
 
-        $progress = $required_qte > 0 ? round(($current_qte / $required_qte) * 100, 2) : 0;
+            $progress = $required_qte > 0 ? round(($current_qte / $required_qte) * 100, 2) : 0;
 
-        // Add progress details to each document
-        $document->current_qte = $current_qte;
-        $document->required_qte = $required_qte;
-        $document->progress = intval($progress);
+            // Add progress details to each document
+            $document->current_qte = $current_qte;
+            $document->required_qte = $required_qte;
+            $document->progress = intval($progress);
 
-        return $document;
-    });
+            return $document;
+        });
 
-    return response()->json($documents);
-}
+        return response()->json($documents);
+    }
 
     public function list(Request $request)
     {
@@ -268,7 +268,7 @@ public function longList()
         } elseif ($user->hasRole('chargement')) {
             $documents->where([
                 ['status_id', '=', 11],
-                ['role_id', '=', 1],
+                ['user_id', '=', 1],
             ]);
         } elseif ($user->hasRole('preparation')) {
             $status = $request->input('status');
@@ -288,7 +288,7 @@ public function longList()
             });
         }
 
-        return $documents->paginate(20);
+        return $documents->orderByDesc('created_at')->paginate(20);
     }
 
 
