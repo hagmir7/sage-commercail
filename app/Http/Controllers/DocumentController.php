@@ -220,8 +220,7 @@ class DocumentController extends Controller
      */
     public function convertDocument()
     {
-        Document::with('docentete')
-            ->doesntHave('docentete')
+        Document::doesntHave('docentete')
             ->get()
             ->each(function ($document) {
                 $doc = $this->documentToConvert($document->piece);
@@ -229,7 +228,7 @@ class DocumentController extends Controller
                 $doPiece = $doc?->docentete?->DO_Piece;
                 $document->update([
                     'docentete_id' => $cbMarq ?? $document->docentete_id,
-                    'status_id' => str_contains($doPiece, 'BL') ? 12 : $document->status_id,
+                    'status_id' => str_contains($doPiece, 'BL') ? (intval($doc?->docentete?->DO_Statut) == 1 ? 13 : 12) : $document->status_id,
                     'piece_bl'     => str_contains($doPiece, 'BL') ? $doPiece : $document->piece_bl,
                     'piece_fa'     => str_contains($doPiece, 'FA') ? $doPiece : $document->piece_fa,
                 ]);
@@ -258,7 +257,7 @@ class DocumentController extends Controller
 
         $user = auth()->user();
         $documents = Document::with([
-            'docentete' => fn($query) => $query->select('DO_Type', 'DO_Piece', 'DO_Date', 'DO_DateLivr', 'cbMarq'),
+            'docentete' => fn($query) => $query->select('DO_Type', 'DO_Piece', 'DO_Date', 'DO_DateLivr', 'cbMarq', 'DO_Statut'),
             'status'
         ]);
 
