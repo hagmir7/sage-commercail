@@ -22,7 +22,6 @@ class Document extends Model
         'piece_bl',
         'piece_fa',
         'user_id',
-        'delivered_by'
     ];
 
     // protected $dateFormat = 'Y-d-m H:i:s.v';

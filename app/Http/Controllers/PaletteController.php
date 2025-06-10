@@ -140,7 +140,7 @@ class PaletteController extends Controller
 
 
 
-    public function scan(Request $request)
+    public function scanLine(Request $request)
     {
         $validator = Validator::make($request->all(), [
             'line' => 'required|exists:lines,id',
@@ -166,9 +166,77 @@ class PaletteController extends Controller
     }
 
 
+    public function scanPalette($code)
+    {
+        try {
+            $palette = Palette::where('code', $code)
+                ->select("id", 'code', 'type', 'company_id', 'document_id')
+                ->withCount('lines')
+                ->with(['company', 'lines' => function($query){
+                    $query->select('lines.id', 'lines.quantity');
+                }, 'document'])
+                ->first();
+
+            if (!$palette) {
+                return response()->json([
+                    'error' => 'Palette not found',
+                    'message' => 'No palette found with the provided code.'
+                ], 404);
+            }
+
+            $palette['quantity'] = $palette->lines->sum('quantity');
+
+            return response()->json($palette);
+        } catch (\Exception $e) {
+            return response()->json([
+                'error' => 'An error occurred while processing the scan.',
+                'message' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    public function confirmPalette($code)
+    {
+        try {
+            $palette = Palette::with('document.palettes')->where('code', $code)->first();
+
+            if (!$palette) {
+                return response()->json([
+                    'error' => 'Palette not found',
+                    'message' => 'No palette found with the provided code.'
+                ], 404);
+            }
+
+            // Update the current palette
+            $palette->delivered_at = now();
+            $palette->save();
+
+            // Check if all palettes in the document are delivered
+            $allPalettesDelivered = $palette->document->palettes
+                ->every(function ($p) {
+                    return !is_null($p->delivered_at);
+                });
+
+            // Add delivery status to response
+            $palette['all_palettes_delivered'] = $allPalettesDelivered;
+
+            if ($allPalettesDelivered) {
+                $palette->document->update([
+                    'status_id' => 14
+                ]);
+            }
+
+            return response()->json($palette);
+        } catch (\Exception $e) {
+            return response()->json([
+                'error' => 'An error occurred while processing the scan.',
+                'message' => $e->getMessage()
+            ], 500);
+        }
+    }
 
 
-
+    
     public function confirm(Request $request)
     {
         $validator = Validator::make($request->all(), [

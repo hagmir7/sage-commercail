@@ -98,8 +98,13 @@ Route::middleware('auth:sanctum')->group(function () {
 
     Route::post('palettes/validate/{piece}', [DocenteteController::class, 'validate']);
     Route::post('palettes/generate', [PaletteController::class, 'generate']);
-    Route::post('palettes/scan', [PaletteController::class, 'scan']);
+    Route::post('palettes/scan', [PaletteController::class, 'scanLine']);
+    Route::get('palettes/scan/{code}', [PaletteController::class, 'scanPalette']);
     Route::post('palettes/confirm', [PaletteController::class, 'confirm']);
+    Route::post('palettes/confirm/{code}', [PaletteController::class, 'confirmPalette']);
+
+    
+
     Route::post('palettes/detach', [PaletteController::class, 'detach']);
     Route::post('palettes/create', [PaletteController::class, 'create']);
     Route::get('palettes/{code}', [PaletteController::class, 'show']);
@@ -108,7 +113,7 @@ Route::middleware('auth:sanctum')->group(function () {
 
     //
     Route::get('palettes/document/{piece}', [PaletteController::class, 'documentPalettes']);
-
+    
     Route::get("calculator/{piece}", [SellController::class, 'calculator']);
 
 

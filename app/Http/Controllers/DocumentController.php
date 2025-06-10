@@ -229,7 +229,7 @@ class DocumentController extends Controller
                 $doPiece = $doc?->docentete?->DO_Piece;
                 $document->update([
                     'docentete_id' => $cbMarq ?? $document->docentete_id,
-                    'status_id' => str_contains($doPiece, 'BL') ? (intval($doc?->docentete?->DO_Statut) == 1 ? 13 : 12) : $document->status_id,
+                    'status_id' => str_contains($doPiece, 'BL') ? 12 : $document->status_id,
                     'piece_bl'     => str_contains($doPiece, 'BL') ? $doPiece : $document->piece_bl,
                     'piece_fa'     => str_contains($doPiece, 'FA') ? $doPiece : $document->piece_fa,
                 ]);
@@ -273,7 +273,7 @@ class DocumentController extends Controller
             $status = $request->input('status');
             $documents->when($status, 
                 fn($query) => $query->where('status_id', $status),
-                fn($query) => $query->whereIn('status_id', [11, 12])
+                fn($query) => $query->whereIn('status_id', [11, 12,13])
             );
         }
 
@@ -312,17 +312,31 @@ class DocumentController extends Controller
         if ($validator->fails()) {
             return response()->json([
                 'errors' => $validator->errors()
-            ], 422); // HTTP 422 Unprocessable Entity
+            ], 422);
         }
 
-        $document->user_id = $request->user_id;
-        $document->save();
+        DB::transaction(function () use ($document, $request) {
+            // Fix N+1: Update all palettes in a single query instead of looping
+            $document->palettes()->update([
+                'delivered_by' => $request->user_id,
+            ]);
+
+            // Fix N+1: Use whereHas to find and update the company relationship directly
+            DB::table('document_companies') // or whatever your pivot table is named
+                ->where('document_id', $document->id)
+                ->where('company_id', auth()->id())
+                ->update(['status_id' => 13]);
+
+            // Update document status
+            $document->update(['status_id' => 13]);
+        });
+
+        // Load the document with relationships for the response if needed
+        $document->load(['palettes', 'companies']);
 
         return response()->json([
             'message' => 'Agent de chargement attribué avec succès',
             'document' => $document
         ]);
     }
-
-
 }

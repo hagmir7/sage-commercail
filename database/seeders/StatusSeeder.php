@@ -24,8 +24,9 @@ class StatusSeeder extends Seeder
             ['name' => 'Contrôle',    'color' => '#d35400'], // Dark Orange
             ['name' => 'Contrôlé',    'color' => '#e67e22'], // Bright Orange
             ['name' => 'Validé',      'color' => '#2ecc71'], // Emerald
-            ['name' => 'Livraison',        'color' => '#34495e'], // Navy Blue
-            ['name' => 'Livré',       'color' => '#2c3e50'], // Dark Blue
+            ['name' => 'Livraison',   'color' => '#34495e'], // Navy Blue
+            ['name' => 'Chargement',   'color' => '#34495e'], 
+            ['name' => 'Livré', 'color' => '#2c3e50'], // Dark Blue
         ];
 
         foreach ($statuses as $status) {

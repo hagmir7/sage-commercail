@@ -25,9 +25,10 @@ return new class extends Migration
             $table->foreignIdFor(User::class, 'transfer_by')->constrained('users')->onDelete('cascade');
             $table->foreignIdFor(User::class, 'validated_by')->nullable();
             $table->foreignIdFor(User::class, 'controlled_by')->nullable();
-            $table->foreignIdFor(User::class, 'delivered_by')->nullable();
             $table->foreignIdFor(User::class)->nullable(); // chargement
             $table->foreignIdFor(Status::class)->default(1);
+            $table->string('piece_bl')->nullable();
+            $table->string('piece_fa')->nullable();
             $table->timestamps();
         });
     }
