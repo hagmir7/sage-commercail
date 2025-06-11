@@ -117,15 +117,20 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get("calculator/{piece}", [SellController::class, 'calculator']);
 
 
-    Route::post('inventory/insert/{inventory}', [InventoryController::class, 'insert']);
-    Route::post('inventory/create', [InventoryController::class, 'create']);
-    Route::get('inventory/emplacement/{code}', [InventoryController::class, 'scanEmplacmenet']);
-    Route::get('inventory/article/{code}', [InventoryController::class, 'scanArticle']);
-    Route::get('inventory/list', [InventoryController::class, 'list']);
-    Route::get('inventory/{inventory}', [InventoryController::class, 'show']);
+    
+    Route::prefix('inventory')->controller(InventoryController::class)->group(function () {
+        Route::post('insert/{inventory}', 'insert');
+        Route::post('create', 'create');
+        Route::get('emplacement/{code}', 'scanEmplacmenet');
+        Route::get('article/{code}', 'scanArticle');
+        Route::get('list', 'list');
+        Route::delete('delete/movement/{inventory_movement}', 'deleteMovement');
+        Route::get('{inventory}', 'show');
+        Route::get("articles/{inventory}", 'stockArticle');
+    });
 
 
-
+    
     Route::prefix('document')->controller(DocumentController::class)->group(function () {
         Route::get('livraison', 'livraison');
     });
