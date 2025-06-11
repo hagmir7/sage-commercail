@@ -248,7 +248,7 @@ class InventoryController extends Controller
             })
             ->select(
                 'article_stocks.*',
-                'inventory_stocks.quantity as inventory_quantity'
+                'inventory_stocks.quantity as inventory_quantity',
             );
 
         $query->orderByDesc("inventory_quantity");

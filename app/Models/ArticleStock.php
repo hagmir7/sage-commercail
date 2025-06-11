@@ -42,4 +42,8 @@ class ArticleStock extends Model
     {
         return $this->belongsToMany(Palette::class)->withPivot('quantity')->withTimestamps();
     }
+
+    public function inventoryMovements(){
+        return $this->hasMany(InventoryMovement::class, 'code_article', 'code');
+    }
 }
