@@ -18,4 +18,8 @@ class InventoryStock extends Model
         'price',
 
     ];
+
+    public function article(){
+        return $this->belongsTo(ArticleStock::class, 'code_article', 'code');
+    }
 }

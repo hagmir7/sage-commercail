@@ -124,6 +124,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('emplacement/{code}', 'scanEmplacmenet');
         Route::get('article/{code}', 'scanArticle');
         Route::get('list', 'list');
+        Route::get('overview/{inventory}', 'overview');
         Route::delete('delete/movement/{inventory_movement}', 'deleteMovement');
         Route::get('{inventory}', 'show');
         Route::get("articles/{inventory}", 'stockArticle');

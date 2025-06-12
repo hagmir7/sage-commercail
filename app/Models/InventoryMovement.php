@@ -31,5 +31,9 @@ class InventoryMovement extends Model
         return $this->belongsTo(Inventory::class);
     }
 
+    public function article(){
+        return $this->belongsTo(ArticleStock::class, 'code_article', 'code');
+    }
+
 
 }

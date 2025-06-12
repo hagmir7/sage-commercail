@@ -272,4 +272,37 @@ class InventoryController extends Controller
 
         return response()->json($articles);
     }
+
+
+    public function overview(Inventory $inventory)
+    {
+        $inventory->load(['movements.article', 'stock.article']);
+        $quantity_in = $inventory->movements->where('type', 'IN')->sum('quantity');
+        $quantity_out = $inventory->movements->where('type', 'OUT')->sum('quantity');
+
+        $value_in = $inventory->movements->where('type', 'IN')->sum(function ($movement) {
+            return $movement->quantity * ($movement->article->price ?? 0);
+        });
+
+        $value_out = $inventory->movements->where('type', 'OUT')->sum(function ($movement) {
+            return $movement->quantity * ($movement->article->price ?? 0);
+        });
+
+        $quantity = $inventory->stock->sum('quantity');
+
+        $value = $inventory->stock->sum(function ($stock) {
+            return $stock->quantity * ($stock->article->price ?? 0);
+        });
+
+        return [
+            'quantity_in' => $quantity_in,
+            'quantity_out' => $quantity_out,
+            'value_in' => $value_in,
+            'value_out' => $value_out,
+            'quantity' => $quantity,
+            'value' => $value
+        ];
+    }
+
+
 }
