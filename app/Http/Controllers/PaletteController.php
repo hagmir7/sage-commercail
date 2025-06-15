@@ -236,7 +236,7 @@ class PaletteController extends Controller
     }
 
 
-    
+
     public function confirm(Request $request)
     {
         $validator = Validator::make($request->all(), [
@@ -284,19 +284,10 @@ class PaletteController extends Controller
                 }
 
                 if ($document->validationCompany(auth()->user()->company_id)) {
-
-                   $companyId = auth()->user()->company_id;
-
-                    $alreadyAttached = $document->companies()->where('companies.id', $companyId)->exists();
-
-                    if (!$alreadyAttached) {
-
-                        $document->companies()->attach($companyId, [
-                            'status_id' => 8,
-                            'updated_at' => now()
-                        ]);
-                    }
-
+                    $document->companies()->updateExistingPivot(auth()->user()->company_id, [
+                        'status_id' => 8,
+                        'updated_at' => now()
+                    ]);
                 }
             });
 
@@ -378,14 +369,26 @@ class PaletteController extends Controller
 
             $allConfirmed = !$palette->lines()->wherePivotNull('controlled_at')->exists();
 
+
+            $document = Line::find($lineId)->document;
             if ($allConfirmed) {
                 $palette->update(['controlled' => true]);
+
+                $document->update([
+                    'status_id' => 10
+                ]);
+            }else{
+                $document->update([
+                    'status_id' => 9
+                ]);
             }
 
-            $palette->load('lines'); // Refresh relationship after update
+            $palette->load('lines');
 
 
             $user_company = auth()->user()->company_id;
+
+
 
             $allControlledCompany = $palette->document->palettes
                 ->where('company_id', $user_company)
@@ -413,9 +416,6 @@ class PaletteController extends Controller
                     'controlled_at' => now()
                 ]);
             }
-
-
-
             return response()->json(['message' => "Article confirmed successfully"]);
         });
     }

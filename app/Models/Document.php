@@ -38,7 +38,7 @@ class Document extends Model
 
     public function lines()
     {
-        return $this->hasMany(Line::class, 'document_id', 'id');
+        return $this->hasMany(Line::class); // Adjust the namespace if needed
     }
 
 

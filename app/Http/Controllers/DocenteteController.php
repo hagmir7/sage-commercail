@@ -209,48 +209,36 @@ class DocenteteController extends Controller
 
 
 
-    // Validation and Controller List
+    // Controller & Validation List
     public function validation(Request $request)
     {
-        $query = Docentete::with(['document.status', 'document.companies'])
-            ->select([
-                'DO_Reliquat',
-                'DO_Piece',
-                'DO_Ref',
-                'DO_Tiers',
-                'cbMarq',
-                \DB::raw("CONVERT(VARCHAR(10), DO_Date, 111) AS DO_Date"),
-                \DB::raw("CONVERT(VARCHAR(10), DO_DateLivr, 111) AS DO_DateLivr"),
-                'DO_Expedit'
-            ])
-            ->whereHas('document.lines', function ($query) {
-                $query->whereIn('status_id', [8, 9, 10])->where("company_id", auth()->user()->company_id);
+        $query = Document::with([
+            'companies',
+            'docentete:cbMarq,DO_Date,DO_DateLivr,DO_Reliquat'
+        ])
+            ->whereHas('lines', function ($query) {
+                $query->where('company_id', auth()->user()->company_id);
             })
-            ->orderByDesc("DO_Date")
-            ->where('DO_Domaine', 0)
-            ->where('DO_Statut', 1);
+            ->whereHas('companies', function ($query) {
+                $query->whereIn('document_companies.status_id', [8, 9, 10]);
+            });
 
-
-
-        if ($request->has('status')) {
-            $query->where('DO_Type', $request->type);
-        } else {
-            $query->where('DO_Type', 2);
-        }
-
-        if ($request->has('search') && $request->search !== '') {
+        if ($request->filled('search')) {
             $search = $request->search;
             $query->where(function ($q) use ($search) {
-                $q->where('DO_Reliquat', 'like', "%$search%")
-                    ->orWhere('DO_Piece', 'like', "%$search%")
-                    ->orWhere('DO_Ref', 'like', "%$search%")
-                    ->orWhere('DO_Tiers', 'like', "%$search%");
+                $q->where('ref', 'like', "%$search%")
+                    ->orWhere('piece', 'like', "%$search%")
+                    ->orWhere('client_id', 'like', "%$search%");
             });
         }
-        $results = $query->paginate(20);
 
-        return response()->json($results);
+        $documents = $query->orderBy('created_at', 'desc')->paginate(20);
+
+        return response()->json($documents);
     }
+
+
+
 
 
 
@@ -506,12 +494,19 @@ class DocenteteController extends Controller
             $lines = Line::whereIn("id", $request->lines)->get();
 
             // Update status
+            $document = $lines[0]->document;
             if ($lines->isNotEmpty()) {
-                $document = $lines[0]->document;
                 $document->update([
                     'status_id' => $status == 7 ? 7 : 2
                 ]);
             }
+
+
+            $document->companies()->updateExistingPivot(auth()->user()->company_id, [
+                'status_id' => $status,
+                'updated_at' => now(),
+            ]);
+
 
             foreach ($lines as $line) {
                 $line->update([
@@ -567,6 +562,13 @@ class DocenteteController extends Controller
                     'validated_by' => null,
                 ]
             );
+
+            if (!$document->companies()->where('company_id', $request->company)->exists()) {
+                $document->companies()->attach($request->company, [
+                    'status_id' => 1,
+                    'updated_at' => now(),
+                ]);
+            }
 
             $lines = [];
 

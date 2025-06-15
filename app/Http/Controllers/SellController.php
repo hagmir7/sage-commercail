@@ -103,7 +103,7 @@ class SellController extends Controller
             $piece
         );
 
-   
+
 
         // Create document lines
         $result = [];
@@ -125,6 +125,12 @@ class SellController extends Controller
             );
 
 
+            DB::connection('sqlsrv')->unprepared("
+                SET NOCOUNT ON;
+                SET XACT_ABORT ON;
+                DISABLE TRIGGER ALL ON F_DOCLIGNEEMPL;
+            ");
+
             DB::table('F_DOCLIGNEEMPL')->insert([
                 'DL_No'            => $dl_no,
                 'DP_No'            => 1,
@@ -133,16 +139,46 @@ class SellController extends Controller
                 'cbCreationUser'   => '69C8CD64-D06F-4097-9CAC-E488AC2610F9',
             ]);
 
+            DB::connection('sqlsrv')->unprepared("
+                SET NOCOUNT ON;
+                SET XACT_ABORT ON;
+                DISABLE TRIGGER ALL ON F_DOCLIGNEEMPL;
+            ");
+
 
             // Incrémentation des stocks
             $qte = floatval($line->DL_Qte);
 
 
-            $updated = DB::table('F_ARTSTOCK')
-                ->where('AR_Ref', $line->AR_Ref)
-                ->update([
-                    'AS_QteSto'  => DB::raw("AS_QteSto + {$qte}"),
-                ]);
+
+
+            try {
+                DB::connection('sqlsrv')->unprepared("
+                SET NOCOUNT ON;
+                SET XACT_ABORT ON;
+                DISABLE TRIGGER ALL ON F_ARTSTOCK;
+            ");
+                $updated = DB::table('F_ARTSTOCK')
+                    ->where('AR_Ref', $line->AR_Ref)
+                    ->update([
+                        'AS_QteSto'  => DB::raw("AS_QteSto + {$qte}"),
+                    ]);
+
+                DB::connection('sqlsrv')->unprepared("
+                SET NOCOUNT ON;
+                SET XACT_ABORT ON;
+                DISABLE TRIGGER ALL ON F_ARTSTOCK;
+            ");
+            } catch (\Throwable $th) {
+                DB::connection('sqlsrv')->unprepared("
+                SET NOCOUNT ON;
+                SET XACT_ABORT ON;
+                DISABLE TRIGGER ALL ON F_ARTSTOCK;
+            ");
+            }
+
+
+
 
             logger("No rows updated for AR_Ref: {$line->AR_Ref} with qte: {$qte}");
 

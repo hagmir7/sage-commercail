@@ -36,13 +36,7 @@ Route::get('/user', function (Request $request) {
 Route::get("client/{client}", [ClientController::class, 'show']);
 Route::get("article/{article}", [ArticleController::class, 'show']);
 
-Route::prefix('documents')->controller(DocumentController::class)->group(function () {
-    Route::get('/', 'list');
-    Route::get('/ready', 'ready');
-    Route::get('/progress/{piece}', 'progress');
-    Route::get('/{piece}', 'checkControlled');
-    Route::post('chargement/{document}', 'addChargement');
-});
+
 
 
 Route::get('document/history/{piece}', [DocumentController::class, 'history']);
@@ -81,7 +75,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('roles/chargement', [RoleController::class, 'chargeRoles']);
     //
 
-    Route::get("docentete/validation", [DocenteteController::class, 'validation']);
+    // Route::get("docentete/validation", [DocenteteController::class, 'validation']);
     Route::post("docentete/transfer", [DocenteteController::class, 'transfer']);
     Route::get("docentete/shipping", [DocenteteController::class, 'shipping']);
     Route::get("docentetes/commercial", [DocenteteController::class, 'commercial']);
@@ -103,7 +97,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('palettes/confirm', [PaletteController::class, 'confirm']);
     Route::post('palettes/confirm/{code}', [PaletteController::class, 'confirmPalette']);
 
-    
+
 
     Route::post('palettes/detach', [PaletteController::class, 'detach']);
     Route::post('palettes/create', [PaletteController::class, 'create']);
@@ -113,11 +107,11 @@ Route::middleware('auth:sanctum')->group(function () {
 
     //
     Route::get('palettes/document/{piece}', [PaletteController::class, 'documentPalettes']);
-    
+
     Route::get("calculator/{piece}", [SellController::class, 'calculator']);
 
 
-    
+
     Route::prefix('inventory')->controller(InventoryController::class)->group(function () {
         Route::post('insert/{inventory}', 'insert');
         Route::post('create', 'create');
@@ -131,7 +125,7 @@ Route::middleware('auth:sanctum')->group(function () {
     });
 
 
-    
+
     Route::prefix('document')->controller(DocumentController::class)->group(function () {
         Route::get('livraison', 'livraison');
     });
@@ -140,6 +134,22 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::prefix('depots')->controller(DepotController::class)->group(function () {
         Route::get('/', 'list');
         Route::get('/{depot}', 'show');
+    });
+
+
+    Route::prefix('documents')->controller(DocumentController::class)->group(function () {
+        Route::get('/', 'list');
+        Route::get('/ready', 'ready');
+        Route::get('/progress/{piece}', 'progress');
+
+        Route::post('chargement/{document}', 'addChargement');
+        Route::get('validation-controller', 'validationControllerList');
+        Route::get('preparation-list', 'preparationList');
+
+
+
+        // All documents routes up to this route !
+        Route::get('/{piece}', 'checkControlled');
     });
 
 
