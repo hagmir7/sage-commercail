@@ -13,20 +13,20 @@ class StatusSeeder extends Seeder
     public function run(): void
     {
         $statuses = [
-            ['name' => 'Transféré',   'color' => '#f39c12'], // Orange
-            ['name' => 'Reçu',        'color' => '#27ae60'], // Green
-            ['name' => 'Fabrication', 'color' => '#2980b9'], // Blue
-            ['name' => 'Fabriqué',    'color' => '#3498db'], // Light Blue
-            ['name' => 'Montage',     'color' => '#9b59b6'], // Purple
-            ['name' => 'Monté',       'color' => '#8e44ad'], // Dark Purple
-            ['name' => 'Préparation', 'color' => '#16a085'], // Teal
-            ['name' => 'Préparé',     'color' => '#1abc9c'], // Aqua
-            ['name' => 'Contrôle',    'color' => '#d35400'], // Dark Orange
-            ['name' => 'Contrôlé',    'color' => '#e67e22'], // Bright Orange
-            ['name' => 'Validé',      'color' => '#2ecc71'], // Emerald
-            ['name' => 'Livraison',   'color' => '#34495e'], // Navy Blue
-            ['name' => 'Chargement',   'color' => '#34495e'], 
-            ['name' => 'Livré', 'color' => '#2c3e50'], // Dark Blue
+            ['name' => 'Transféré',   'color' => '#FF6B35'], // Vibrant orange
+            ['name' => 'Reçu',        'color' => '#10B981'], // Emerald green
+            ['name' => 'Fabrication', 'color' => '#3B82F6'], // Blue
+            ['name' => 'Fabriqué',    'color' => '#06B6D4'], // Cyan
+            ['name' => 'Montage',     'color' => '#8B5CF6'], // Purple
+            ['name' => 'Monté',       'color' => '#A855F7'], // Violet
+            ['name' => 'Préparation', 'color' => '#059669'], // Teal
+            ['name' => 'Préparé',     'color' => '#14B8A6'], // Light teal
+            ['name' => 'Contrôle',    'color' => '#F59E0B'], // Amber
+            ['name' => 'Contrôlé',    'color' => '#EF4444'], // Red
+            ['name' => 'Validé',      'color' => '#22C55E'], // Green
+            ['name' => 'Livraison',   'color' => '#6366F1'], // Indigo
+            ['name' => 'Chargement',  'color' => '#7C3AED'], // Deep purple
+            ['name' => 'Livré',       'color' => '#15803D'], // Dark green
         ];
 
         foreach ($statuses as $status) {

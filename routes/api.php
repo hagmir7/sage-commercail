@@ -95,7 +95,8 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('palettes/scan', [PaletteController::class, 'scanLine']);
     Route::get('palettes/scan/{code}', [PaletteController::class, 'scanPalette']);
     Route::post('palettes/confirm', [PaletteController::class, 'confirm']);
-    Route::post('palettes/confirm/{code}', [PaletteController::class, 'confirmPalette']);
+    Route::post('palettes/confirm/{code}/{piece}', [PaletteController::class, 'confirmPalette']);
+    Route::put('palettes/reset/{code}', [PaletteController::class, 'resetPalette']);
 
 
 
@@ -107,6 +108,7 @@ Route::middleware('auth:sanctum')->group(function () {
 
     //
     Route::get('palettes/document/{piece}', [PaletteController::class, 'documentPalettes']);
+    
 
     Route::get("calculator/{piece}", [SellController::class, 'calculator']);
 
@@ -146,9 +148,9 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('validation-controller', 'validationControllerList');
         Route::get('preparation-list', 'preparationList');
 
-
-
         // All documents routes up to this route !
+        Route::get('/{piece}/palettes', 'documentPalettes');
+        Route::get('{piece}/delivered-palettes', 'deliveredPalettes');
         Route::get('/{piece}', 'checkControlled');
     });
 

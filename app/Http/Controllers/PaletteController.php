@@ -151,9 +151,9 @@ class PaletteController extends Controller
         }
 
         try {
-            $line = Line::with(['docligne' => function($query){
-                $query->select("DO_Piece", "cbMarq", "DO_Ref", "CT_Num" ,"Hauteur", "Largeur", "Chant", "Poignée");
-            }, 'article_stock' => function($query){
+            $line = Line::with(['docligne' => function ($query) {
+                $query->select("DO_Piece", "cbMarq", "DO_Ref", "CT_Num", "Hauteur", "Largeur", "Chant", "Poignée");
+            }, 'article_stock' => function ($query) {
                 $query->select("code", "name", "height", "width", "depth", "color", "thickness", 'chant');
             }])->find($request->line);
             return response()->json($line);
@@ -172,7 +172,7 @@ class PaletteController extends Controller
             $palette = Palette::where('code', $code)
                 ->select("id", 'code', 'type', 'company_id', 'document_id')
                 ->withCount('lines')
-                ->with(['company', 'lines' => function($query){
+                ->with(['company', 'lines' => function ($query) {
                     $query->select('lines.id', 'lines.quantity');
                 }, 'document'])
                 ->first();
@@ -195,36 +195,44 @@ class PaletteController extends Controller
         }
     }
 
-    public function confirmPalette($code)
+    public function confirmPalette($code, $piece)
     {
         try {
-            $palette = Palette::with('document.palettes')->where('code', $code)->first();
+
+            $document = Document::with('palettes')->where("piece", $piece)->first();
+
+            if (!$document) {
+                return response()->json([
+                    'error' => 'Document not found',
+                    'message' => 'Document non trouvée'
+                ], 404);
+            }
+
+            $palette = $document->palettes->where('code', $code)->first();
 
             if (!$palette) {
                 return response()->json([
                     'error' => 'Palette not found',
-                    'message' => 'No palette found with the provided code.'
+                    'message' => 'Aucune palette dans le document '
                 ], 404);
             }
 
-            // Update the current palette
+            // Update delivery timestamp
             $palette->delivered_at = now();
             $palette->save();
 
-            // Check if all palettes in the document are delivered
-            $allPalettesDelivered = $palette->document->palettes
-                ->every(function ($p) {
-                    return !is_null($p->delivered_at);
-                });
+            // Check if all palettes are delivered
+            $allPalettesDelivered = $document->palettes->every(fn($p) => !is_null($p->delivered_at));
 
-            // Add delivery status to response
-            $palette['all_palettes_delivered'] = $allPalettesDelivered;
-
+            // Add status if all delivered
             if ($allPalettesDelivered) {
-                $palette->document->update([
+                $document->update([
                     'status_id' => 14
                 ]);
             }
+
+            // Add delivery status to palette response
+            $palette->all_palettes_delivered = $allPalettesDelivered;
 
             return response()->json($palette);
         } catch (\Exception $e) {
@@ -278,7 +286,6 @@ class PaletteController extends Controller
                 // Check if all line with status_id 8 (Prepare)
                 if ($document->validation()) {
                     $document->update(['status_id' => 8]);
-
                 } elseif ($document->status_id != 7) {
                     $document->update(['status_id' => 7]);
                 }
@@ -292,7 +299,6 @@ class PaletteController extends Controller
             });
 
             return response()->json($palette);
-
         } catch (\Exception $e) {
             return response()->json([
                 'message' => $e->getMessage()
@@ -303,7 +309,7 @@ class PaletteController extends Controller
 
     public function documentPalettes($piece)
     {
-       $document = Document::with([
+        $document = Document::with([
             'status',
             'palettes' => function ($query) {
                 $query->with('user')
@@ -377,7 +383,7 @@ class PaletteController extends Controller
                 $document->update([
                     'status_id' => 10
                 ]);
-            }else{
+            } else {
                 $document->update([
                     'status_id' => 9
                 ]);
@@ -409,7 +415,6 @@ class PaletteController extends Controller
                         'status_id' => 10,
                     ]);
                 }
-
             } else {
                 $palette->document->companies()->updateExistingPivot($user_company, [
                     'status_id' => 9,
@@ -492,5 +497,23 @@ class PaletteController extends Controller
 
         $palette->load(['lines.article_stock']);
         return response()->json($palette);
+    }
+
+    public function resetPalette($code)
+    {
+
+        $palette = Palette::where("code", $code)->first();
+
+        if (!$palette) {
+            return response()->json([
+                'error' => 'Palette not found',
+                'message' => 'Aucune palette dans le document '
+            ], 404);
+        }
+
+        $palette->update([
+            'delivered_at' => null,
+        ]);
+        return ['message' => "Palette supprimée avec succès"];
     }
 }

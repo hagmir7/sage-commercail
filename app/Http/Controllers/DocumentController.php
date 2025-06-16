@@ -323,7 +323,8 @@ class DocumentController extends Controller
         $user = auth()->user();
         $documents = Document::with([
             'docentete' => fn($query) => $query->select('DO_Type', 'DO_Piece', 'DO_Date', 'DO_DateLivr', 'cbMarq', 'DO_Statut'),
-            'status'
+            'status',
+            'companies'
         ])->withCount('palettes');
 
         if ($user->hasRole('commercial')) {
@@ -331,9 +332,10 @@ class DocumentController extends Controller
                     ->whereNull('piece_fa');
         } elseif ($user->hasRole('chargement')) {
             $documents->where([
-                ['status_id', '=', 12],
-                ['user_id', '=', auth()->id()],
-            ]);
+                ['status_id', '=', 13],
+            ])->whereHas('palettes', function($query){
+                $query->where("delivered_by", auth()->id());
+            });
         } elseif ($user->hasRole('preparation')) {
             $status = $request->input('status');
             $documents->when($status,
@@ -381,27 +383,59 @@ class DocumentController extends Controller
         }
 
         DB::transaction(function () use ($document, $request) {
-            // Fix N+1: Update all palettes in a single query instead of looping
-            $document->palettes()->update([
-                'delivered_by' => $request->user_id,
+
+            foreach ($document->palettes()->where('company_id', auth()->user()?->company_id)->get() as $palette) {
+                $palette->delivered_by = $request->user_id;
+                $palette->save();
+            }
+
+            $document->companies()->updateExistingPivot(auth()->user()->company_id, [
+                'status_id' => 13,
             ]);
 
-            // Fix N+1: Use whereHas to find and update the company relationship directly
-            DB::table('document_companies') // or whatever your pivot table is named
-                ->where('document_id', $document->id)
-                ->where('company_id', auth()->id())
-                ->update(['status_id' => 13]);
 
-            // Update document status
+
+            // DB::table('document_companies')
+            //     ->where('document_id', $document->id)
+            //     ->where('company_id', auth()->id())
+            //     ->update(['status_id' => 13]);
+
             $document->update(['status_id' => 13]);
         });
 
-        // Load the document with relationships for the response if needed
         $document->load(['palettes', 'companies']);
 
         return response()->json([
             'message' => 'Agent de chargement attribué avec succès',
             'document' => $document
         ]);
+    }
+
+
+    public function deliveredPalettes($piece)
+    {
+        $document = Document::withCount('palettes')->with(['palettes' => function($query) {
+            $query->whereNotNull('delivered_at');
+        }])->where('piece', $piece)->first();
+        
+        if (!$document) {
+            return response()->json([
+                'error' => 'Document not found',
+                'message' => 'Document non trouvée'
+            ], 404);
+        }
+        
+        return $document;
+    }
+
+    public function palettes($piece){
+        $document = Document::with(['palettes'])->where('piece', $piece)->first();
+        
+        if (!$document) {
+            return response()->json([
+                'error' => 'Document not found',
+                'message' => 'Document non trouvée'
+            ], 404);
+        }
     }
 }
