@@ -56,6 +56,11 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/logout', [AuthController::class, 'logout']);
     Route::get('/user', [AuthController::class, 'user']);
 
+    Route::prefix('depots')->controller(DepotController::class)->group(function () {
+        Route::get('/', 'list');
+        Route::get('/{depot}', 'show');
+    });
+
     // Roles
     Route::get('/roles', [RoleController::class, 'index']);
     Route::post('/roles', [RoleController::class, 'store']);
@@ -108,7 +113,7 @@ Route::middleware('auth:sanctum')->group(function () {
 
     //
     Route::get('palettes/document/{piece}', [PaletteController::class, 'documentPalettes']);
-    
+
 
     Route::get("calculator/{piece}", [SellController::class, 'calculator']);
 
@@ -133,10 +138,7 @@ Route::middleware('auth:sanctum')->group(function () {
     });
 
 
-    Route::prefix('depots')->controller(DepotController::class)->group(function () {
-        Route::get('/', 'list');
-        Route::get('/{depot}', 'show');
-    });
+
 
 
     Route::prefix('documents')->controller(DocumentController::class)->group(function () {
