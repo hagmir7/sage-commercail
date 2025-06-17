@@ -28,7 +28,7 @@ return new class extends Migration
             $table->dateTime('delivered_at')->nullable();
             $table->foreignIdFor(User::class, 'delivered_by')->nullable();
             $table->timestamps();
-            $table->unique(['code', 'company_id']);
+            $table->unique(['code']);
 
         });
     }

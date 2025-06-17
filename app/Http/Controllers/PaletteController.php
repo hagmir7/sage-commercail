@@ -48,6 +48,7 @@ class PaletteController extends Controller
         // Get the last inserted code
         $lastCode = DB::table('palettes')
             ->orderBy('id', 'desc')
+            ->where('code', 'like', 'PALL%')
             ->value('code');
 
         if (!$lastCode) {
@@ -59,7 +60,7 @@ class PaletteController extends Controller
         }
 
         // Format with leading zeros and prefix
-        return 'PB' . str_pad($nextNumber, 8, '0', STR_PAD_LEFT);
+        return 'PALL' . str_pad($nextNumber, 8, '0', STR_PAD_LEFT);
     }
 
     public function generate(Request $request)

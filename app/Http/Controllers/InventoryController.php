@@ -7,6 +7,7 @@ use App\Models\Emplacement;
 use App\Models\Inventory;
 use App\Models\InventoryMovement;
 use App\Models\InventoryStock;
+use App\Models\Palette;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
@@ -118,17 +119,37 @@ class InventoryController extends Controller
 
 
 
-    public function scanArticle($code)
-    {
-        $article = ArticleStock::where('code', $code)->first();
+        public function scanArticle($code)
+        {
+            $article = ArticleStock::where('code', $code)
+                ->orWhere('code_supplier', $code)
+                ->orWhere('qr_code', $code)
+                ->first();
 
-        if (!$article) {
-            return response()->json(['error' => "Article is not Found"], 404);
+            if (!$article) {
+                return response()->json(['error' => "Article not found"], 404);
+            }
+
+            return $article;
         }
-        return $article;
-    }
 
 
+
+        public function generatePaletteCode()
+        {
+            $lastCode = DB::table('palettes')
+                ->where('code', 'like', 'PALS%')
+                ->orderBy('id', 'desc')
+                ->value('code');
+
+            if (!$lastCode) {
+                $nextNumber = 1;
+            } else {
+                $number = (int) substr($lastCode, 4);
+                $nextNumber = $number + 1;
+            }
+            return 'PALS' . str_pad($nextNumber, 8, '0', STR_PAD_LEFT);
+        }
 
 
 
@@ -137,8 +158,10 @@ class InventoryController extends Controller
         $validator = Validator::make($request->all(), [
             'emplacement_code' => 'required|string|max:255|min:3|exists:emplacements,code',
             'article_code' => 'string|required',
-            'quantity' => 'integer|required|min:0',
-            'condition' => 'nullable'
+            'quantity' => 'numeric|between:0,9999.99|required|min:0',
+            'condition' => 'nullable',
+            'type_colis' => 'nullable|in:Piece,Palette,Carton',
+            'palettes' => 'integer'
         ]);
 
         if ($validator->fails()) {
@@ -147,6 +170,7 @@ class InventoryController extends Controller
                 'errors' => $validator->errors()
             ], 422);
         }
+
 
         $article = ArticleStock::where('code', $request->article_code)->first();
 
@@ -189,6 +213,23 @@ class InventoryController extends Controller
                     'price' => $article->price,
                     'quantity' => $conditionMultiplier * $request->quantity,
                 ]);
+            }
+
+            // Create Palett
+            if ($request->type_colis == "Palette") {
+                for ($i = 1; $i <= intval($request->palettes); $i++) {
+                    $palette = Palette::create([
+                        "code" => $this->generatePaletteCode(),
+                        "emplacement_id" => $emplacement->id,
+                        "company_id" => 1,
+                        "user_id" => auth()->id(),
+                        "type" => "Stock"
+                    ]);
+
+                    $palette->articles()->attach($article->id, [
+                        'quantity' => floatval($request->condition)
+                    ]);
+                }
             }
         });
 

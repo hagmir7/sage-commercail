@@ -25,7 +25,10 @@ class ArticleStock extends Model
         'width',
         'price',
         'depth',
-        'chant'
+        'chant',
+        'palette_condition',
+        'unit',
+        'gamme'
     ];
 
     public function article()

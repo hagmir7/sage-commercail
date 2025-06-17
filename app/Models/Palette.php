@@ -33,7 +33,7 @@ class Palette extends Model
 
     public function articles()
     {
-        return $this->belongsToMany(ArticleStock::class)->withPivot('quantity')->withTimestamps();
+        return $this->belongsToMany(ArticleStock::class, 'article_palette')->withPivot('quantity')->withTimestamps();
     }
 
     public function document(){
