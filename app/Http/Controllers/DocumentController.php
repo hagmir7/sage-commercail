@@ -328,8 +328,8 @@ class DocumentController extends Controller
         ])->withCount('palettes');
 
         if ($user->hasRole('commercial')) {
-            $documents->whereNotNull('piece_bl')
-                    ->whereNull('piece_fa');
+            $documents->whereIn('status_id', [11, 12, 13, 14])
+                ->whereNull('piece_fa');
         } elseif ($user->hasRole('chargement')) {
             $documents->where([
                 ['status_id', '=', 13],

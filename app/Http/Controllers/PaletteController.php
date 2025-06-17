@@ -45,23 +45,23 @@ class PaletteController extends Controller
 
     public function generatePaletteCode()
     {
-        // Get the last inserted code
+        // Lock table or use transactions if needed for concurrency
         $lastCode = DB::table('palettes')
-            ->orderBy('id', 'desc')
             ->where('code', 'like', 'PALL%')
+            ->orderBy('id', 'desc')
             ->value('code');
 
         if (!$lastCode) {
             $nextNumber = 1;
         } else {
-            // Extract numeric part (remove PB)
-            $number = (int) substr($lastCode, 2);
+            // Use 4 because 'PALL' is 4 characters
+            $number = (int) substr($lastCode, 4);
             $nextNumber = $number + 1;
         }
 
-        // Format with leading zeros and prefix
         return 'PALL' . str_pad($nextNumber, 8, '0', STR_PAD_LEFT);
     }
+            
 
     public function generate(Request $request)
     {
