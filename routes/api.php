@@ -11,6 +11,7 @@ use App\Http\Controllers\ClientController;
 use App\Http\Controllers\DepotController;
 use App\Http\Controllers\DocenteteController;
 use App\Http\Controllers\DocumentController;
+use App\Http\Controllers\EmplacementController;
 use App\Http\Controllers\InventoryController;
 use App\Http\Controllers\PaletteController;
 use App\Http\Controllers\PermissionController;
@@ -129,6 +130,10 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::delete('delete/movement/{inventory_movement}', 'deleteMovement');
         Route::get('{inventory}', 'show');
         Route::get("articles/{inventory}", 'stockArticle');
+    });
+
+    Route::prefix('emplacement')->controller(EmplacementController::class)->group(function(){
+        Route::get('{emplacement:code}', 'show');
     });
 
 

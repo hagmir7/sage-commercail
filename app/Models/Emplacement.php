@@ -11,10 +11,14 @@ class Emplacement extends Model
 
     public function articles()
     {
-        return $this->belongsToMany(ArticleStock::class, 'article_emplacement')->withPivot('quantity')->withTimestamps();
+        return $this->belongsToMany(ArticleStock::class, 'article_emplacement', 'emplacement_id', 'article_stock_id')
+            ->withPivot('quantity')
+            ->withTimestamps();
     }
 
-    public function depte(){
-        return $this->belongsTo(Depot::class);
+
+    public function depte()
+    {
+        return $this->belongsTo(Depot::class, 'depot_id');
     }
 }
