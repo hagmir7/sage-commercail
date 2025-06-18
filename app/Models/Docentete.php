@@ -22,6 +22,7 @@ class Docentete extends Model
     protected $guarded = [];
 
 
+
     protected function casts(): array
     {
         return [

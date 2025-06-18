@@ -45,8 +45,8 @@ class DocenteteController extends Controller
                 'DO_Ref',
                 'DO_Tiers',
                 'cbMarq',
-                \DB::raw("CONVERT(VARCHAR(10), DO_Date, 111) AS DO_Date"),
-                \DB::raw("CONVERT(VARCHAR(10), DO_DateLivr, 111) AS DO_DateLivr"),
+                'DO_Date',
+                'DO_DateLivr',
                 'DO_Expedit'
             ])
             ->whereIn("DO_Piece", $documents->pluck('piece'))
@@ -148,64 +148,59 @@ class DocenteteController extends Controller
     }
 
 
-    public function commercial(Request $request)
-    {
-        // dd($user_roles);
-        $query = Docentete::with('document.status')
-            ->select([
-                'DO_Reliquat',
-                'DO_Piece',
-                'DO_Ref',
-                'DO_Tiers',
-                'cbMarq',
-                \DB::raw("CONVERT(VARCHAR(10), DO_Date, 111) AS DO_Date"),
-                \DB::raw("CONVERT(VARCHAR(10), DO_DateLivr, 111) AS DO_DateLivr"),
-                'DO_Expedit'
-            ])
-            ->orderByDesc("DO_Date")
-            ->where('DO_Domaine', 0)
-            ->where('DO_Statut', 1);
+ public function commercial(Request $request)
+{
+    $query = Docentete::query()
+        ->select([
+            'DO_Reliquat',
+            'DO_Piece',
+            'DO_Ref',
+            'DO_Tiers',
+            'cbMarq',
+            'DO_Date',
+            'DO_DateLivr',
+            'DO_Expedit'
+        ])
+        ->orderByDesc("DO_Date")
+        ->where('DO_Domaine', 0)
+        ->where('DO_Statut', 1)
+        ->where('DO_Type', $request->type ?? 2); // Default type
 
+    // Optional: Only eager load if relationships are used in response
+    // $query->with('document.status');
 
-        if (!empty($request->status)) {
-            $query->whereHas('document.status', function ($query) use ($request) {
-                $query->where('id', $request->status);
-            });
-        }
-
-        if ($request->filled('date')) {
-            $dates = explode(',', $request->date);
-
-            // Parse and format
-            $start = Carbon::parse(urldecode($dates[0]))->format('Y-m-d');
-            $end = Carbon::parse(urldecode($dates[1]))->format('Y-m-d');
-
-            $query->whereHas('document', function ($query) use ($start, $end) {
-                $query->whereBetween('created_at', [$start, $end]);
-            });
-        }
-
-
-
-        if ($request->has('type')) {
-            $query->where('DO_Type', $request->type);
-        } else {
-            $query->where('DO_Type', 2);
-        }
-
-        if ($request->has('search') && $request->search !== '') {
-            $search = $request->search;
-            $query->where(function ($q) use ($search) {
-                $q->where('DO_Reliquat', 'like', "%$search%")
-                    ->orWhere('DO_Piece', 'like', "%$search%")
-                    ->orWhere('DO_Ref', 'like', "%$search%")
-                    ->orWhere('DO_Tiers', 'like', "%$search%");
-            });
-        }
-        $results = $query->paginate(20);
-
-        return response()->json($results);
+    if (!empty($request->status)) {
+        $query->whereHas('document.status', function ($q) use ($request) {
+            $q->where('id', $request->status);
+        });
     }
+
+    if ($request->filled('date')) {
+        $dates = explode(',', $request->date, 2);
+        $start = Carbon::parse(urldecode($dates[0]))->startOfDay();
+        $end = Carbon::parse(urldecode($dates[1] ?? $dates[0]))->endOfDay();
+
+        $query->whereHas('document', function ($q) use ($start, $end) {
+            $q->whereDate('created_at', '>=', $start)
+              ->whereDate('created_at', '<=', $end);
+        });
+    }
+
+    if ($request->filled('search')) {
+        $search = $request->search;
+        $query->where(function ($q) use ($search) {
+            $q->where('DO_Ref', 'like', "$search%") // Prefix search (index-friendly)
+                ->orWhere('DO_Piece', 'like', "$search%")
+                ->orWhere('DO_Tiers', 'like', "$search%")
+                ->orWhere('DO_Reliquat', 'like', "$search%");
+        });
+    }
+
+    // Faster pagination without total counts
+    $results = $query->simplePaginate(20);
+
+    return response()->json($results);
+}
 
 
 
