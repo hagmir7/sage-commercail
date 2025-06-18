@@ -109,7 +109,7 @@ class InventoryController extends Controller
 
     public function scanEmplacmenet($code)
     {
-        $emplacement = Emplacement::with('depte.company')->where('code', $code)->first();
+        $emplacement = Emplacement::with('depot.company')->where('code', $code)->first();
 
         if (!$emplacement) {
             return response()->json(['error' => "emplac emplacement is not Found"], 404);
@@ -227,9 +227,21 @@ class InventoryController extends Controller
                     ]);
 
                     $palette->articles()->attach($article->id, [
-                        'quantity' => floatval($request->condition)
+                        'quantity' => $request->condition
                     ]);
                 }
+            }else{
+                $palette = Palette::create([
+                    "code" => $this->generatePaletteCode(),
+                    "emplacement_id" => $emplacement->id,
+                    "company_id" => 1,
+                    "user_id" => auth()->id(),
+                    "type" => "Stock"
+                ]);
+
+                $palette->articles()->attach($article->id, [
+                    'quantity' => floatval($request->quantity)
+                ]);
             }
         });
 

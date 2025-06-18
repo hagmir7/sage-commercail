@@ -21,4 +21,6 @@ class Inventory extends Model
         return $this->hasMany(InventoryStock::class);
     }
 
+
+
 }

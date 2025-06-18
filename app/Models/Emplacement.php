@@ -17,8 +17,14 @@ class Emplacement extends Model
     }
 
 
-    public function depte()
+    public function depot()
     {
         return $this->belongsTo(Depot::class, 'depot_id');
+    }
+
+
+    public function palettes()
+    {
+        return $this->hasMany(Palette::class);
     }
 }

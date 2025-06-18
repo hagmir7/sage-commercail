@@ -9,10 +9,7 @@ class EmplacementController extends Controller
 {
     public function show(Emplacement $emplacement)
     {
-        // Chargement eager des relations
-        $emplacement->load(['depte', 'articles']);
-
-        // Optionnel : tu peux retourner une réponse JSON propre
+        $emplacement->load(['depot', 'palettes.articles']);
         return response()->json($emplacement);
     }
 }

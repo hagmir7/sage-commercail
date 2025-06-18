@@ -119,6 +119,10 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get("calculator/{piece}", [SellController::class, 'calculator']);
 
 
+    Route::prefix('emplacement')->controller(EmplacementController::class)->group(function () {
+        Route::get('{emplacement:code}', 'show');
+    });
+
 
     Route::prefix('inventory')->controller(InventoryController::class)->group(function () {
         Route::post('insert/{inventory}', 'insert');
@@ -132,9 +136,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get("articles/{inventory}", 'stockArticle');
     });
 
-    Route::prefix('emplacement')->controller(EmplacementController::class)->group(function(){
-        Route::get('{emplacement:code}', 'show');
-    });
+
 
 
 
