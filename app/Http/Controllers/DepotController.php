@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Depot;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Validator;
 
 class DepotController extends Controller
 {
@@ -14,6 +15,37 @@ class DepotController extends Controller
             ->orderByDesc('created_at')
             ->paginate(30);
         return $depots;
+    }
+
+    public function create(Request $request)
+    {
+
+        $validator = Validator::make($request->all(), [
+            'code' => "required|min:3|max:50|unique:depots,code,except,code",
+            'company_id' => 'required|exists:companies,id'
+        ]);
+
+
+        if ($validator->fails()) {
+            return response()->json([
+                'message' => "Les données ne sont pas valides",
+                'errors' => $validator->errors()
+            ], 422);
+        }
+
+
+        $depot = Depot::create([
+            'code' => $request->code,
+            'company_id' => $request->company_id
+        ]);
+
+        return $depot;
+    }
+
+    public function delete(Depot $depot)
+    {
+        $depot->delete();
+        return ['message' => "Dépôt supprimé avec succès"];
     }
 
 
@@ -48,7 +80,7 @@ class DepotController extends Controller
                 'palette_count' => $uniquePaletteCount,
                 'distinct_article_count' => $articleQuantities->count(),
                 'total_articles_quantity' => $articleQuantities->sum(),
-                'articles' => $articleQuantities, 
+                'articles' => $articleQuantities,
             ];
         })->values();
 

@@ -19,6 +19,7 @@ use App\Http\Controllers\RoleController;
 use App\Http\Controllers\SellController;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\UserPermissionController;
+use App\Models\ArticleStock;
 use App\Models\Docentete;
 use App\Models\User;
 use Illuminate\Http\Request;
@@ -59,7 +60,9 @@ Route::middleware('auth:sanctum')->group(function () {
 
     Route::prefix('depots')->controller(DepotController::class)->group(function () {
         Route::get('/', 'list');
+        Route::delete('delete/{depot}', 'delete');
         Route::get('/{depot}', 'show');
+        Route::post('/create', 'create');
     });
 
     // Roles
@@ -135,6 +138,12 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::delete('delete/movement/{inventory_movement}', 'deleteMovement');
         Route::get('{inventory}', 'show');
         Route::get("articles/{inventory}", 'stockArticle');
+    });
+
+
+    Route::prefix('articles')->controller(ArticleStockController::class)->group(function(){
+        Route::get('{article_stock:code}', 'show');
+        // Route::get('update/{article:code}', 'update');
     });
 
 

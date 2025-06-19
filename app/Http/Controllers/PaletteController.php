@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Http\Controllers\Controller;
+use App\Models\ArticleStock;
 use App\Models\Docligne;
 use App\Models\Document;
 use App\Models\InventoryStock;
@@ -63,7 +64,7 @@ class PaletteController extends Controller
 
         return 'PALL' . str_pad($nextNumber, 8, '0', STR_PAD_LEFT);
     }
-            
+
 
     public function generate(Request $request)
     {
@@ -535,7 +536,8 @@ class PaletteController extends Controller
             }
 
             $quantity = $result->quantity;
-            $inventoryStock = InventoryStock::findOrFail($article_id);
+            $article = ArticleStock::find($article_id);
+            $inventoryStock = InventoryStock::where('code_article', $article->code)->first();
 
             if ($inventoryStock->quantity < $quantity) {
                 throw new \Exception("Insufficient inventory quantity");
@@ -599,15 +601,15 @@ class PaletteController extends Controller
             $oldQuantity = $currentPivotData->quantity;
             $quantityDifference = $newQuantity - $oldQuantity;
 
-            
-            $inventoryStock = InventoryStock::findOrFail($article_id);
+            $article = ArticleStock::find($article_id);
+            $inventoryStock = InventoryStock::where('code_article', $article->code)->first();
 
-            if ($quantityDifference > 0 && $inventoryStock->quantity < $quantityDifference) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Stock insuffisant en inventaire. Stock disponible: ' . $inventoryStock->quantity
-                ], 400);
-            }
+            // if ($quantityDifference > 0 && $inventoryStock->quantity < $quantityDifference) {
+            //     return response()->json([
+            //         'success' => false,
+            //         'message' => 'Stock insuffisant en inventaire. Stock disponible: ' . $inventoryStock->quantity
+            //     ], 400);
+            // }
 
             DB::transaction(function () use ($inventoryStock, $quantityDifference, $palette, $article_id, $newQuantity) {
                 if ($quantityDifference > 0) {

@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Http\Controllers\Controller;
 use App\Models\ArticleStock;
+use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
 
@@ -76,11 +77,12 @@ class ArticleStockController extends Controller
      * @param  int  $id
      * @return \Illuminate\Http\Response
      */
-    public function show($id)
+    public function show(ArticleStock $article_stock)
     {
-        $article = ArticleStock::with(['family', 'palette'])->findOrFail($id);
-        return response()->json(['data' => $article]);
+        return $article_stock;
+        // return response()->json(['data' => ]);
     }
+
 
     /**
      * Update the specified resource in storage.
