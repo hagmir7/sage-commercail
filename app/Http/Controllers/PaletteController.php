@@ -517,4 +517,36 @@ class PaletteController extends Controller
         ]);
         return ['message' => "Palette supprimée avec succès"];
     }
+
+
+    // Article Palette function
+    public function detachArticle($code, $article_id)
+    {
+
+        $palette = Palette::where('code', $code)->first();
+        $palette->articles()->detach($article_id);
+    }
+
+    public function updateArticleQuantity(Request $request, $code, $article_id)
+    {
+        $validator = Validator::make($request->all(), [
+            'quantity' => "numeric|required|min:0.001"
+        ]);
+
+        if($validator->fails()){
+            return response()->json([
+                'message' => "La quantité n'est pas valide",
+                'errors' => $validator->errors()
+            ], 500);
+        }
+
+        $palette = Palette::where('code', $code)->first();
+
+        if ($palette) {
+            $palette->articles()->updateExistingPivot($article_id, [
+                'quantity' => $request->quantity
+            ]);
+        }
+    }
+
 }

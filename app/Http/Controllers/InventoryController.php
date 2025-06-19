@@ -161,7 +161,7 @@ class InventoryController extends Controller
             'quantity' => 'numeric|between:0,9999.99|required|min:0',
             'condition' => 'nullable',
             'type_colis' => 'nullable|in:Piece,Palette,Carton',
-            'palettes' => 'integer'
+            'palettes' => 'numeric'
         ]);
 
         if ($validator->fails()) {
@@ -231,17 +231,29 @@ class InventoryController extends Controller
                     ]);
                 }
             }else{
-                $palette = Palette::create([
+                $palette = Palette::firstOrCreate(
+                    ["emplacement_id" => $emplacement->id,],
+                    [
                     "code" => $this->generatePaletteCode(),
-                    "emplacement_id" => $emplacement->id,
                     "company_id" => 1,
                     "user_id" => auth()->id(),
                     "type" => "Stock"
                 ]);
 
-                $palette->articles()->attach($article->id, [
-                    'quantity' => floatval($request->quantity)
-                ]);
+                $existing = $palette->articles()->where('article_id', $article->id)->first();
+
+                if ($existing) {
+                    // Add to existing quantity
+                    $currentQty = $existing->pivot->quantity;
+                    $newQty = $currentQty + floatval($request->quantity);
+
+                    $palette->articles()->updateExistingPivot($article->id, ['quantity' => $newQty]);
+                } else {
+                    // Create new pivot entry
+                    $palette->articles()->attach($article->id, [
+                        'quantity' => floatval($request->quantity)
+                    ]);
+                }
             }
         });
 

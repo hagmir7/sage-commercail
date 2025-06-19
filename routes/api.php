@@ -103,7 +103,8 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('palettes/confirm', [PaletteController::class, 'confirm']);
     Route::post('palettes/confirm/{code}/{piece}', [PaletteController::class, 'confirmPalette']);
     Route::put('palettes/reset/{code}', [PaletteController::class, 'resetPalette']);
-
+    Route::delete('palettes/{code}/article/{article_id}/delete', [PaletteController::class, 'detachArticle']);
+    Route::put('palettes/{code}/article/{article_id}/update', [PaletteController::class, 'updateArticleQuantity']);
 
 
     Route::post('palettes/detach', [PaletteController::class, 'detach']);
