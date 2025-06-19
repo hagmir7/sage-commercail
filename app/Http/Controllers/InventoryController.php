@@ -43,6 +43,10 @@ class InventoryController extends Controller
             ->with(['user:id,full_name'])
             ->when($types, fn($q) => $q->whereIn('type', $types));
 
+        if (!auth()->user()->hasRole('admin') || !auth()->user()->hasRole('supper_admin')) {
+            $movements->where("user_id", auth()->id());
+        }
+
 
         if ($request->filled('search') && $request->search !== '') {
             $search = $request->search;

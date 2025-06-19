@@ -598,6 +598,8 @@ class PaletteController extends Controller
 
             $oldQuantity = $currentPivotData->quantity;
             $quantityDifference = $newQuantity - $oldQuantity;
+
+            
             $inventoryStock = InventoryStock::findOrFail($article_id);
 
             if ($quantityDifference > 0 && $inventoryStock->quantity < $quantityDifference) {
