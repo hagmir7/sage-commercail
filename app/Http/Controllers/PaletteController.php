@@ -5,11 +5,13 @@ namespace App\Http\Controllers;
 use App\Http\Controllers\Controller;
 use App\Models\Docligne;
 use App\Models\Document;
+use App\Models\InventoryStock;
 use App\Models\Line;
 use App\Models\Palette;
 use Illuminate\Http\Request;
 // use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Validator;
 
 class PaletteController extends Controller
@@ -522,30 +524,137 @@ class PaletteController extends Controller
     // Article Palette function
     public function detachArticle($code, $article_id)
     {
+        try {
+            $palette = Palette::where('code', $code)->firstOrFail();
+            $result = DB::selectOne(
+                "SELECT quantity FROM article_palette WHERE article_stock_id = ? AND palette_id = ?",
+                [$article_id, $palette->id]
+            );
+            if (!$result) {
+                throw new \Exception("Article not found in this palette");
+            }
 
-        $palette = Palette::where('code', $code)->first();
-        $palette->articles()->detach($article_id);
+            $quantity = $result->quantity;
+            $inventoryStock = InventoryStock::findOrFail($article_id);
+
+            if ($inventoryStock->quantity < $quantity) {
+                throw new \Exception("Insufficient inventory quantity");
+            }
+
+            DB::transaction(function () use ($inventoryStock, $quantity, $palette, $article_id) {
+                $inventoryStock->update([
+                    'quantity' => $inventoryStock->quantity - $quantity
+                ]);
+                $palette->articles()->detach($article_id);
+            });
+            return [
+                'success' => true,
+                'message' => 'Article detached successfully',
+                'detached_quantity' => $quantity
+            ];
+        } catch (\Exception $e) {
+            Log::error('Error detaching article: ' . $e->getMessage(), [
+                'code' => $code,
+                'article_id' => $article_id
+            ]);
+            return [
+                'success' => false,
+                'message' => 'Failed to detach article: ' . $e->getMessage()
+            ];
+        }
     }
+
 
     public function updateArticleQuantity(Request $request, $code, $article_id)
     {
-        $validator = Validator::make($request->all(), [
-            'quantity' => "numeric|required|min:0.001"
-        ]);
-
-        if($validator->fails()){
-            return response()->json([
-                'message' => "La quantité n'est pas valide",
-                'errors' => $validator->errors()
-            ], 500);
-        }
-
-        $palette = Palette::where('code', $code)->first();
-
-        if ($palette) {
-            $palette->articles()->updateExistingPivot($article_id, [
-                'quantity' => $request->quantity
+        try {
+            $validator = Validator::make($request->all(), [
+                'quantity' => "numeric|required|min:0.001"
             ]);
+
+            if ($validator->fails()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => "La quantité n'est pas valide",
+                    'errors' => $validator->errors()
+                ], 422);
+            }
+
+            $newQuantity = $request->quantity;
+
+            $palette = Palette::where('code', $code)->firstOrFail();
+
+            $currentPivotData = DB::selectOne(
+                "SELECT quantity FROM article_palette WHERE article_stock_id = ? AND palette_id = ?",
+                [$article_id, $palette->id]
+            );
+
+            if (!$currentPivotData) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Article non trouvé dans cette palette'
+                ], 404);
+            }
+
+            $oldQuantity = $currentPivotData->quantity;
+            $quantityDifference = $newQuantity - $oldQuantity;
+            $inventoryStock = InventoryStock::findOrFail($article_id);
+
+            if ($quantityDifference > 0 && $inventoryStock->quantity < $quantityDifference) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Stock insuffisant en inventaire. Stock disponible: ' . $inventoryStock->quantity
+                ], 400);
+            }
+
+            DB::transaction(function () use ($inventoryStock, $quantityDifference, $palette, $article_id, $newQuantity) {
+                if ($quantityDifference > 0) {
+
+                    $inventoryStock->update([
+                        'quantity' => $inventoryStock->quantity + $quantityDifference
+                    ]);
+                } elseif ($quantityDifference < 0) {
+                    $inventoryStock->update([
+                        'quantity' => $inventoryStock->quantity - abs($quantityDifference)
+                    ]);
+                }
+
+                $palette->articles()->updateExistingPivot($article_id, [
+                    'quantity' => $newQuantity
+                ]);
+            });
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Quantité mise à jour avec succès',
+                'data' => [
+                    'old_quantity' => $oldQuantity,
+                    'new_quantity' => $newQuantity,
+                    'quantity_difference' => $quantityDifference,
+                    'inventory_updated' => $quantityDifference !== 0
+                ]
+            ], 200);
+        } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
+            Log::error('Model not found in updateArticleQuantity: ' . $e->getMessage(), [
+                'code' => $code,
+                'article_id' => $article_id
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Palette ou article non trouvé'
+            ], 404);
+        } catch (\Exception $e) {
+            Log::error('Error updating article quantity: ' . $e->getMessage(), [
+                'code' => $code,
+                'article_id' => $article_id,
+                'quantity' => $request->quantity ?? null
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Erreur lors de la mise à jour de la quantité'
+            ], 500);
         }
     }
 
