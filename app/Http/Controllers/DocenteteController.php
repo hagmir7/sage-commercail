@@ -167,7 +167,7 @@ class DocenteteController extends Controller
         ->where('DO_Type', $request->type ?? 2); // Default type
 
     // Optional: Only eager load if relationships are used in response
-    // $query->with('document.status');
+    $query->with('document.status');
 
     if (!empty($request->status)) {
         $query->whereHas('document.status', function ($q) use ($request) {
