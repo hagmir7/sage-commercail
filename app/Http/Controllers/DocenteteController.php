@@ -198,7 +198,7 @@ class DocenteteController extends Controller
 
     // Faster pagination without total counts
     $results = $query->simplePaginate(20);
-
+   
     return response()->json($results);
 }
 
@@ -357,13 +357,11 @@ class DocenteteController extends Controller
 
     public function show($id)
     {
-        // Cache user info to avoid repeated queries
         $user = auth()->user();
         $userCompanyId = $user->company_id;
         $userRoles = $user->roles()->pluck('name')->toArray();
         $userRoleIds = $user->roles()->pluck('id')->toArray();
 
-        // Optimize the main query with eager loading
         $docentete = Docentete::with(['document.status', 'document.companies'])
             ->select(
                 "DO_Piece",
@@ -373,13 +371,13 @@ class DocenteteController extends Controller
                 "cbMarq",
                 "Type",
                 "DO_Reliquat",
-                DB::raw("CONVERT(VARCHAR(10), DO_Date, 111) AS DO_Date"),
-                DB::raw("CONVERT(VARCHAR(10), DO_DateLivr, 111) AS DO_DateLivr")
+                "DO_Date",
+                "DO_DateLivr"
             )
             ->where('DO_Piece', $id)
             ->firstOrFail();
 
-        // Build the docligne query with optimized eager loading
+
         $docligneQuery = Docligne::with([
             'article' => function ($query) {
                 $query->select("AR_Ref", "Nom", 'Hauteur', 'Largeur', 'Profonduer', 'Longueur', 'Couleur', 'Chant', 'Episseur', 'Description');
@@ -394,7 +392,6 @@ class DocenteteController extends Controller
             ->select("DO_Piece", "AR_Ref", 'DL_Design', 'DL_Qte', "Nom", "Hauteur", "Largeur", "Profondeur", "Langeur", "Couleur", "Chant", "Episseur", "cbMarq")
             ->where('DO_Piece', $id);
 
-        // Apply role-based filtering more efficiently
         if (in_array('preparation', $userRoles)) {
 
             $docligneQuery->whereHas('line', function ($query) use ($userCompanyId) {
@@ -410,7 +407,6 @@ class DocenteteController extends Controller
 
         // Execute with chunk processing for large datasets
         $doclignes = $docligneQuery->get();
-
         return response()->json([
             'docentete' => $docentete,
             'doclignes' => $doclignes

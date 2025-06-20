@@ -269,6 +269,13 @@
                 </div>
             </main>
         </div>
+        <form method="POST" action="{{ route("login")}}">
+            @csrf
+            <input type="email" name="email"><br>
+            <input type="password" name="password"> <br>
+            <button>Login</button>
+
+        </form>
 
         @if (Route::has('login'))
             <div class="h-14.5 hidden lg:block"></div>
