@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\ArticleStock;
+use App\Models\Depot;
 use App\Models\Emplacement;
 use App\Models\Inventory;
 use App\Models\InventoryMovement;
@@ -11,9 +12,9 @@ use App\Models\Palette;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
-use SebastianBergmann\CodeUnit\FunctionUnit;
 use DateTime;
 use Exception;
+use Illuminate\Support\Facades\Log;
 
 class InventoryController extends Controller
 {
@@ -123,37 +124,37 @@ class InventoryController extends Controller
 
 
 
-        public function scanArticle($code)
-        {
-            $article = ArticleStock::where('code', $code)
-                ->orWhere('code_supplier', $code)
-                ->orWhere('qr_code', $code)
-                ->first();
+    public function scanArticle($code)
+    {
+        $article = ArticleStock::where('code', $code)
+            ->orWhere('code_supplier', $code)
+            ->orWhere('qr_code', $code)
+            ->first();
 
-            if (!$article) {
-                return response()->json(['error' => "Article not found"], 404);
-            }
-
-            return $article;
+        if (!$article) {
+            return response()->json(['error' => "Article not found"], 404);
         }
 
+        return $article;
+    }
 
 
-        public function generatePaletteCode()
-        {
-            $lastCode = DB::table('palettes')
-                ->where('code', 'like', 'PALS%')
-                ->orderBy('id', 'desc')
-                ->value('code');
 
-            if (!$lastCode) {
-                $nextNumber = 1;
-            } else {
-                $number = (int) substr($lastCode, 4);
-                $nextNumber = $number + 1;
-            }
-            return 'PALS' . str_pad($nextNumber, 8, '0', STR_PAD_LEFT);
+    public function generatePaletteCode()
+    {
+        $lastCode = DB::table('palettes')
+            ->where('code', 'like', 'PALS%')
+            ->orderBy('id', 'desc')
+            ->value('code');
+
+        if (!$lastCode) {
+            $nextNumber = 1;
+        } else {
+            $number = (int) substr($lastCode, 4);
+            $nextNumber = $number + 1;
         }
+        return 'PALS' . str_pad($nextNumber, 8, '0', STR_PAD_LEFT);
+    }
 
 
 
@@ -188,6 +189,8 @@ class InventoryController extends Controller
             ->where('inventory_id', $inventory->id)
             ->first();
 
+                
+
         $conditionMultiplier = $request->condition ? (int) $request->condition : 1;
 
 
@@ -204,13 +207,15 @@ class InventoryController extends Controller
                 'user_id' => auth()->id(),
                 'date' => now(),
             ]);
+  
+
 
             if ($inventory_stock) {
                 $inventory_stock->update([
                     'quantity' => $inventory_stock->quantity + ($conditionMultiplier * $request->quantity),
                 ]);
             } else {
-                InventoryStock::create([
+                $inventory_stock = InventoryStock::create([
                     'code_article' => $request->article_code,
                     'designation' => $article->description,
                     'inventory_id' => $inventory->id,
@@ -227,34 +232,39 @@ class InventoryController extends Controller
                         "emplacement_id" => $emplacement->id,
                         "company_id" => 1,
                         "user_id" => auth()->id(),
-                        "type" => "Stock"
+                        "type" => "Stock",
+                        "inventory_id" => $inventory?->id
                     ]);
 
-                    $palette->articles()->attach($article->id, [
+                    $palette->inventoryArticles()->attach($inventory_stock->id, [
                         'quantity' => $request->condition
                     ]);
                 }
-            }else{
+            } else {
                 $palette = Palette::firstOrCreate(
-                    ["emplacement_id" => $emplacement->id,],
                     [
-                    "code" => $this->generatePaletteCode(),
-                    "company_id" => 1,
-                    "user_id" => auth()->id(),
-                    "type" => "Stock"
-                ]);
+                        "emplacement_id" => $emplacement->id,
+                        "inventory_id" => $inventory?->id
+                    ],
+                    [
+                        "code" => $this->generatePaletteCode(),
+                        "company_id" => 1,
+                        "user_id" => auth()->id(),
+                        "type" => "Stock"
+                    ]
+                );
 
-                $existing = $palette->articles()->where('article_id', $article->id)->first();
+                $existing = $palette->inventoryArticles()->where('code_article', $article->code)->first();
 
                 if ($existing) {
                     // Add to existing quantity
                     $currentQty = $existing->pivot->quantity;
                     $newQty = $currentQty + floatval($request->quantity);
 
-                    $palette->articles()->updateExistingPivot($article->id, ['quantity' => $newQty]);
+                    $palette->inventoryArticles()->updateExistingPivot($inventory_stock->id, ['quantity' => $newQty]);
                 } else {
                     // Create new pivot entry
-                    $palette->articles()->attach($article->id, [
+                    $palette->inventoryArticles()->attach($inventory_stock->id, [
                         'quantity' => floatval($request->quantity)
                     ]);
                 }
@@ -374,4 +384,149 @@ class InventoryController extends Controller
     }
 
 
+    public function depotEmplacements(Inventory $inventory, Depot $depot)
+    {
+        $raw = DB::table('emplacements')
+            ->leftJoin('palettes', function ($join) use ($inventory) {
+                $join->on('emplacements.id', '=', 'palettes.emplacement_id')
+                    ->where('palettes.inventory_id', '=', $inventory->id);
+            })
+            ->leftJoin('inventory_article_palette', 'palettes.id', '=', 'inventory_article_palette.palette_id')
+            ->select(
+                'emplacements.id as emplacement_id',
+                'emplacements.code',
+                'palettes.id as palette_id',
+                'inventory_article_palette.inventory_stock_id',
+                'inventory_article_palette.quantity'
+            )
+            ->where('emplacements.depot_id', $depot->id)
+            ->get();
+
+        $grouped = $raw->groupBy('emplacement_id')->map(function ($rows, $emplacementId) {
+            $code = $rows->first()->code;
+
+            $uniquePaletteCount = $rows->pluck('palette_id')->filter()->unique()->count();
+
+            $articleQuantities = $rows
+                ->filter(fn($row) => $row->inventory_stock_id !== null)
+                ->groupBy('inventory_stock_id')
+                ->map(fn($articles) => $articles->sum('quantity'));
+
+            return [
+                'id' => $emplacementId,
+                'code' => $code,
+                'palette_count' => $uniquePaletteCount,
+                'distinct_article_count' => $articleQuantities->count(),
+                'total_articles_quantity' => $articleQuantities->sum(),
+                'articles' => $articleQuantities,
+            ];
+        })->values();
+
+        return response()->json([
+            "depot" => $depot,
+            "emplacements" => $grouped
+        ]);
+    }
+
+
+
+   public function updateArticleQuantityInPalette(Request $request, Palette $palette, InventoryStock $inventory_stock)
+
+  
+    {
+        try {
+            $validator = Validator::make($request->all(), [
+                'quantity' => "numeric|required|min:0.001"
+            ]);
+
+            if ($validator->fails()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => "La quantité n'est pas valide",
+                    'errors' => $validator->errors()
+                ], 422);
+            }
+
+            $newQuantity = $request->quantity;
+
+            $currentPivotData = DB::selectOne(
+                "SELECT quantity FROM inventory_article_palette WHERE inventory_stock_id = ? AND palette_id = ?",
+                [$inventory_stock->id, $palette->id]
+            );
+
+            if (!$currentPivotData) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Article non trouvé dans cette palette'
+                ], 404);
+            }
+
+            $oldQuantity = $currentPivotData->quantity;
+            $quantityDifference = $newQuantity - $oldQuantity;
+
+            $inventoryStock = InventoryStock::where('code_article', $inventory_stock->code)->first();
+
+            if (!$inventoryStock) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Stock de l\'article non trouvé'
+                ], 404);
+            }
+
+            if ($quantityDifference > 0 && $inventoryStock->quantity < $quantityDifference) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Stock insuffisant pour effectuer cette opération'
+                ], 400);
+            }
+
+            DB::transaction(function () use ($inventoryStock, $quantityDifference, $palette, $inventory_stock, $newQuantity) {
+                if ($quantityDifference > 0) {
+                    $inventoryStock->update([
+                        'quantity' => $inventoryStock->quantity - $quantityDifference
+                    ]);
+                } elseif ($quantityDifference < 0) {
+                    $inventoryStock->update([
+                        'quantity' => $inventoryStock->quantity + abs($quantityDifference)
+                    ]);
+                }
+
+                $palette->inventoryArticles()->updateExistingPivot($inventory_stock->id, [
+                    'quantity' => $newQuantity
+                ]);
+            });
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Quantité mise à jour avec succès',
+                'data' => [
+                    'old_quantity' => $oldQuantity,
+                    'new_quantity' => $newQuantity,
+                    'quantity_difference' => $quantityDifference,
+                    'inventory_updated' => $quantityDifference !== 0
+                ]
+            ], 200);
+        } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
+            Log::error('Model not found in updateArticleQuantity: ' . $e->getMessage(), [
+                'palette_id' => $palette->code,
+                'article_id' => $inventory_stock->id
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Palette ou article non trouvé'
+            ], 404);
+        } catch (\Exception $e) {
+            Log::error('Error updating article quantity: ' . $e->getMessage(), [
+                'palette_code' => $palette->code,
+                'article_id' => $inventory_stock->id,
+                'quantity' => $request->quantity ?? null
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Erreur lors de la mise à jour de la quantité'
+            ], 500);
+        }
+    }
 }

@@ -6,7 +6,7 @@ use Illuminate\Database\Eloquent\Model;
 
 class Emplacement extends Model
 {
-    protected $fillable = ['depot_id', 'code', 'description'];
+    protected $fillable = ['depot_id', 'code', 'description', 'inventory_id'];
 
 
     public function articles()
