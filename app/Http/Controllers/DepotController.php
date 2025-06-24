@@ -9,7 +9,8 @@ use Illuminate\Support\Facades\Validator;
 
 class DepotController extends Controller
 {
-    public function list(){
+    public function list()
+    {
         $depots = Depot::withCount('emplacements')
             ->with('company')
             ->orderByDesc('created_at')
@@ -58,16 +59,20 @@ class DepotController extends Controller
                 'emplacements.id as emplacement_id',
                 'emplacements.code',
                 'palettes.id as palette_id',
+                'palettes.inventory_id',
                 'article_palette.article_stock_id',
                 'article_palette.quantity'
             )
             ->where('emplacements.depot_id', $depot->id)
             ->get();
 
+
         $grouped = $raw->groupBy('emplacement_id')->map(function ($rows, $emplacementId) {
             $code = $rows->first()->code;
 
-            $uniquePaletteCount = $rows->pluck('palette_id')->filter()->unique()->count();
+            $uniquePaletteCount = $rows->filter(function ($row) {
+                return is_null($row->inventory_id) && !is_null($row->palette_id);
+            })->pluck('palette_id')->unique()->count();
 
             $articleQuantities = $rows
                 ->filter(fn($row) => $row->article_stock_id !== null)
@@ -89,9 +94,4 @@ class DepotController extends Controller
             "emplacements" => $grouped
         ]);
     }
-
-
-
-
-
 }

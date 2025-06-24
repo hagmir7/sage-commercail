@@ -451,15 +451,51 @@ class PaletteController extends Controller
         return response()->json(['data' => $palette, 'message' => 'Palette updated successfully']);
     }
 
-
-
-    public function destroy($id)
+    public function destroy(Palette $palette)
     {
-        $palette = Palette::findOrFail($id);
-        $palette->delete();
+        try {
+            DB::transaction(function () use ($palette) {
 
-        return response()->json(['message' => 'Palette deleted successfully']);
+                if ($palette->type == "Stock") {
+
+                    if ($palette->articles()->exists()) {
+                        $palette->articles()->detach();
+                    }
+
+                    if ($palette->inventoryArticles()->exists()) {
+
+                        $inventoryArticles = DB::table('inventory_article_palette')
+                            ->where('palette_id', $palette->id)
+                            ->get();
+
+                        foreach ($inventoryArticles as $item) {
+                            $inventoryStock = \App\Models\InventoryStock::find($item->inventory_stock_id);
+                            if ($inventoryStock) {
+                                $inventoryStock->update([
+                                    'quantity' => $inventoryStock->quantity - $item->quantity
+                                ]);
+                            }
+                        }
+                        $palette->inventoryArticles()->detach();
+                    }
+                }
+
+                $palette->delete();
+            });
+
+            return response()->json(['message' => 'Palette supprimée avec succès'], 200);
+        } catch (\Exception $e) {
+            Log::error('Erreur lors de la suppression de la palette: ' . $e->getMessage(), [
+                'palette_id' => $palette->id,
+                'palette_code' => $palette->code
+            ]);
+
+            return response()->json([
+                'message' => 'Erreur lors de la suppression de la palette'
+            ], 500);
+        }
     }
+
 
 
 
@@ -604,13 +640,6 @@ class PaletteController extends Controller
             $article = ArticleStock::find($article_id);
             $inventoryStock = InventoryStock::where('code_article', $article->code)->first();
 
-            // if ($quantityDifference > 0 && $inventoryStock->quantity < $quantityDifference) {
-            //     return response()->json([
-            //         'success' => false,
-            //         'message' => 'Stock insuffisant en inventaire. Stock disponible: ' . $inventoryStock->quantity
-            //     ], 400);
-            // }
-
             DB::transaction(function () use ($inventoryStock, $quantityDifference, $palette, $article_id, $newQuantity) {
                 if ($quantityDifference > 0) {
 
@@ -662,4 +691,47 @@ class PaletteController extends Controller
         }
     }
 
+
+    public function detachArticleForInvenotry($code, $article_id)
+    {
+        try {
+            $palette = Palette::where('code', $code)->firstOrFail();
+            $result = DB::selectOne(
+                "SELECT quantity FROM article_palette WHERE article_stock_id = ? AND palette_id = ?",
+                [$article_id, $palette->id]
+            );
+            if (!$result) {
+                throw new \Exception("Article not found in this palette");
+            }
+
+            $quantity = $result->quantity;
+            $article = ArticleStock::find($article_id);
+            $inventoryStock = InventoryStock::where('code_article', $article->code)->first();
+
+            if ($inventoryStock->quantity < $quantity) {
+                throw new \Exception("Insufficient inventory quantity");
+            }
+
+            DB::transaction(function () use ($inventoryStock, $quantity, $palette, $article_id) {
+                $inventoryStock->update([
+                    'quantity' => $inventoryStock->quantity - $quantity
+                ]);
+                $palette->articles()->detach($article_id);
+            });
+            return [
+                'success' => true,
+                'message' => 'Article detached successfully',
+                'detached_quantity' => $quantity
+            ];
+        } catch (\Exception $e) {
+            Log::error('Error detaching article: ' . $e->getMessage(), [
+                'code' => $code,
+                'article_id' => $article_id
+            ]);
+            return [
+                'success' => false,
+                'message' => 'Failed to detach article: ' . $e->getMessage()
+            ];
+        }
+    }
 }

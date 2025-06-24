@@ -191,7 +191,8 @@ class InventoryController extends Controller
 
 
 
-        $conditionMultiplier = $request->condition ? (int) $request->condition : 1;
+        $conditionMultiplier = $request->condition ? (float) $request->condition : 1.0;
+
 
 
         DB::transaction(function () use ($article, $request, $inventory, $inventory_stock, $conditionMultiplier) {
@@ -210,9 +211,15 @@ class InventoryController extends Controller
 
 
 
+            if ($request->type_colis == "Palette" || $request->type_colis == "Carton") {
+                $qte_value = $request->palettes * $conditionMultiplier;
+            } else {
+                $qte_value = $request->quantity;
+            }
+
             if ($inventory_stock) {
                 $inventory_stock->update([
-                    'quantity' => $inventory_stock->quantity + ($conditionMultiplier * $request->quantity),
+                    'quantity' => $inventory_stock->quantity + $qte_value,
                 ]);
             } else {
                 $inventory_stock = InventoryStock::create([
@@ -220,7 +227,7 @@ class InventoryController extends Controller
                     'designation' => $article->description,
                     'inventory_id' => $inventory->id,
                     'price' => $article->price,
-                    'quantity' => $conditionMultiplier * $request->quantity,
+                    'quantity' => $qte_value,
                 ]);
             }
 
@@ -491,7 +498,6 @@ class InventoryController extends Controller
                 $palette->inventoryArticles()->updateExistingPivot($inventory_stock->id, [
                     'quantity' => $newQuantity
                 ]);
-
             });
 
             return response()->json([
@@ -524,6 +530,63 @@ class InventoryController extends Controller
             return response()->json([
                 'success' => false,
                 'message' => 'Erreur lors de la mise à jour de la quantité'
+            ], 500);
+        }
+    }
+
+    public function deleteArticleFromPalette(Request $request, Palette $palette, InventoryStock $inventory_stock)
+    {
+        try {
+            $currentPivotData = DB::selectOne(
+                "SELECT quantity FROM inventory_article_palette WHERE inventory_stock_id = ? AND palette_id = ?",
+                [$inventory_stock->id, $palette->id]
+            );
+
+            if (!$currentPivotData) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Article non trouvé dans cette palette'
+                ], 404);
+            }
+
+            $quantityToRemove = $currentPivotData->quantity;
+
+            DB::transaction(function () use ($inventory_stock, $palette, $quantityToRemove) {
+                // Decrease inventory stock
+                $inventory_stock->update([
+                    'quantity' => $inventory_stock->quantity - $quantityToRemove
+                ]);
+
+                // Detach the relation
+                $palette->inventoryArticles()->detach($inventory_stock->id);
+            });
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Article supprimé de la palette avec succès',
+                'data' => [
+                    'removed_quantity' => $quantityToRemove
+                ]
+            ], 200);
+        } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
+            Log::error('Model not found in deleteArticleFromPalette: ' . $e->getMessage(), [
+                'palette_id' => $palette->id,
+                'article_id' => $inventory_stock->id
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Palette ou article non trouvé'
+            ], 404);
+        } catch (\Exception $e) {
+            Log::error('Error deleting article from palette: ' . $e->getMessage(), [
+                'palette_code' => $palette->code,
+                'article_id' => $inventory_stock->id
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Erreur lors de la suppression de l’article de la palette'
             ], 500);
         }
     }

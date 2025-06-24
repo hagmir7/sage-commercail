@@ -9,7 +9,14 @@ class EmplacementController extends Controller
 {
     public function show(Emplacement $emplacement)
     {
-        $emplacement->load(['depot', 'palettes.articles']);
+        $emplacement->load([
+            'depot',
+            'palettes' => function ($query) {
+                $query->whereNull('inventory_id');
+            },
+            'palettes.articles'
+        ]);
+
         return response()->json($emplacement);
     }
 

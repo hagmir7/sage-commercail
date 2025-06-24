@@ -28,7 +28,8 @@ class ArticleStock extends Model
         'chant',
         'palette_condition',
         'unit',
-        'gamme'
+        'gamme',
+        'category'
     ];
 
     public function article()
@@ -44,6 +45,10 @@ class ArticleStock extends Model
     public function palettes()
     {
         return $this->belongsToMany(Palette::class)->withPivot('quantity')->withTimestamps();
+    }
+
+    public function companies(){
+        return $this->belongsToMany(Company::class, 'article_company');
     }
 
     public function inventoryMovements(){

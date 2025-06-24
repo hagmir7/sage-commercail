@@ -19,13 +19,9 @@ use App\Http\Controllers\RoleController;
 use App\Http\Controllers\SellController;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\UserPermissionController;
-use App\Models\ArticleStock;
-use App\Models\Docentete;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
-use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Str;
 
 
 Route::get('/user', function (Request $request) {
@@ -38,10 +34,6 @@ Route::get('/user', function (Request $request) {
 Route::get("client/{client}", [ClientController::class, 'show']);
 Route::get("article/{article}", [ArticleController::class, 'show']);
 
-
-
-
-Route::get('document/history/{piece}', [DocumentController::class, 'history']);
 
 
 Route::get("preparation/{piece}/{companyId}", [PaletteController::class, 'validationCompany']);
@@ -57,13 +49,6 @@ Route::get("progress/{piece}", [DocenteteController::class, 'progress']);
 Route::middleware('auth:sanctum')->group(function () {
     Route::post('/logout', [AuthController::class, 'logout']);
     Route::get('/user', [AuthController::class, 'user']);
-
-    Route::prefix('depots')->controller(DepotController::class)->group(function () {
-        Route::get('/', 'list');
-        Route::delete('delete/{depot}', 'delete');
-        Route::get('/{depot}', 'show');
-        Route::post('/create', 'create');
-    });
 
     // Roles
     Route::get('/roles', [RoleController::class, 'index']);
@@ -82,46 +67,14 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/user/{id}/permissions', [UserPermissionController::class, 'getUserRolesAndPermissions']);
     Route::get('/user/permissions', [UserPermissionController::class, 'getAuthUserRolesAndPermissions']);
     Route::get('roles/chargement', [RoleController::class, 'chargeRoles']);
-    //
-
-    // Route::get("docentete/validation", [DocenteteController::class, 'validation']);
-    Route::post("docentete/transfer", [DocenteteController::class, 'transfer']);
-    Route::get("docentete/shipping", [DocenteteController::class, 'shipping']);
-    Route::get("docentetes/commercial", [DocenteteController::class, 'commercial']);
-    Route::get("docentetes/preparation", [DocenteteController::class, 'preparation']);
-    Route::get("docentetes/fabrication", [DocenteteController::class, 'fabrication']);
-    Route::get("docentete/{id}", [DocenteteController::class, 'show']);
 
 
-    Route::post("docentetes/start", [DocenteteController::class, 'start']);
-
-    Route::post("docentetes/complation", [DocenteteController::class, 'complation']);
-    // http://localhost:8000/api/palettes/PB00000020
-    Route::get("docentetes/reset/{piece}", [DocenteteController::class, 'reset']);
-
-    Route::post('palettes/validate/{piece}', [DocenteteController::class, 'validate']);
-    Route::post('palettes/generate', [PaletteController::class, 'generate']);
-    Route::post('palettes/scan', [PaletteController::class, 'scanLine']);
-    Route::get('palettes/scan/{code}', [PaletteController::class, 'scanPalette']);
-    Route::post('palettes/confirm', [PaletteController::class, 'confirm']);
-    Route::post('palettes/confirm/{code}/{piece}', [PaletteController::class, 'confirmPalette']);
-    Route::put('palettes/reset/{code}', [PaletteController::class, 'resetPalette']);
-    Route::delete('palettes/{code}/article/{article_id}/delete', [PaletteController::class, 'detachArticle']);
-    Route::put('palettes/{code}/article/{article_id}/update', [PaletteController::class, 'updateArticleQuantity']);
-
-
-    Route::post('palettes/detach', [PaletteController::class, 'detach']);
-    Route::post('palettes/create', [PaletteController::class, 'create']);
-    Route::get('palettes/{code}', [PaletteController::class, 'show']);
-    Route::get('palettes/{code}/line/{lineId}', [PaletteController::class, 'controller']);
-
-
-    //
-    Route::get('palettes/document/{piece}', [PaletteController::class, 'documentPalettes']);
-
-
-    Route::get("calculator/{piece}", [SellController::class, 'calculator']);
-
+    Route::prefix('depots')->controller(DepotController::class)->group(function () {
+        Route::get('/', 'list');
+        Route::delete('delete/{depot}', 'delete');
+        Route::get('/{depot}', 'show');
+        Route::post('/create', 'create');
+    });
 
     Route::prefix('emplacement')->controller(EmplacementController::class)->group(function () {
         Route::get('inventory/{emplacement:code}', 'showForInventory');
@@ -129,9 +82,46 @@ Route::middleware('auth:sanctum')->group(function () {
     });
 
 
-    Route::prefix('inventory')->controller(InventoryController::class)->group(function () {
-        Route::put('palette/{palette:code}/article/{inventory_stock}', 'updateArticleQuantityInPalette');
+    Route::prefix('palettes')->controller(PaletteController::class)->group(function () {
+        Route::post('generate', 'generate');
+        Route::post('scan', 'scanLine');
+        Route::get('scan/{code}', 'scanPalette');
+        Route::post('confirm', 'confirm');
+        Route::post('confirm/{code}/{piece}', 'confirmPalette');
+        Route::put('reset/{code}', 'resetPalette');
+       
+        Route::delete('{code}/article/{article_id}/inventory/delete', 'detachArticleForInvenotry');
+        Route::delete('{code}/article/{article_id}/delete', 'detachArticle');
+        Route::put('{code}/article/{article_id}/update', 'updateArticleQuantity');
+        Route::post('detach', 'detach');
+        Route::post('create', 'create');
+        Route::get('{code}', 'show');
+        Route::get('{code}/line/{lineId}', 'controller');
+        Route::get('document/{piece}', 'documentPalettes');
+        Route::delete('{palette:code}', 'destroy');
+    });
 
+    Route::prefix('docentetes')->controller(DocenteteController::class)->group(function () {
+        Route::get("commercial", 'commercial');
+        Route::get("preparation", 'preparation');
+        Route::get("fabrication", 'fabrication');
+        Route::post("start", 'start');
+        Route::post("complation", 'complation');
+        Route::get("reset/{piece}", 'reset');
+        Route::post("transfer", 'transfer');
+        Route::get("shipping", 'shipping');
+        Route::post('palettes/validate/{piece}', 'validate');
+        Route::get("{id}", 'show');
+    });
+
+    
+
+    Route::get("calculator/{piece}", [SellController::class, 'calculator']);
+
+
+    Route::prefix('inventory')->controller(InventoryController::class)->group(function () {
+        Route::put('palette/{palette:code}/article/{inventory_stock}/update', 'updateArticleQuantityInPalette');
+        Route::delete('palette/{palette:code}/article/{inventory_stock}/delete', 'deleteArticleFromPalette');
         Route::post('insert/{inventory}', 'insert');
         Route::post('create', 'create');
         Route::get('emplacement/{code}', 'scanEmplacmenet');
@@ -139,52 +129,33 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('list', 'list');
         Route::get('overview/{inventory}', 'overview');
         Route::delete('delete/movement/{inventory_movement}', 'deleteMovement');
-
         Route::get("articles/{inventory}", 'stockArticle');
         Route::get('{inventory}/depot/{depot}', 'depotEmplacements');
-
-
-
         Route::get("{inventory}", 'show');
     });
 
 
-    Route::prefix('articles')->controller(ArticleStockController::class)->group(function(){
+    Route::prefix('articles')->controller(ArticleStockController::class)->group(function () {
+        Route::get('', 'index');
         Route::put('update/{article_stock:code}', 'update');
         Route::get('{article_stock:code}', 'show');
         Route::get('update/{article:code}', 'update');
     });
 
 
-
-
-
-    Route::prefix('document')->controller(DocumentController::class)->group(function () {
-        Route::get('livraison', 'livraison');
-    });
-
-
-
-
-
     Route::prefix('documents')->controller(DocumentController::class)->group(function () {
         Route::get('/', 'list');
         Route::get('/ready', 'ready');
         Route::get('/progress/{piece}', 'progress');
-
         Route::post('chargement/{document}', 'addChargement');
         Route::get('validation-controller', 'validationControllerList');
         Route::get('preparation-list', 'preparationList');
-
+        Route::get('livraison', 'livraison');
         // All documents routes up to this route !
         Route::get('/{piece}/palettes', 'documentPalettes');
         Route::get('{piece}/delivered-palettes', 'deliveredPalettes');
         Route::get('/{piece}', 'checkControlled');
     });
-
-
-    // Test
-    // Route::get("docentete/validation/{id}", [DocenteteController::class, 'validation']);
 });
 
 
@@ -195,22 +166,3 @@ Route::post('/register', [AuthController::class, 'register']);
 Route::get('/user/{id}', [AuthController::class, 'show']);
 
 Route::post('/user/update/{id}', [UserController::class, 'update']);
-
-// Companies
-// Route::apiResource('companies', CompanyController::class);
-
-// Depots
-// Route::apiResource('depots', DepotController::class);
-
-// Positions
-// Route::apiResource('positions', PositionController::class);
-
-// Palettes
-Route::apiResource('palettes', PaletteController::class);
-
-// Article Families
-// Route::apiResource('article-families', ArticleFamilyController::class);
-
-// Articles
-Route::apiResource('articles', ArticleStockController::class);
-
