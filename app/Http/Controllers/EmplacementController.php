@@ -12,4 +12,12 @@ class EmplacementController extends Controller
         $emplacement->load(['depot', 'palettes.articles']);
         return response()->json($emplacement);
     }
+
+
+    
+    public function showForInventory(Emplacement $emplacement)
+    {
+        $emplacement->load(['depot', 'palettes.inventoryArticles']);
+        return response()->json($emplacement);
+    }
 }

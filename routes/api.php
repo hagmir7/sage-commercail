@@ -124,11 +124,14 @@ Route::middleware('auth:sanctum')->group(function () {
 
 
     Route::prefix('emplacement')->controller(EmplacementController::class)->group(function () {
+        Route::get('inventory/{emplacement:code}', 'showForInventory');
         Route::get('{emplacement:code}', 'show');
     });
 
 
     Route::prefix('inventory')->controller(InventoryController::class)->group(function () {
+        Route::put('palette/{palette:code}/article/{inventory_stock}', 'updateArticleQuantityInPalette');
+
         Route::post('insert/{inventory}', 'insert');
         Route::post('create', 'create');
         Route::get('emplacement/{code}', 'scanEmplacmenet');
@@ -136,16 +139,20 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('list', 'list');
         Route::get('overview/{inventory}', 'overview');
         Route::delete('delete/movement/{inventory_movement}', 'deleteMovement');
-        Route::get('{inventory}', 'show');
+
         Route::get("articles/{inventory}", 'stockArticle');
+        Route::get('{inventory}/depot/{depot}', 'depotEmplacements');
+
+
+
+        Route::get("{inventory}", 'show');
     });
 
 
     Route::prefix('articles')->controller(ArticleStockController::class)->group(function(){
-        Route::put('/update/{article_stock:code}', 'update');
+        Route::put('update/{article_stock:code}', 'update');
         Route::get('{article_stock:code}', 'show');
-
-        // Route::get('update/{article:code}', 'update');
+        Route::get('update/{article:code}', 'update');
     });
 
 

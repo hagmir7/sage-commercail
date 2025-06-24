@@ -15,7 +15,8 @@ class Palette extends Model
         'user_id',
         'controlled',
         'delivered_at',
-        'delivered_by'
+        'delivered_by',
+        'inventory_id'
     ];
 
     // public $timestamps = false;
@@ -36,6 +37,10 @@ class Palette extends Model
         return $this->belongsToMany(ArticleStock::class, 'article_palette')->withPivot('quantity')->withTimestamps();
     }
 
+    public function inventoryArticles(){
+        return $this->belongsToMany(InventoryStock::class, 'inventory_article_palette')->withPivot('quantity')->withTimestamps();
+    }
+
     public function document(){
         return $this->belongsTo(Document::class);
     }
@@ -49,4 +54,11 @@ class Palette extends Model
     public function user(){
         return $this->belongsTo(User::class);
     }
+
+    // public function getRouteKeyName()
+    // {
+    //     return 'code';
+    // }
+
+    
 }
