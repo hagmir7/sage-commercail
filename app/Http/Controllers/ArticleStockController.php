@@ -91,34 +91,58 @@ class ArticleStockController extends Controller
      * @param  int  $id
      * @return \Illuminate\Http\Response
      */
-    public function update(Request $request, $id)
-    {
-        $article = ArticleStock::findOrFail($id);
 
+    public function update(Request $request, ArticleStock $article_stock)
+    {
         $validator = Validator::make($request->all(), [
-            'code' => 'sometimes|required|string|max:255|unique:articles,code,' . $id,
-            'description' => 'sometimes|required|string',
-            'name' => 'nullable|string|max:255',
-            'color' => 'nullable|string|max:255',
-            'qte_inter' => 'integer|min:0',
-            'qte_serie' => 'integer|min:0',
-            'palette_id' => 'nullable|exists:palettes,id',
-            'family_id' => 'sometimes|required|exists:article_families,id',
+            'code' => 'required|string|max:100',
+            'description' => 'nullable|string|max:255',
+            'name' => 'required|string|max:150',
+            'color' => 'nullable|string|max:50',
+            'qte_inter' => 'nullable|numeric',
+            'qte_serie' => 'nullable|numeric',
+            'quantity' => 'nullable|numeric',
+            'stock_min' => 'nullable|numeric',
+            'price' => 'nullable|numeric',
             'thickness' => 'nullable|numeric',
-            'hieght' => 'nullable|numeric',
+            'height' => 'nullable|numeric',
             'width' => 'nullable|numeric',
             'depth' => 'nullable|numeric',
-            'chant' => 'nullable|string|max:255',
+            'chant' => 'nullable|string|max:100',
+            'family_id' => 'nullable|exists:F_FAMILLE,cbMarq',
+            'condition' => 'nullable|string|max:100',
+            'code_supplier' => 'nullable|string|max:100',
+            'qr_code' => 'nullable|string|max:255',
+            'palette_condition' => 'nullable|string|max:100',
+            'unit' => 'nullable|string|max:20',
+            'gamme' => 'nullable|string|max:100',
         ]);
 
         if ($validator->fails()) {
-            return response()->json(['errors' => $validator->errors()], 422);
+            return response()->json([
+                'message' => 'Validation failed.',
+                'errors' => $validator->errors(),
+            ], 422);
         }
 
-        $article->update($request->all());
 
-        return response()->json(['data' => $article, 'message' => 'Article updated successfully']);
+        if (!$article_stock) {
+            return response()->json(['message' => 'Article not found.'], 404);
+        }
+
+        // Update article fields
+        $article_stock->update($request->only([
+            'code', 'description', 'name', 'color', 'qte_inter', 'qte_serie', 'quantity', 'stock_min',
+            'price', 'thickness', 'height', 'width', 'depth', 'chant', 'family_id',
+            'condition', 'code_supplier', 'qr_code', 'palette_condition', 'unit', 'gamme'
+        ]));
+
+        return response()->json([
+            'message' => 'Article updated successfully.',
+            'data' => $article_stock
+        ], 200);
     }
+
 
     /**
      * Remove the specified resource from storage.

@@ -142,7 +142,9 @@ Route::middleware('auth:sanctum')->group(function () {
 
 
     Route::prefix('articles')->controller(ArticleStockController::class)->group(function(){
+        Route::put('/update/{article_stock:code}', 'update');
         Route::get('{article_stock:code}', 'show');
+
         // Route::get('update/{article:code}', 'update');
     });
 
