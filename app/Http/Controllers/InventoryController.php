@@ -189,7 +189,7 @@ class InventoryController extends Controller
             ->where('inventory_id', $inventory->id)
             ->first();
 
-                
+
 
         $conditionMultiplier = $request->condition ? (int) $request->condition : 1;
 
@@ -207,7 +207,7 @@ class InventoryController extends Controller
                 'user_id' => auth()->id(),
                 'date' => now(),
             ]);
-  
+
 
 
             if ($inventory_stock) {
@@ -430,9 +430,7 @@ class InventoryController extends Controller
 
 
 
-   public function updateArticleQuantityInPalette(Request $request, Palette $palette, InventoryStock $inventory_stock)
-
-  
+    public function updateArticleQuantityInPalette(Request $request, Palette $palette, InventoryStock $inventory_stock)
     {
         try {
             $validator = Validator::make($request->all(), [
@@ -464,36 +462,36 @@ class InventoryController extends Controller
             $oldQuantity = $currentPivotData->quantity;
             $quantityDifference = $newQuantity - $oldQuantity;
 
-            $inventoryStock = InventoryStock::where('code_article', $inventory_stock->code)->first();
-
-            if (!$inventoryStock) {
+            // Skip update if no change
+            if ($quantityDifference == 0) {
                 return response()->json([
-                    'success' => false,
-                    'message' => 'Stock de l\'article non trouvé'
-                ], 404);
+                    'success' => true,
+                    'message' => 'Aucune modification nécessaire',
+                    'data' => [
+                        'old_quantity' => $oldQuantity,
+                        'new_quantity' => $newQuantity,
+                        'quantity_difference' => $quantityDifference,
+                        'inventory_updated' => false
+                    ]
+                ], 200);
             }
 
-            if ($quantityDifference > 0 && $inventoryStock->quantity < $quantityDifference) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Stock insuffisant pour effectuer cette opération'
-                ], 400);
-            }
-
-            DB::transaction(function () use ($inventoryStock, $quantityDifference, $palette, $inventory_stock, $newQuantity) {
+            DB::transaction(function () use ($inventory_stock, $quantityDifference, $palette, $newQuantity) {
                 if ($quantityDifference > 0) {
-                    $inventoryStock->update([
-                        'quantity' => $inventoryStock->quantity - $quantityDifference
+
+                    $inventory_stock->update([
+                        'quantity' => $inventory_stock->quantity + $quantityDifference
                     ]);
                 } elseif ($quantityDifference < 0) {
-                    $inventoryStock->update([
-                        'quantity' => $inventoryStock->quantity + abs($quantityDifference)
+                    $inventory_stock->update([
+                        'quantity' => $inventory_stock->quantity - abs($quantityDifference)
                     ]);
                 }
 
                 $palette->inventoryArticles()->updateExistingPivot($inventory_stock->id, [
                     'quantity' => $newQuantity
                 ]);
+
             });
 
             return response()->json([
@@ -503,12 +501,12 @@ class InventoryController extends Controller
                     'old_quantity' => $oldQuantity,
                     'new_quantity' => $newQuantity,
                     'quantity_difference' => $quantityDifference,
-                    'inventory_updated' => $quantityDifference !== 0
+                    'inventory_updated' => true
                 ]
             ], 200);
         } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
             Log::error('Model not found in updateArticleQuantity: ' . $e->getMessage(), [
-                'palette_id' => $palette->code,
+                'palette_id' => $palette->id,
                 'article_id' => $inventory_stock->id
             ]);
 
