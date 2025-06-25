@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Emplacement;
+use App\Models\Inventory;
 use Illuminate\Http\Request;
 
 class EmplacementController extends Controller
@@ -12,7 +13,7 @@ class EmplacementController extends Controller
         $emplacement->load([
             'depot',
             'palettes' => function ($query) {
-                $query->whereNull('inventory_id');
+                $query->where('type', 'Stock');
             },
             'palettes.articles'
         ]);
@@ -21,10 +22,12 @@ class EmplacementController extends Controller
     }
 
 
-    
-    public function showForInventory(Emplacement $emplacement)
+
+    public function showForInventory(Emplacement $emplacement, Inventory $inventory)
     {
-        $emplacement->load(['depot', 'palettes.inventoryArticles']);
+        $emplacement->load(['depot', 'palettes' => function ($query) use($inventory) {
+            $query->where('inventory_id', $inventory->id );
+        }, 'palettes.inventoryArticles']);
         return response()->json($emplacement);
     }
 }

@@ -20,7 +20,7 @@ return new class extends Migration
             $table->string('code');
             $table->foreignIdFor(Company::class);
             $table->foreignIdFor(Emplacement::class)->nullable();
-            $table->enum('type', ["Livraison", 'Stock'])->nullable();
+            $table->enum('type', ["Livraison", 'Stock', 'Inventaire'])->nullable();
             $table->foreignIdFor(Document::class)->nullable();
             $table->float('weight')->nullable();
             $table->foreignIdFor(User::class); // creted by

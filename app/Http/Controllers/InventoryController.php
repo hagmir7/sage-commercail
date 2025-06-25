@@ -239,7 +239,7 @@ class InventoryController extends Controller
                         "emplacement_id" => $emplacement->id,
                         "company_id" => 1,
                         "user_id" => auth()->id(),
-                        "type" => "Stock",
+                        "type" => "Inventaier",
                         "inventory_id" => $inventory?->id
                     ]);
 
@@ -257,7 +257,7 @@ class InventoryController extends Controller
                         "code" => $this->generatePaletteCode(),
                         "company_id" => 1,
                         "user_id" => auth()->id(),
-                        "type" => "Stock"
+                        "type" => "Inventaier"
                     ]
                 );
 
@@ -590,4 +590,60 @@ class InventoryController extends Controller
             ], 500);
         }
     }
+
+
+    public function resetToStock(Inventory $inventory)
+    {
+        try {
+            DB::transaction(function () use ($inventory) {
+
+                Palette::where('type', 'Stock')
+                    ->whereNull('inventory_id')
+                    ->delete();
+
+
+                Palette::where('type', 'Stock')
+                    ->whereNotNull('inventory_id')
+                    ->update(['type' => 'Inventaire']);
+
+
+                foreach ($inventory->palettes as $palette) {
+
+                    $palette->update(['type' => 'Stock']);
+
+                    $articlesToAttach = [];
+
+                    foreach ($palette->inventoryArticles as $inventoryArticle) {
+                        $article = ArticleStock::where('code', $inventoryArticle->code_article)->first();
+
+                        if ($article) {
+                            $articlesToAttach[$article->id] = [
+                                'quantity' => $inventoryArticle->pivot->quantity,
+                                'created_at' => now(),
+                                'updated_at' => now(),
+                            ];
+                        }
+                    }
+
+                    if (!empty($articlesToAttach)) {
+                        $palette->articles()->attach($articlesToAttach);
+                    }
+                }
+            });
+
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Stock initialized successfully',
+            ]);
+        } catch (\Exception $e) {
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to initialize stock: ' . $e->getMessage(),
+            ], 500);
+        }
+    }
+
+
 }

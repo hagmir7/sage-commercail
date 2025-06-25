@@ -17,10 +17,12 @@ class Inventory extends Model
         return $this->hasMany(InventoryMovement::class);
     }
 
+    public function palettes(){
+        return $this->hasMany(Palette::class);
+    }
+
     public function stock(){
         return $this->hasMany(InventoryStock::class);
     }
-
-
 
 }
