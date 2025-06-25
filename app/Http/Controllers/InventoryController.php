@@ -126,7 +126,7 @@ class InventoryController extends Controller
 
     public function scanArticle($code)
     {
-        $article = ArticleStock::where('code', $code)
+        $article = ArticleStock::with('companies')->where('code', $code)
             ->orWhere('code_supplier', $code)
             ->orWhere('qr_code', $code)
             ->first();
@@ -239,7 +239,7 @@ class InventoryController extends Controller
                         "emplacement_id" => $emplacement->id,
                         "company_id" => 1,
                         "user_id" => auth()->id(),
-                        "type" => "Inventaier",
+                        "type" => "Inventaire",
                         "inventory_id" => $inventory?->id
                     ]);
 
@@ -257,7 +257,7 @@ class InventoryController extends Controller
                         "code" => $this->generatePaletteCode(),
                         "company_id" => 1,
                         "user_id" => auth()->id(),
-                        "type" => "Inventaier"
+                        "type" => "Inventaire"
                     ]
                 );
 

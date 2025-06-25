@@ -53,7 +53,10 @@ class DepotController extends Controller
     public function show(Depot $depot)
     {
         $raw = DB::table('emplacements')
-            ->leftJoin('palettes', 'emplacements.id', '=', 'palettes.emplacement_id')
+            ->leftJoin('palettes', function($join) {
+                $join->on('emplacements.id', '=', 'palettes.emplacement_id')
+                    ->where('palettes.type', 'Stock');
+            })
             ->leftJoin('article_palette', 'palettes.id', '=', 'article_palette.palette_id')
             ->select(
                 'emplacements.id as emplacement_id',
@@ -67,12 +70,11 @@ class DepotController extends Controller
             ->get();
 
 
+
         $grouped = $raw->groupBy('emplacement_id')->map(function ($rows, $emplacementId) {
             $code = $rows->first()->code;
 
-            $uniquePaletteCount = $rows->filter(function ($row) {
-                return is_null($row->inventory_id) && !is_null($row->palette_id);
-            })->pluck('palette_id')->unique()->count();
+            $uniquePaletteCount = $rows->pluck('palette_id')->unique()->count();
 
             $articleQuantities = $rows
                 ->filter(fn($row) => $row->article_stock_id !== null)
