@@ -95,7 +95,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('confirm', 'confirm');
         Route::post('confirm/{code}/{piece}', 'confirmPalette');
         Route::put('reset/{code}', 'resetPalette');
-       
+
         Route::delete('{code}/article/{article_id}/inventory/delete', 'detachArticleForInvenotry');
         Route::delete('{code}/article/{article_id}/delete', 'detachArticle');
         Route::put('{code}/article/{article_id}/update', 'updateArticleQuantity');
@@ -120,7 +120,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get("{id}", 'show');
     });
 
-    
+
 
     Route::get("calculator/{piece}", [SellController::class, 'calculator']);
 
@@ -146,6 +146,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::put('update/{article_stock:code}', 'update');
         Route::get('{article_stock:code}', 'show');
         Route::get('update/{article:code}', 'update');
+        Route::post('import', 'import');
     });
 
 

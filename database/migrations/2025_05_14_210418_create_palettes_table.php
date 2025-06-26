@@ -3,6 +3,7 @@
 use App\Models\Company;
 use App\Models\Document;
 use App\Models\Emplacement;
+use App\Models\Inventory;
 use App\Models\User;
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
@@ -27,6 +28,7 @@ return new class extends Migration
             $table->boolean('controlled')->default(false);
             $table->dateTime('delivered_at')->nullable();
             $table->foreignIdFor(User::class, 'delivered_by')->nullable();
+            $table->foreignIdFor(Inventory::class)->nullable();
             $table->timestamps();
             $table->unique(['code']);
 

@@ -32,15 +32,6 @@ class ArticleStock extends Model
         'category'
     ];
 
-    public function article()
-    {
-        return $this->belongsTo(Article::class, 'cbMarq');
-    }
-
-    public function family()
-    {
-        return $this->belongsTo(ArticleFamily::class, 'cbMarq');
-    }
 
     public function palettes()
     {

@@ -16,7 +16,7 @@ return new class extends Migration
             $table->id();
             $table->foreignIdFor(ArticleStock::class);
             $table->foreignId('palette_id')->constrained()->onDelete('cascade');
-            $table->integer('quantity')->default(0);
+            $table->float('quantity')->default(0.0);
             $table->timestamps();
         });
     }

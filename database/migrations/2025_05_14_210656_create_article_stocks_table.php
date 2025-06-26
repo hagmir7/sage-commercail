@@ -29,22 +29,13 @@ return new class extends Migration
             $table->float('width')->nullable();
             $table->float('depth')->nullable();
             $table->string('chant')->nullable();
-            $table->integer('family_id');
-            $table->integer('article_id');
             $table->string('condition')->nullable();
+            $table->string('palette_condition')->nullable();
+            $table->string('unit')->nullable();
             $table->string('code_supplier')->nullable();
             $table->string('qr_code')->nullable();
-
-            $table->foreign('family_id')
-                ->references('cbMarq')
-                ->on('F_FAMILLE')
-                ->onDelete('cascade');
-
-            $table->foreign('article_id')
-                ->references('cbMarq')
-                ->on('F_ARTICLE')
-                ->onDelete('cascade');
-
+            $table->string('gamme')->nullable();
+            $table->string('category')->nullable();
             $table->timestamps();
         });
     }

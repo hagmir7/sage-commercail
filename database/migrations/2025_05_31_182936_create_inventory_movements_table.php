@@ -21,7 +21,7 @@ return new class extends Migration
             $table->foreignIdFor(Emplacement::class)->nullable();
             $table->foreignIdFor(Inventory::class);
             $table->enum('type', ['IN', 'OUT', 'TRANSFER'])->default('IN');
-            $table->integer('quantity');
+            $table->float('quantity');
             $table->foreignIdFor(User::class)->nullable();
             $table->string('emplacement_code')->nullable();
             $table->timestamps();

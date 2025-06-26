@@ -3,10 +3,12 @@
 namespace App\Http\Controllers;
 
 use App\Http\Controllers\Controller;
+use App\Imports\ArticleStockImport;
 use App\Models\ArticleStock;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
+use Maatwebsite\Excel\Facades\Excel;
 
 class ArticleStockController extends Controller
 {
@@ -20,8 +22,8 @@ class ArticleStockController extends Controller
         $query = ArticleStock::query();
 
         // Apply filters
-        if ($request->has('family_id')) {
-            $query->where('family_id', $request->family_id);
+        if ($request->has('category')) {
+            $query->where('category', $request->category);
         }
 
         if ($request->has('search') && $request->search !== '') {
@@ -35,8 +37,40 @@ class ArticleStockController extends Controller
         }
 
 
-        $articles = $query->with(['family'])->paginate(100);
+        $articles = $query->paginate(100);
         return response()->json($articles);
+    }
+
+
+
+    public function import(Request $request)
+    {
+        $request->validate([
+            'file' => 'required|file|mimes:xlsx,xls,csv',
+        ]);
+
+        try {
+            // Set higher limits for large imports
+            ini_set('max_execution_time', 7200); // 2 hours
+            ini_set('memory_limit', '4G'); // 1GB memory
+
+            Excel::import(new ArticleStockImport, $request->file('file'));
+
+            return response()->json([
+                'message' => "Fichier importé avec succès"
+            ], 200);
+        } catch (\Maatwebsite\Excel\Validators\ValidationException $e) {
+            return response()->json([
+                'message' => 'Erreur de validation',
+                'errors' => $e->failures()
+            ], 422);
+        } catch (\Exception $e) {
+            \Log::error('Import failed: ' . $e->getMessage());
+
+            return response()->json([
+                'message' => 'Erreur lors de l\'importation du fichier'
+            ], 500);
+        }
     }
 
     /**
@@ -55,7 +89,6 @@ class ArticleStockController extends Controller
             'qte_inter' => 'integer|min:0',
             'qte_serie' => 'integer|min:0',
             'palette_id' => 'nullable|exists:palettes,id',
-            'family_id' => 'required|exists:article_families,id',
             'thickness' => 'nullable|numeric',
             'hieght' => 'nullable|numeric',
             'width' => 'nullable|numeric',
@@ -97,7 +130,7 @@ class ArticleStockController extends Controller
         $validator = Validator::make($request->all(), [
             'code' => 'required|string|max:100',
             'description' => 'nullable|string|max:255',
-            'name' => 'required|string|max:150',
+            'name' => 'string|max:150',
             'color' => 'nullable|string|max:50',
             'qte_inter' => 'nullable|numeric',
             'qte_serie' => 'nullable|numeric',
@@ -109,18 +142,18 @@ class ArticleStockController extends Controller
             'width' => 'nullable|numeric',
             'depth' => 'nullable|numeric',
             'chant' => 'nullable|string|max:100',
-            'family_id' => 'nullable|exists:F_FAMILLE,cbMarq',
             'condition' => 'nullable|string|max:100',
             'code_supplier' => 'nullable|string|max:100',
             'qr_code' => 'nullable|string|max:255',
             'palette_condition' => 'nullable|string|max:100',
             'unit' => 'nullable|string|max:20',
             'gamme' => 'nullable|string|max:100',
+            'category' => 'nullable|string|max:100',
         ]);
 
         if ($validator->fails()) {
             return response()->json([
-                'message' => 'Validation failed.',
+                'message' => $validator->errors()->first(),
                 'errors' => $validator->errors(),
             ], 422);
         }
@@ -133,7 +166,7 @@ class ArticleStockController extends Controller
         // Update article fields
         $article_stock->update($request->only([
             'code', 'description', 'name', 'color', 'qte_inter', 'qte_serie', 'quantity', 'stock_min',
-            'price', 'thickness', 'height', 'width', 'depth', 'chant', 'family_id',
+            'price', 'thickness', 'height', 'width', 'depth', 'chant',
             'condition', 'code_supplier', 'qr_code', 'palette_condition', 'unit', 'gamme'
         ]));
 
