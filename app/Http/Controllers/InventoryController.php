@@ -340,8 +340,8 @@ class InventoryController extends Controller
         $query->orderByDesc("inventory_quantity");
 
         // Apply filters
-        if ($request->has('family_id')) {
-            $query->where('article_stocks.family_id', $request->family_id);
+        if ($request->has('category')) {
+            $query->where('article_stocks.category', $request->category);
         }
 
         if ($request->has('search') && $request->search !== '') {
@@ -354,7 +354,7 @@ class InventoryController extends Controller
             });
         }
 
-        $articles = $query->with('family')->paginate(100);
+        $articles = $query->paginate(100);
 
         return response()->json($articles);
     }
