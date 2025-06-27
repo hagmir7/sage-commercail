@@ -164,16 +164,16 @@ class InventoryController extends Controller
         $validator = Validator::make($request->all(), [
             'emplacement_code' => 'required|string|max:255|min:3|exists:emplacements,code',
             'article_code' => 'string|required',
-            'quantity' => 'numeric|between:0,9999.99|required|min:0',
+            'quantity' => 'numeric|required|min:0',
             'condition' => 'nullable',
             'type_colis' => 'nullable|in:Piece,Palette,Carton',
             'palettes' => 'numeric',
-            'company' => "required|numeric"
+            // 'company' => "required|numeric"
         ]);
 
         if ($validator->fails()) {
             return response()->json([
-                'message' => 'Validation failed',
+                'message' => $validator->errors()->first(),
                 'errors' => $validator->errors()
             ], 422);
         }
@@ -208,7 +208,7 @@ class InventoryController extends Controller
                 'type' => "IN",
                 'quantity' => $request->quantity,
                 'user_id' => auth()->id(),
-                'company_id' => $request->company,
+                'company_id' =>1 ,
                 'date' => now(),
             ]);
 
@@ -240,7 +240,7 @@ class InventoryController extends Controller
                     $palette = Palette::create([
                         "code" => $this->generatePaletteCode(),
                         "emplacement_id" => $emplacement->id,
-                        "company_id" => $request->company,
+                        "company_id" =>1 ,
                         "user_id" => auth()->id(),
                         "type" => "Inventaire",
                         "inventory_id" => $inventory?->id
@@ -258,7 +258,7 @@ class InventoryController extends Controller
                     ],
                     [
                         "code" => $this->generatePaletteCode(),
-                        "company_id" => $request->company,
+                        "company_id" =>1 ,
                         "user_id" => auth()->id(),
                         "type" => "Inventaire"
                     ]
@@ -344,7 +344,7 @@ class InventoryController extends Controller
 
         // Apply filters
         if ($request->has('category')) {
-            $query->where('category', $request->category);
+            $query->where('article_stocks.category', $request->category);
         }
 
         if ($request->has('search') && $request->search !== '') {

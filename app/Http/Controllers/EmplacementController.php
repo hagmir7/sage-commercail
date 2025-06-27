@@ -24,6 +24,15 @@ class EmplacementController extends Controller
         return response()->json($emplacement);
     }
 
+    public function create(Request $request)
+    {
+        Emplacement::create([
+            'depot_id' => $request->depot_id,
+            'code' => $request->code
+        ]);
+        return response()->json(['message' => "Addedd successfully"]);
+    }
+
 
 
     public function showForInventory(Emplacement $emplacement, Inventory $inventory)
