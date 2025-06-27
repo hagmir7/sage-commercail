@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Http\Controllers\API;
+namespace App\Http\Controllers;
 
 use App\Http\Controllers\Controller;
 use App\Models\Company;
@@ -17,7 +17,7 @@ class CompanyController extends Controller
     public function index()
     {
         $companies = Company::all();
-        return response()->json(['data' => $companies]);
+        return response()->json($companies);
     }
 
     /**

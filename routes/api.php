@@ -1,7 +1,7 @@
 <?php
 
 // use App\Http\Controllers\ArticleFamilyController;
-// use App\Http\Controllers\CompanyController;
+use App\Http\Controllers\CompanyController;
 // use App\Http\Controllers\PositionController;
 
 use App\Http\Controllers\ArticleStockController;
@@ -147,6 +147,11 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('{article_stock:code}', 'show');
         Route::get('update/{article:code}', 'update');
         Route::post('import', 'import');
+    });
+
+
+    Route::prefix('companies')->controller(CompanyController::class)->group(function () {
+        Route::get('', 'index');
     });
 
 
