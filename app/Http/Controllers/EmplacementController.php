@@ -30,4 +30,12 @@ class EmplacementController extends Controller
         }, 'palettes.inventoryArticles']);
         return response()->json($emplacement);
     }
+
+    public function create(Request $request){
+        Emplacement::create([
+            'depot_id' => $request->depot_id,
+            'code' => $request->code
+        ]);
+        return response()->json(['message' => "Addedd successfully"] );
+    }
 }

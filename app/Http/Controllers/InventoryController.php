@@ -163,7 +163,7 @@ class InventoryController extends Controller
         $validator = Validator::make($request->all(), [
             'emplacement_code' => 'required|string|max:255|min:3|exists:emplacements,code',
             'article_code' => 'string|required',
-            'quantity' => 'numeric|between:0,9999.99|required|min:0',
+            'quantity' => 'numeric|required|min:0',
             'condition' => 'nullable',
             'type_colis' => 'nullable|in:Piece,Palette,Carton',
             'palettes' => 'numeric'
@@ -171,7 +171,7 @@ class InventoryController extends Controller
 
         if ($validator->fails()) {
             return response()->json([
-                'message' => 'Validation failed',
+                'message' => $validator->errors()->first(),
                 'errors' => $validator->errors()
             ], 422);
         }

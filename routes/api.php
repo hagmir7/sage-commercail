@@ -83,6 +83,7 @@ Route::middleware('auth:sanctum')->group(function () {
     });
 
     Route::prefix('emplacement')->controller(EmplacementController::class)->group(function () {
+        Route::post('create', 'create');
         Route::get('{emplacement:code}/inventory/{inventory}', 'showForInventory');
         Route::get('{emplacement:code}', 'show');
     });
