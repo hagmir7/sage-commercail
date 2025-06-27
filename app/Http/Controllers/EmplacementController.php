@@ -2,9 +2,12 @@
 
 namespace App\Http\Controllers;
 
+use App\Imports\EmplacementImport;
+use App\Models\Depot;
 use App\Models\Emplacement;
 use App\Models\Inventory;
 use Illuminate\Http\Request;
+use Maatwebsite\Excel\Facades\Excel;
 
 class EmplacementController extends Controller
 {
@@ -30,4 +33,33 @@ class EmplacementController extends Controller
         }, 'palettes.inventoryArticles']);
         return response()->json($emplacement);
     }
+
+    public function import(Request $request, Depot $depot)
+        {
+            $request->validate([
+                'file' => 'required|file|mimes:xlsx,xls,csv',
+            ]);
+
+            try {
+                ini_set('max_execution_time', 7200); // 2 hours
+                ini_set('memory_limit', '4G');
+
+                Excel::import(new EmplacementImport($depot->id), $request->file('file'));
+
+                return response()->json([
+                    'message' => "Fichier importé avec succès"
+                ], 200);
+            } catch (\Maatwebsite\Excel\Validators\ValidationException $e) {
+                return response()->json([
+                    'message' => 'Erreur de validation',
+                    'errors' => $e->failures()
+                ], 422);
+            } catch (\Exception $e) {
+                \Log::error('Import failed: ' . $e->getMessage());
+
+                return response()->json([
+                    'message' => 'Erreur lors de l\'importation du fichier'
+                ], 500);
+            }
+        }
 }

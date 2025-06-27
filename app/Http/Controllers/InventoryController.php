@@ -128,6 +128,7 @@ class InventoryController extends Controller
     {
         $article = ArticleStock::with('companies')->where('code', $code)
             ->orWhere('code_supplier', $code)
+            ->orWhere('code_supplier_2', $code)
             ->orWhere('qr_code', $code)
             ->first();
 
@@ -166,7 +167,8 @@ class InventoryController extends Controller
             'quantity' => 'numeric|between:0,9999.99|required|min:0',
             'condition' => 'nullable',
             'type_colis' => 'nullable|in:Piece,Palette,Carton',
-            'palettes' => 'numeric'
+            'palettes' => 'numeric',
+            'company' => "required|numeric"
         ]);
 
         if ($validator->fails()) {
@@ -206,6 +208,7 @@ class InventoryController extends Controller
                 'type' => "IN",
                 'quantity' => $request->quantity,
                 'user_id' => auth()->id(),
+                'company_id' => $request->company,
                 'date' => now(),
             ]);
 
@@ -237,7 +240,7 @@ class InventoryController extends Controller
                     $palette = Palette::create([
                         "code" => $this->generatePaletteCode(),
                         "emplacement_id" => $emplacement->id,
-                        "company_id" => 1,
+                        "company_id" => $request->company,
                         "user_id" => auth()->id(),
                         "type" => "Inventaire",
                         "inventory_id" => $inventory?->id
@@ -255,7 +258,7 @@ class InventoryController extends Controller
                     ],
                     [
                         "code" => $this->generatePaletteCode(),
-                        "company_id" => 1,
+                        "company_id" => $request->company,
                         "user_id" => auth()->id(),
                         "type" => "Inventaire"
                     ]
@@ -340,8 +343,8 @@ class InventoryController extends Controller
         $query->orderByDesc("inventory_quantity");
 
         // Apply filters
-        if ($request->has('family_id')) {
-            $query->where('article_stocks.family_id', $request->family_id);
+        if ($request->has('category')) {
+            $query->where('category', $request->category);
         }
 
         if ($request->has('search') && $request->search !== '') {
@@ -354,7 +357,7 @@ class InventoryController extends Controller
             });
         }
 
-        $articles = $query->with('family')->paginate(100);
+        $articles = $query->paginate(100);
 
         return response()->json($articles);
     }

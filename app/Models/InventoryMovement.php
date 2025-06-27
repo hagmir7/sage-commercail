@@ -15,6 +15,7 @@ class InventoryMovement extends Model
         'type',
         'quantity',
         'user_id',
+        'company_id'
     ];
 
     public function user()
@@ -33,6 +34,11 @@ class InventoryMovement extends Model
 
     public function article(){
         return $this->belongsTo(ArticleStock::class, 'code_article', 'code');
+    }
+
+
+    public function company(){
+        return $this->belongsTo(Company::class);
     }
 
 

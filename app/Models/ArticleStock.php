@@ -12,14 +12,12 @@ class ArticleStock extends Model
         'description',
         'name',
         'color',
-        'article_id',
         'qr_code',
         'quantity',
         'qte_inter',
         'stock_min',
         'qte_serie',
         'condition',
-        'family_id',
         'thickness',
         'height',
         'width',
@@ -29,6 +27,8 @@ class ArticleStock extends Model
         'palette_condition',
         'unit',
         'gamme',
+        'code_supplier',
+        'code_supplier_2',
         'category'
     ];
 

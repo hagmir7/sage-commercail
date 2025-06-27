@@ -4,6 +4,7 @@
 // use App\Http\Controllers\CompanyController;
 // use App\Http\Controllers\PositionController;
 
+use App\Http\Controllers\CompanyController;
 use App\Http\Controllers\ArticleStockController;
 use App\Http\Controllers\ArticleController;
 use App\Http\Controllers\AuthController;
@@ -82,9 +83,16 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('/create', 'create');
     });
 
+     Route::prefix('companies')->controller(CompanyController::class)->group(function () {
+        Route::get('/', 'index');
+    });
+
+
     Route::prefix('emplacement')->controller(EmplacementController::class)->group(function () {
         Route::get('{emplacement:code}/inventory/{inventory}', 'showForInventory');
+        Route::post('{depot}/import', 'import');
         Route::get('{emplacement:code}', 'show');
+        
     });
 
 
