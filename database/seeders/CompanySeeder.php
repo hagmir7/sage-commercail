@@ -21,5 +21,9 @@ class CompanySeeder extends Seeder
         Company::create([
             'name' => "Seriemoble"
         ]);
+
+        Company::create([
+            'name' => "AstiDkora"
+        ]);
     }
 }

@@ -63,6 +63,7 @@ class ArticleStockImport implements ToModel, WithHeadingRow
             'category'           => $this->parseValue($row['codefamille'] ?? null),
             'qr_code'            => $this->parseValue($row['code_barre'] ?? null),
             'palette_condition'  => $this->parseValue($row['conditionpalette'] ?? null),
+            'code_supplier_2'    => $this->parseValue($row['ref_four2'] ?? null),
         ]);
 
         $article->save();

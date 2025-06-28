@@ -27,6 +27,8 @@ class ArticleStock extends Model
         'palette_condition',
         'unit',
         'gamme',
+        'code_supplier',
+        'code_supplier_2',
         'category'
     ];
 

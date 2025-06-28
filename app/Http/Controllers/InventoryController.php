@@ -128,6 +128,7 @@ class InventoryController extends Controller
     {
         $article = ArticleStock::with('companies')->where('code', $code)
             ->orWhere('code_supplier', $code)
+            ->orWhere('code_supplier_2', $code)
             ->orWhere('qr_code', $code)
             ->first();
 
@@ -166,7 +167,8 @@ class InventoryController extends Controller
             'quantity' => 'numeric|required|min:0',
             'condition' => 'nullable',
             'type_colis' => 'nullable|in:Piece,Palette,Carton',
-            'palettes' => 'numeric'
+            'palettes' => 'numeric',
+            // 'company' => "required|numeric"
         ]);
 
         if ($validator->fails()) {
@@ -206,6 +208,7 @@ class InventoryController extends Controller
                 'type' => "IN",
                 'quantity' => $request->quantity,
                 'user_id' => auth()->id(),
+                'company_id' =>1 ,
                 'date' => now(),
             ]);
 
@@ -237,7 +240,7 @@ class InventoryController extends Controller
                     $palette = Palette::create([
                         "code" => $this->generatePaletteCode(),
                         "emplacement_id" => $emplacement->id,
-                        "company_id" => 1,
+                        "company_id" =>1 ,
                         "user_id" => auth()->id(),
                         "type" => "Inventaire",
                         "inventory_id" => $inventory?->id
@@ -255,7 +258,7 @@ class InventoryController extends Controller
                     ],
                     [
                         "code" => $this->generatePaletteCode(),
-                        "company_id" => 1,
+                        "company_id" =>1 ,
                         "user_id" => auth()->id(),
                         "type" => "Inventaire"
                     ]
