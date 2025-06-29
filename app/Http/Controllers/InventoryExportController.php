@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Exports\InventoryArticlesExport;
+use App\Exports\InventoryMovementExport;
 use App\Models\Company;
 use App\Models\Inventory;
 use Illuminate\Http\Request;
@@ -60,5 +61,45 @@ class InventoryExportController extends Controller
         $fileName .= ".xlsx";
 
         return Excel::download(new InventoryArticlesExport($grouped), $fileName);
+    }
+
+    public function movements(Inventory $inventory, Request $request)
+    {
+        $depots = $request->filled('depots') ? explode(',', $request->depots) : null;
+        $users = $request->filled('users') ? explode(',', $request->users) : null;
+
+
+        $inventory->load(['movements' => function ($query) use ($request, $depots, $users) {
+            if ($request->filled('category')) {
+                $query->filterByCategory($request->category);
+            }
+
+            if (!empty($depots)) {
+                $query->filterByDepots($depots);
+            }
+
+            if (!empty($users)) {
+                $query->filterByUsers($users);
+            }
+        }, 'movements.user', 'movements.company', 'movements.article']);
+
+        $movements = $inventory->movements;
+
+
+        $grouped = $movements->map(function ($item) {
+            return [
+                'movement_code' => $item->id,
+                'code_article' => $item->code_article,
+                'designation' => $item->designation,
+                'article_name' => $item?->article?->name,
+                'quantity' => $item->quantity,
+                'emplacement' => $item->emplacement_code,
+                'user' => $item->user->full_name,
+                'date' => $item->created_at,
+                'company_name' => $item?->company?->name,
+            ];
+        })->values();
+
+        return Excel::download(new InventoryMovementExport($grouped), 'inventaire.xlsx');
     }
 }

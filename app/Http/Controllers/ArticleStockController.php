@@ -167,7 +167,7 @@ class ArticleStockController extends Controller
         $article_stock->update($request->only([
             'code', 'description', 'name', 'color', 'qte_inter', 'qte_serie', 'quantity', 'stock_min',
             'price', 'thickness', 'height', 'width', 'depth', 'chant',
-            'condition', 'code_supplier', 'qr_code', 'palette_condition', 'unit', 'gamme'
+            'condition', 'code_supplier', 'qr_code', 'palette_condition', 'unit', 'gamme', 'category'
         ]));
 
         return response()->json([

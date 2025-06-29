@@ -13,6 +13,7 @@ use App\Http\Controllers\DocumentController;
 use App\Http\Controllers\EmplacementController;
 use App\Http\Controllers\InventoryController;
 use App\Http\Controllers\InventoryExportController;
+use App\Http\Controllers\InventoryMovementController;
 use App\Http\Controllers\PaletteController;
 use App\Http\Controllers\PermissionController;
 use App\Http\Controllers\RoleController;
@@ -20,6 +21,7 @@ use App\Http\Controllers\SellController;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\UserPermissionController;
 use App\Models\Inventory;
+use App\Models\InventoryMovement;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
@@ -43,6 +45,8 @@ Route::get("preparation/{piece}/{companyId}", [PaletteController::class, 'valida
 Route::get('/users', function (Request $request) {
     return User::all();
 });
+
+Route::get('inventory/{inventory}/movements/export', [InventoryExportController::class, 'movements']);
 
 Route::get('inventory/{inventory}/init', [InventoryController::class, 'resetToStock']);
 Route::get('inventory/{inventory}/export', [InventoryExportController::class, 'export']);
@@ -87,7 +91,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('{emplacement:code}/inventory/{inventory}', 'showForInventory');
         Route::post('{depot}/import', 'import');
         Route::get('{emplacement:code}', 'show');
-        
+
     });
 
 
@@ -126,6 +130,11 @@ Route::middleware('auth:sanctum')->group(function () {
 
 
     Route::get("calculator/{piece}", [SellController::class, 'calculator']);
+
+    Route::prefix('inventory-movement')->controller(InventoryMovementController::class) ->group(function () {
+            Route::put('update/{inventory_movement}', 'updateQuantity');
+        });
+
 
 
     Route::prefix('inventory')->controller(InventoryController::class)->group(function () {

@@ -36,6 +36,7 @@ class InventoryController extends Controller
 
         $types = $request->filled('types') ? explode(',', $request->types) : null;
 
+
         if ($types && array_diff($types, ['IN', 'OUT', 'TRANSFER'])) {
             return response()->json(['error' => 'Invalid types provided'], 422);
         }
@@ -49,40 +50,38 @@ class InventoryController extends Controller
         }
 
 
-        if ($request->filled('search') && $request->search !== '') {
-            $search = $request->search;
-            $movements->where(function ($q) use ($search) {
-                $q->where('emplacement_code', 'like', "%$search%")
-                    ->orWhere('code_article', 'like', "%$search%")
-                    ->orWhere('designation', 'like', "%$search%");
-            });
+        $depots = $request->filled('depots') ? explode(',', $request->depots) : null;
+
+        $users = $request->filled('users') ? explode(',', $request->users) : null;
+
+
+        if (!empty($depots)) {
+            $movements->filterByDepots($depots);
         }
 
-        // Date Filter
-        if ($request->filled('dates') && $request->dates !== ',') {
-            $dates = array_map('trim', explode(',', $request->dates));
 
-            if (count($dates) === 2) {
-                try {
-                    $start = preg_match('/^\d{4}-\d{2}-\d{2}$/', $dates[0])
-                        ? $dates[0] . ' 00:00:00'
-                        : DateTime::createFromFormat('d/m/Y', $dates[0])->format('Y-m-d 00:00:00');
-
-                    $end = preg_match('/^\d{4}-\d{2}-\d{2}$/', $dates[1])
-                        ? $dates[1] . ' 23:59:59'
-                        : DateTime::createFromFormat('d/m/Y', $dates[1])->format('Y-m-d 23:59:59');
-
-                    $movements->whereBetween('created_at', [$start, $end]);
-                } catch (Exception $e) {
-                    \Log::error('Date parsing error: ' . $e->getMessage());
-                }
-            }
+        if (!empty($users)) {
+            $movements->filterByUsers($users);
         }
+
+        if ($request->filled('search')  && $request->search !== '') {
+            $movements->search($request->search);
+        }
+
+
+        if ($request->filled('category') && $request->category !== '') {
+            $movements->filterByCategory($request->category);
+        }
+
+        if ($request->filled('dates')  && $request->dates !== ',') {
+            $movements->filterByDates($request->dates);
+        }
+
 
         return response()->json([
             'inventory' => $inventory,
             'movements' => $movements->orderBy('created_at', 'desc')
-                ->paginate($request->input('per_page', 15)),
+                ->paginate($request->input('per_page', 20)),
         ]);
     }
 
@@ -168,8 +167,10 @@ class InventoryController extends Controller
             'condition' => 'nullable',
             'type_colis' => 'nullable|in:Piece,Palette,Carton',
             'palettes' => 'numeric',
-            // 'company' => "required|numeric"
+            'company' => "required|numeric"
         ]);
+
+        // Log::error()
 
         if ($validator->fails()) {
             return response()->json([
@@ -208,7 +209,7 @@ class InventoryController extends Controller
                 'type' => "IN",
                 'quantity' => $request->quantity,
                 'user_id' => auth()->id(),
-                'company_id' =>1 ,
+                'company_id' => intval($request?->company ?? 1),
                 'date' => now(),
             ]);
 
@@ -240,7 +241,7 @@ class InventoryController extends Controller
                     $palette = Palette::create([
                         "code" => $this->generatePaletteCode(),
                         "emplacement_id" => $emplacement->id,
-                        "company_id" =>1 ,
+                        "company_id" => intval($request?->company ?? 1),
                         "user_id" => auth()->id(),
                         "type" => "Inventaire",
                         "inventory_id" => $inventory?->id
@@ -258,7 +259,7 @@ class InventoryController extends Controller
                     ],
                     [
                         "code" => $this->generatePaletteCode(),
-                        "company_id" =>1 ,
+                        "company_id" => intval($request?->company ?? 1),
                         "user_id" => auth()->id(),
                         "type" => "Inventaire"
                     ]
@@ -267,13 +268,11 @@ class InventoryController extends Controller
                 $existing = $palette->inventoryArticles()->where('code_article', $article->code)->first();
 
                 if ($existing) {
-                    // Add to existing quantity
                     $currentQty = $existing->pivot->quantity;
                     $newQty = $currentQty + floatval($request->quantity);
 
                     $palette->inventoryArticles()->updateExistingPivot($inventory_stock->id, ['quantity' => $newQty]);
                 } else {
-                    // Create new pivot entry
                     $palette->inventoryArticles()->attach($inventory_stock->id, [
                         'quantity' => floatval($request->quantity)
                     ]);
@@ -283,8 +282,6 @@ class InventoryController extends Controller
 
         return response()->json(['message' => 'Stock successfully inserted or updated.']);
     }
-
-
 
     public function movements(Inventory $inventory)
     {
@@ -647,6 +644,4 @@ class InventoryController extends Controller
             ], 500);
         }
     }
-
-
 }

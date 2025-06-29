@@ -5,7 +5,7 @@ namespace App\Exports;
 use Maatwebsite\Excel\Concerns\FromCollection;
 use Maatwebsite\Excel\Concerns\WithHeadings;
 
-class InventoryArticlesExport implements FromCollection, WithHeadings
+class InventoryMovementExport implements FromCollection, WithHeadings
 {
     protected $data;
 
@@ -28,7 +28,8 @@ class InventoryArticlesExport implements FromCollection, WithHeadings
             'Quantité',
             'Emplacement',
             'Responsable',
-            'Date'
+            'Date',
+            'Société'
         ];
     }
 }
