@@ -59,6 +59,10 @@ class InventoryController extends Controller
             $movements->filterByDepots($depots);
         }
 
+        if ($request->filled('emplacement')  && $request->search !== '') {
+            $movements->filterByEmplacement($request->emplacement);
+        }
+
 
         if (!empty($users)) {
             $movements->filterByUsers($users);
@@ -157,7 +161,6 @@ class InventoryController extends Controller
     }
 
 
-
     public function insert(Request $request, Inventory $inventory)
     {
         $validator = Validator::make($request->all(), [
@@ -167,10 +170,7 @@ class InventoryController extends Controller
             'condition' => 'nullable',
             'type_colis' => 'nullable|in:Piece,Palette,Carton',
             'palettes' => 'numeric',
-            'company' => "required|numeric"
         ]);
-
-        // Log::error()
 
         if ($validator->fails()) {
             return response()->json([
@@ -192,11 +192,7 @@ class InventoryController extends Controller
             ->where('inventory_id', $inventory->id)
             ->first();
 
-
-
         $conditionMultiplier = $request->condition ? (float) $request->condition : 1.0;
-
-
 
         DB::transaction(function () use ($article, $request, $inventory, $inventory_stock, $conditionMultiplier) {
             $emplacement = Emplacement::where('code', $request->emplacement_code)->first();
@@ -212,8 +208,6 @@ class InventoryController extends Controller
                 'company_id' => intval($request?->company ?? 1),
                 'date' => now(),
             ]);
-
-
 
             if ($request->type_colis == "Palette" || $request->type_colis == "Carton") {
                 $qte_value = $request->palettes * $conditionMultiplier;

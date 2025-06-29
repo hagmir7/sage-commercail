@@ -58,6 +58,10 @@ class InventoryMovement extends Model
         return $query->whereIn('user_id', $users);
     }
 
+    public function scopeFilterByEmplacement($query, $emplacement)
+    {
+        return $query->where('emplacement_code', 'like', "%$emplacement%");
+    }
 
     public function scopeSearch($query, $search)
     {
@@ -71,6 +75,9 @@ class InventoryMovement extends Model
 
         return $query;
     }
+
+
+
 
 
     public function scopeFilterByDates(Builder $query, $dateRange)
