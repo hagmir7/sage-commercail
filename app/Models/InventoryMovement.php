@@ -11,6 +11,7 @@ class InventoryMovement extends Model
         'designation',
         'emplacement_id',
         'emplacement_code',
+        'controlled_by',
         'inventory_id',
         'type',
         'quantity',

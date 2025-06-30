@@ -22,6 +22,7 @@ class InventoryMovementExport implements FromCollection, WithHeadings
     public function headings(): array
     {
         return [
+            'Movement Ref',
             'Ref',
             'Désignation',
             'Nom',

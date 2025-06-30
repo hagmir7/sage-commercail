@@ -140,6 +140,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::prefix('inventory')->controller(InventoryController::class)->group(function () {
         Route::put('palette/{palette:code}/article/{inventory_stock}/update', 'updateArticleQuantityInPalette');
         Route::delete('palette/{palette:code}/article/{inventory_stock}/delete', 'deleteArticleFromPalette');
+        Route::get('movements/controlle/{inventory_movement}', 'controlle');
         Route::post('insert/{inventory}', 'insert');
         Route::post('create', 'create');
         Route::get('emplacement/{code}', 'scanEmplacmenet');

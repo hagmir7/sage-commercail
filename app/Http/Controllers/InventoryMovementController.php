@@ -2,11 +2,11 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Emplacement;
 use App\Models\Inventory;
 use App\Models\InventoryMovement;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
-use Maatwebsite\Excel\Facades\Excel;
 
 class InventoryMovementController extends Controller
 {
@@ -14,7 +14,8 @@ class InventoryMovementController extends Controller
     public function updateQuantity(Request $request, InventoryMovement $inventory_movement)
     {
         $validator = Validator::make($request->all(), [
-            'quantity' => "required|numeric|min:0.1"
+            'quantity' => "required|numeric|min:0.1",
+            'emplacement' => 'required|exists:emplacements,code'
         ]);
 
         if ($validator->fails()) {
@@ -24,10 +25,15 @@ class InventoryMovementController extends Controller
             ], 422);
         }
 
-        if ($inventory_movement->quantity != $request->quantity) {
-            $inventory_movement->update(['quantity' => $request->quantity]);
+        if (($inventory_movement->quantity != $request->quantity) || ($inventory_movement->emplacement_code != $request->emplacement)) {
+            $emplacement = Emplacement::where('code', $request->emplacement)->first();
 
-            // Log pour audit
+            $inventory_movement->update([
+                'quantity' => $request->quantity,
+                'emplacement_id' => $emplacement->id,
+                'emplacement_code' => $request->emplacement
+            ]);
+
             \Log::info("Quantité mise à jour", [
                 'movement_id' => $inventory_movement->id,
                 'ancien' => $inventory_movement->quantity,

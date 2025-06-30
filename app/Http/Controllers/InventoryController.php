@@ -85,7 +85,7 @@ class InventoryController extends Controller
         return response()->json([
             'inventory' => $inventory,
             'movements' => $movements->orderBy('created_at', 'desc')
-                ->paginate($request->input('per_page', 20)),
+                ->paginate($request->input('per_page', 30)),
         ]);
     }
 
@@ -161,8 +161,9 @@ class InventoryController extends Controller
     }
 
 
-    public function insert(Request $request, Inventory $inventory)
-    {
+public function insert(Request $request, Inventory $inventory)
+{
+    try {
         $validator = Validator::make($request->all(), [
             'emplacement_code' => 'required|string|max:255|min:3|exists:emplacements,code',
             'article_code' => 'string|required',
@@ -173,16 +174,26 @@ class InventoryController extends Controller
         ]);
 
         if ($validator->fails()) {
+            Log::warning('Validation failed in insert function', [
+                'errors' => $validator->errors()->toArray(),
+                'request_data' => $request->all(),
+                'inventory_id' => $inventory->id
+            ]);
+            
             return response()->json([
                 'message' => $validator->errors()->first(),
                 'errors' => $validator->errors()
             ], 422);
         }
 
-
         $article = ArticleStock::where('code', $request->article_code)->first();
 
         if (!$article) {
+            Log::warning('Article not found in insert function', [
+                'article_code' => $request->article_code,
+                'inventory_id' => $inventory->id
+            ]);
+            
             return response()->json([
                 'errors' => ['article' => 'Article non trouvé']
             ], 404);
@@ -195,87 +206,137 @@ class InventoryController extends Controller
         $conditionMultiplier = $request->condition ? (float) $request->condition : 1.0;
 
         DB::transaction(function () use ($article, $request, $inventory, $inventory_stock, $conditionMultiplier) {
-            $emplacement = Emplacement::where('code', $request->emplacement_code)->first();
-            InventoryMovement::create([
-                'code_article' => $request->article_code,
-                'designation' => $article->description,
-                'emplacement_code' => $request->emplacement_code,
-                'emplacement_id' => $emplacement->id,
-                'inventory_id' => $inventory->id,
-                'type' => "IN",
-                'quantity' => $request->quantity,
-                'user_id' => auth()->id(),
-                'company_id' => intval($request?->company ?? 1),
-                'date' => now(),
-            ]);
-
-            if ($request->type_colis == "Palette" || $request->type_colis == "Carton") {
-                $qte_value = $request->palettes * $conditionMultiplier;
-            } else {
-                $qte_value = $request->quantity;
-            }
-
-            if ($inventory_stock) {
-                $inventory_stock->update([
-                    'quantity' => $inventory_stock->quantity + $qte_value,
-                ]);
-            } else {
-                $inventory_stock = InventoryStock::create([
+            try {
+                $emplacement = Emplacement::where('code', $request->emplacement_code)->first();
+                
+                InventoryMovement::create([
                     'code_article' => $request->article_code,
                     'designation' => $article->description,
+                    'emplacement_code' => $request->emplacement_code,
+                    'emplacement_id' => $emplacement->id,
                     'inventory_id' => $inventory->id,
-                    'price' => $article->price,
-                    'quantity' => $qte_value,
+                    'type' => "IN",
+                    'quantity' => $request->quantity,
+                    'user_id' => auth()->id(),
+                    'company_id' => intval($request?->company ?? 1),
+                    'date' => now(),
                 ]);
-            }
 
-            // Create Palett
-            if ($request->type_colis == "Palette") {
-                for ($i = 1; $i <= intval($request->palettes); $i++) {
-                    $palette = Palette::create([
-                        "code" => $this->generatePaletteCode(),
-                        "emplacement_id" => $emplacement->id,
-                        "company_id" => intval($request?->company ?? 1),
-                        "user_id" => auth()->id(),
-                        "type" => "Inventaire",
-                        "inventory_id" => $inventory?->id
-                    ]);
-
-                    $palette->inventoryArticles()->attach($inventory_stock->id, [
-                        'quantity' => $request->condition
-                    ]);
-                }
-            } else {
-                $palette = Palette::firstOrCreate(
-                    [
-                        "emplacement_id" => $emplacement->id,
-                        "inventory_id" => $inventory?->id
-                    ],
-                    [
-                        "code" => $this->generatePaletteCode(),
-                        "company_id" => intval($request?->company ?? 1),
-                        "user_id" => auth()->id(),
-                        "type" => "Inventaire"
-                    ]
-                );
-
-                $existing = $palette->inventoryArticles()->where('code_article', $article->code)->first();
-
-                if ($existing) {
-                    $currentQty = $existing->pivot->quantity;
-                    $newQty = $currentQty + floatval($request->quantity);
-
-                    $palette->inventoryArticles()->updateExistingPivot($inventory_stock->id, ['quantity' => $newQty]);
+                if ($request->type_colis == "Palette" || $request->type_colis == "Carton") {
+                    $qte_value = $request->palettes * $conditionMultiplier;
                 } else {
-                    $palette->inventoryArticles()->attach($inventory_stock->id, [
-                        'quantity' => floatval($request->quantity)
+                    $qte_value = $request->quantity;
+                }
+
+                if ($inventory_stock) {
+                    $inventory_stock->update([
+                        'quantity' => $inventory_stock->quantity + $qte_value,
+                    ]);
+                } else {
+                    $inventory_stock = InventoryStock::create([
+                        'code_article' => $request->article_code,
+                        'designation' => $article->description,
+                        'inventory_id' => $inventory->id,
+                        'price' => $article->price,
+                        'quantity' => $qte_value,
                     ]);
                 }
+
+                // Create Palette
+                if ($request->type_colis == "Palette") {
+                    for ($i = 1; $i <= intval($request->palettes); $i++) {
+                        $palette = Palette::create([
+                            "code" => $this->generatePaletteCode(),
+                            "emplacement_id" => $emplacement->id,
+                            "company_id" => intval($request?->company ?? 1),
+                            "user_id" => auth()->id(),
+                            "type" => "Inventaire",
+                            "inventory_id" => $inventory?->id
+                        ]);
+
+                        $palette->inventoryArticles()->attach($inventory_stock->id, [
+                            'quantity' => $request->condition
+                        ]);
+                    }
+                } else {
+                    $palette = Palette::firstOrCreate(
+                        [
+                            "emplacement_id" => $emplacement->id,
+                            "inventory_id" => $inventory?->id
+                        ],
+                        [
+                            "code" => $this->generatePaletteCode(),
+                            "company_id" => intval($request?->company ?? 1),
+                            "user_id" => auth()->id(),
+                            "type" => "Inventaire"
+                        ]
+                    );
+
+                    $existing = $palette->inventoryArticles()->where('code_article', $article->code)->first();
+
+                    if ($existing) {
+                        $currentQty = $existing->pivot->quantity;
+                        $newQty = $currentQty + floatval($request->quantity);
+
+                        $palette->inventoryArticles()->updateExistingPivot($inventory_stock->id, ['quantity' => $newQty]);
+                    } else {
+                        $palette->inventoryArticles()->attach($inventory_stock->id, [
+                            'quantity' => floatval($request->quantity)
+                        ]);
+                    }
+                }
+            } catch (\Exception $transactionException) {
+                Log::error('Error within database transaction in insert function', [
+                    'error' => $transactionException->getMessage(),
+                    'trace' => $transactionException->getTraceAsString(),
+                    'request_data' => $request->all(),
+                    'inventory_id' => $inventory->id,
+                    'article_code' => $request->article_code
+                ]);
+                throw $transactionException; // Re-throw to trigger transaction rollback
             }
         });
 
+        Log::info('Stock successfully inserted or updated', [
+            'article_code' => $request->article_code,
+            'inventory_id' => $inventory->id,
+            'quantity' => $request->quantity,
+            'user_id' => auth()->id()
+        ]);
+
         return response()->json(['message' => 'Stock successfully inserted or updated.']);
+        
+    } catch (\Illuminate\Database\QueryException $e) {
+        Log::error('Database error in insert function', [
+            'error' => $e->getMessage(),
+            'sql' => $e->getSql() ?? 'N/A',
+            'bindings' => $e->getBindings() ?? [],
+            'trace' => $e->getTraceAsString(),
+            'request_data' => $request->all(),
+            'inventory_id' => $inventory->id
+        ]);
+        
+        return response()->json([
+            'message' => 'Une erreur de base de données s\'est produite.',
+            'error' => 'Database error'
+        ], 500);
+        
+    } catch (\Exception $e) {
+        Log::error('Unexpected error in insert function', [
+            'error' => $e->getMessage(),
+            'trace' => $e->getTraceAsString(),
+            'request_data' => $request->all(),
+            'inventory_id' => $inventory->id,
+            'line' => $e->getLine(),
+            'file' => $e->getFile()
+        ]);
+        
+        return response()->json([
+            'message' => 'Une erreur inattendue s\'est produite.',
+            'error' => 'Internal server error'
+        ], 500);
     }
+}
 
     public function movements(Inventory $inventory)
     {
@@ -637,5 +698,17 @@ class InventoryController extends Controller
                 'message' => 'Failed to initialize stock: ' . $e->getMessage(),
             ], 500);
         }
+    }
+
+
+
+    public function controlle(InventoryMovement $inventory_movement){
+        
+        $inventory_movement->update([
+            'controlled_by' => auth()->id()
+        ]);
+
+        return response()->json(['message' => 'Mouvement contrôlé avec succès']);
+
     }
 }
