@@ -29,7 +29,7 @@ class InventoryController extends Controller
     public function show(Request $request, Inventory $inventory)
     {
         $request->validate([
-            'per_page' => 'nullable|integer|min:1|max:100',
+            'per_page' => 'nullable|integer|min:1',
             'dates' => 'nullable|string',
             'types' => 'nullable|string',
         ]);

@@ -97,6 +97,7 @@ class InventoryExportController extends Controller
                 'user' => $item->user->full_name,
                 'date' => $item->created_at,
                 'company_name' => $item?->company?->name,
+                'controlled_by' => $item?->controller?->full_name,
             ];
         })->values();
 

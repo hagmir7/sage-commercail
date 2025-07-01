@@ -30,7 +30,8 @@ class InventoryMovementExport implements FromCollection, WithHeadings
             'Emplacement',
             'Responsable',
             'Date',
-            'Société'
+            'Société',
+            'Contrôlé par'
         ];
     }
 }

@@ -42,6 +42,10 @@ class InventoryMovement extends Model
         return $this->belongsTo(Company::class);
     }
 
+    public function controller(){
+        return $this->belongsTo(User::class, 'controlled_by');
+    }
+
 
 
     public function scopeFilterByCategory($query, $category)
@@ -61,8 +65,12 @@ class InventoryMovement extends Model
 
     public function scopeFilterByEmplacement($query, $emplacement)
     {
-        return $query->where('emplacement_code', 'like', "%$emplacement%");
+        return $query->where('emplacement_code', 'like', "%$emplacement%")
+            ->orWhereHas('article', function($q) use($emplacement) {
+                $q->where('code', 'like', "%$emplacement%");
+            });
     }
+
 
     public function scopeSearch($query, $search)
     {
@@ -71,7 +79,7 @@ class InventoryMovement extends Model
                 $q->where('emplacement_code', 'like', "%{$search}%")
                     ->orWhere('code_article', 'like', "%{$search}%")
                     ->orWhere('designation', 'like', "%{$search}%");
-            });
+            })->orWhere('emplacement_code', 'like', "%{$search}%");
         }
 
         return $query;
