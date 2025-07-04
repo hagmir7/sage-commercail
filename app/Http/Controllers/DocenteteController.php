@@ -130,7 +130,7 @@ class DocenteteController extends Controller
 
                 $line->update([
                     'complation_date' => $request->complation_date,
-                    'status_id' => $user->hasRole("fabrication") ? 3 : 5 // 3 For Fabrication & 5 for Montage
+                    'status_id' => $user->hasRole("fabrication") ? 3 : 5
                 ]);
 
                 Action::create([
@@ -164,9 +164,8 @@ class DocenteteController extends Controller
         ->orderByDesc("DO_Date")
         ->where('DO_Domaine', 0)
         ->where('DO_Statut', 1)
-        ->where('DO_Type', $request->type ?? 2); // Default type
+        ->where('DO_Type', $request->type ?? 2);
 
-    // Optional: Only eager load if relationships are used in response
     $query->with('document.status');
 
     if (!empty($request->status)) {
@@ -389,7 +388,8 @@ class DocenteteController extends Controller
             }
         ])
 
-            ->select("DO_Piece", "AR_Ref", 'DL_Design', 'DL_Qte', "Nom", "Hauteur", "Largeur", "Profondeur", "Langeur", "Couleur", "Chant", "Episseur", "cbMarq")
+            ->select("DO_Piece", "AR_Ref", 'DL_Design', 'DL_Qte', "Nom", "Hauteur", "Largeur", "Profondeur", "Langeur", "Couleur", "Chant", "Episseur", "cbMarq", "DL_Ligne")
+            ->OrderByDesc("DL_Ligne")
             ->where('DO_Piece', $id);
 
         if (in_array('preparation', $userRoles)) {
