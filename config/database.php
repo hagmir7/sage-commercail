@@ -112,8 +112,8 @@ return [
             'password' => env('DB_PASSWORD', ''),
             'prefix' => '',
             'prefix_indexes' => true,
-            'encrypt' => env('DB_ENCRYPT', false),
-            'trust_server_certificate' => env('DB_TRUST_SERVER_CERTIFICATE', true),
+            'encrypt' => env('DB_ENCRYPT', 'yes'),
+            'trust_server_certificate' => env('DB_TRUST_SERVER_CERTIFICATE', 'true'),
             'charset'  => 'utf8',
             'options' => [
                 PDO::ATTR_STRINGIFY_FETCHES => false,
