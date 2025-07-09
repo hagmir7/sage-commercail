@@ -151,7 +151,7 @@ class PaletteController extends Controller
         ]);
 
         if ($validator->fails()) {
-            return response()->json(['errors' => $validator->errors()], 422);
+            return response()->json(['message' => "L'article n'existe pas", 'errors' => $validator->errors()], 422);
         }
 
         try {
@@ -160,6 +160,11 @@ class PaletteController extends Controller
             }, 'article_stock' => function ($query) {
                 $query->select("code", "name", "height", "width", "depth", "color", "thickness", 'chant');
             }])->find($request->line);
+
+            if($line->ref == 'SP000001' && $line->name == null && $line->design == ''){
+                return response()->json(['message' => "L'article n'existe pas SP000001"], 422);
+            }
+
             return response()->json($line);
         } catch (\Exception $e) {
             return response()->json([
@@ -274,11 +279,11 @@ class PaletteController extends Controller
                 });
 
                 if (intval($line->quantity) < ($totalQte + intval($request->quantity))) {
-                    throw new \Exception("Quantity is not valid", 422);
+                    throw new \Exception("La quantité n'est pas valide", 422);
                 }
 
                 if ($line->document_id !== $palette->document_id) {
-                    throw new \Exception("The document does not match", 404);
+                    throw new \Exception("Le document ne correspond pas", 404);
                 }
 
                 $line->palettes()->attach($palette->id, ['quantity' => $request->quantity]);

@@ -66,8 +66,13 @@ class Document extends Model
     public function validation(): bool
     {
         $this->load('lines.palettes');
+        $lines = $this->lines
+            ->where('ref', '!=', 'SP000001')
+            ->where('design','!=', '')
+            ->whereNotNull('name');
 
-        foreach ($this->lines as $line) {
+
+        foreach ($lines as $line) {
             $totalPrepared = $line->palettes->sum(function ($palette) {
                 return $palette->pivot->quantity ?? 0;
             });
