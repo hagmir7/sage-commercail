@@ -103,8 +103,8 @@
                 <div class="bg-[#fff2f2] dark:bg-[#1D0002] relative lg:-ml-px -mb-px lg:mb-0 rounded-t-lg lg:rounded-t-none lg:rounded-r-lg aspect-[335/376] lg:aspect-auto w-full lg:w-[438px] shrink-0 overflow-hidden">
                     {{-- Laravel Logo --}}
                     <!-- Replaced SVG logo with Inter Cocina font -->
-                    <div class="text-xl mb-5" style="font-family: 'DOCK11-Heavy', sans-serif !important;font-size: 61px;">
-                    <span class="w-full transition-all translate-y-0 opacity-100 max-w-none duration-750 starting:opacity-0 starting:translate-y-6 text-[#706f6c] dark:text-[#A1A09A]">
+                    <div class="text-xl mb-5" style="font-family: 'DOCK11-Heavy', sans-serif !important;font-size: 63px;">
+                    <span class="w-full transition-all translate-y-0 opacity-100 max-w-none duration-750 starting:opacity-0 starting:translate-y-6 text-[#706f6c] dark:text-[#A1A09A]" style="margin-right: -18px">
                         INTER
                     </span>
                     <span class="text-[#F53003] dark:text-[#F61500] font-black tracking-widest">
