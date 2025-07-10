@@ -101,6 +101,7 @@ return [
             'sslmode' => 'prefer',
         ],
 
+
         'sqlsrv' => [
 
             'driver' => 'sqlsrv',
@@ -118,8 +119,8 @@ return [
             'options' => [
                 PDO::ATTR_STRINGIFY_FETCHES => false,
                 PDO::SQLSRV_ATTR_ENCODING => PDO::SQLSRV_ENCODING_UTF8,
-                // Force proper date format
-                'Authentication' => 9, // ActiveDirectoryIntegrated
+
+                'Authentication' => 9,
                 PDO::ATTR_EMULATE_PREPARES => true,
             ],
             'date_format' => 'Y-d-m H:i:s.v',
