@@ -18,10 +18,12 @@ use App\Http\Controllers\PaletteController;
 use App\Http\Controllers\PermissionController;
 use App\Http\Controllers\RoleController;
 use App\Http\Controllers\SellController;
+use App\Http\Controllers\StockMovementController;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\UserPermissionController;
 use App\Models\Inventory;
 use App\Models\InventoryMovement;
+use App\Models\StockMovement;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
@@ -128,12 +130,18 @@ Route::middleware('auth:sanctum')->group(function () {
     });
 
 
+    Route::prefix('stock')->controller(StockMovementController::class)->group(function(){
+        Route::post('in', 'in');
+        Route::post('out', 'out');
+    });
+
+
 
     Route::get("calculator/{piece}", [SellController::class, 'calculator']);
 
-    Route::prefix('inventory-movement')->controller(InventoryMovementController::class) ->group(function () {
-            Route::put('update/{inventory_movement}', 'updateQuantity');
-        });
+    Route::prefix('inventory-movement')->controller(InventoryMovementController::class)->group(function () {
+        Route::put('update/{inventory_movement}', 'updateQuantity');
+    });
 
 
 
@@ -155,9 +163,10 @@ Route::middleware('auth:sanctum')->group(function () {
 
 
     Route::prefix('articles')->controller(ArticleStockController::class)->group(function () {
+        Route::get('{article_stock:code}', 'show');
         Route::get('', 'index');
         Route::put('update/{article_stock:code}', 'update');
-        Route::get('{article_stock:code}', 'show');
+        
         Route::get('update/{article:code}', 'update');
         Route::post('import', 'import');
     });
