@@ -143,7 +143,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::put('update/{inventory_movement}', 'updateQuantity');
     });
 
-
+    
 
     Route::prefix('inventory')->controller(InventoryController::class)->group(function () {
         Route::put('palette/{palette:code}/article/{inventory_stock}/update', 'updateArticleQuantityInPalette');
