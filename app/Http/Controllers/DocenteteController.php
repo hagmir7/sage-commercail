@@ -179,19 +179,20 @@ class DocenteteController extends Controller
         $start = Carbon::parse(urldecode($dates[0]))->startOfDay();
         $end = Carbon::parse(urldecode($dates[1] ?? $dates[0]))->endOfDay();
 
-        $query->whereHas('document', function ($q) use ($start, $end) {
-            $q->whereDate('created_at', '>=', $start)
-              ->whereDate('created_at', '<=', $end);
+        $query->where(function ($query) use ($start, $end) {
+            $query->whereDate('cbCreation', '>=', $start)
+                ->whereDate('cbCreation', '<=', $end);
         });
+
     }
 
     if ($request->filled('search')) {
         $search = $request->search;
         $query->where(function ($q) use ($search) {
-            $q->where('DO_Ref', 'like', "$search%") // Prefix search (index-friendly)
-                ->orWhere('DO_Piece', 'like', "$search%")
-                ->orWhere('DO_Tiers', 'like', "$search%")
-                ->orWhere('DO_Reliquat', 'like', "$search%");
+            $q->where('DO_Ref', 'like', "%$search%")
+                ->orWhere('DO_Piece', 'like', "%$search%")
+                ->orWhere('DO_Tiers', 'like', "%$search%")
+                ->orWhere('DO_Reliquat', 'like', "%$search%");
         });
     }
 

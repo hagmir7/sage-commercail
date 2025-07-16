@@ -67,9 +67,10 @@ class Document extends Model
     {
         $this->load('lines.palettes');
         $lines = $this->lines
-            ->where('ref', '!=', 'SP000001')
-            ->where('design','!=', '')
-            ->whereNotNull('name');
+        ->where('ref', '!=', 'SP000001')
+        ->whereNotIn('design', ['Special', '', 'special']);
+
+
 
 
         foreach ($lines as $line) {
@@ -81,6 +82,14 @@ class Document extends Model
                 return false;
             }
         }
+
+        $lines = $this->lines
+            ->where('ref', 'SP000001')
+            ->whereIn('design', ['', 'Special', 'special']);
+
+        foreach($lines as $line){
+            $line->delete();
+        }
         return true;
     }
 
@@ -88,6 +97,10 @@ class Document extends Model
     public function validationCompany($companyId): bool
     {
         $this->load('lines.palettes');
+
+        $lines = $this->lines
+            ->where('ref', '!=', 'SP000001')
+            ->whereNotIn('design', ['Special', '', 'special']);
 
         foreach ($this->lines->where('company_id', $companyId) as $line) {
             $totalPrepared = $line->palettes->where('company_id', $companyId)->sum(function ($palette) {
@@ -97,6 +110,13 @@ class Document extends Model
             if ($totalPrepared < $line->quantity) {
                 return false;
             }
+        }
+
+         $lines = $this->lines
+            ->where('ref', 'SP000001')
+            ->whereIn('design', ['', 'Special', 'special']);
+        foreach($lines as $line){
+            $line->delete();
         }
 
         return true;
