@@ -99,7 +99,12 @@ Route::middleware('auth:sanctum')->group(function () {
 
     });
 
-    Route::post('transfer-order', [TransferController::class, 'store']);
+    Route::prefix('transfer')->controller(TransferController::class)->group(function () {
+        Route::get('', 'index');
+        Route::post('store', 'store');
+    });
+
+
 
 
     Route::prefix('palettes')->controller(PaletteController::class)->group(function () {
@@ -148,7 +153,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::put('update/{inventory_movement}', 'updateQuantity');
     });
 
-    
+
 
     Route::prefix('inventory')->controller(InventoryController::class)->group(function () {
         Route::put('palette/{palette:code}/article/{inventory_stock}/update', 'updateArticleQuantityInPalette');
@@ -171,7 +176,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('{article_stock:code}', 'show');
         Route::get('', 'index');
         Route::put('update/{article_stock:code}', 'update');
-        
+
         Route::get('update/{article:code}', 'update');
         Route::post('import', 'import');
     });
