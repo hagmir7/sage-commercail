@@ -324,9 +324,11 @@ class PaletteController extends Controller
         $document = Document::with([
             'status',
             'palettes' => function ($query) {
-                $query->with('user')
-                    ->where('company_id', auth()->user()->company_id)
-                    ->withCount('lines');
+                $query->with('user')->withCount('lines');
+
+                if (!auth()->user()->hasRole(['admin', 'super_admin', 'commercial'])) {
+                    $query->where('company_id', auth()->user()->company_id);
+                }
             }
         ])->where('piece', $piece)->first();
 
@@ -336,6 +338,8 @@ class PaletteController extends Controller
 
         return response()->json($document);
     }
+
+
 
 
 

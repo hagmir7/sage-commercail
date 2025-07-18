@@ -58,6 +58,12 @@ class UserController extends Controller
     }
 
 
+    public function usersByRole($role){
+        $users = User::role($role)->select('id', 'name', 'full_name', 'status')->get();
+        return $users;
+    }
+
+
     
     public function login(Request $request)
     {
