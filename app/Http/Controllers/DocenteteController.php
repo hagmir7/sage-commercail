@@ -197,7 +197,7 @@ class DocenteteController extends Controller
     }
 
     // Faster pagination without total counts
-    $results = $query->simplePaginate(20);
+    $results = $query->simplePaginate(30);
    
     return response()->json($results);
 }
@@ -586,6 +586,7 @@ class DocenteteController extends Controller
                         'quantity' => $currentDocligne->DL_Qte,
                         'dimensions' => $currentDocligne->item,
                         'company_id' => $request->company,
+                        'first_company_id'  => $request->company,
                         'document_id' => $document->id,
 
                     ]);

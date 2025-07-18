@@ -21,7 +21,8 @@ class Line extends Model
         'received',
         'complation_date',
         'validated',
-        'status_id'
+        'status_id',
+        'first_company_id'
     ];
 
 
@@ -33,6 +34,11 @@ class Line extends Model
     public function company()
     {
         return $this->belongsTo(Company::class);
+    }
+
+    public function first_company()
+    {
+        return $this->belongsTo(Company::class, 'first_company');
     }
 
     public function docligne()

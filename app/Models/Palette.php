@@ -16,7 +16,8 @@ class Palette extends Model
         'controlled',
         'delivered_at',
         'delivered_by',
-        'inventory_id'
+        'inventory_id',
+        'first_company_id'
     ];
 
     // public $timestamps = false;
@@ -24,6 +25,11 @@ class Palette extends Model
     public function company()
     {
         return $this->belongsTo(Company::class);
+    }
+
+    public function first_company()
+    {
+        return $this->belongsTo(Company::class, 'first_company');
     }
 
     public function position()

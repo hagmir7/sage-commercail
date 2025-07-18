@@ -19,6 +19,7 @@ use App\Http\Controllers\PermissionController;
 use App\Http\Controllers\RoleController;
 use App\Http\Controllers\SellController;
 use App\Http\Controllers\StockMovementController;
+use App\Http\Controllers\TransferController;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\UserPermissionController;
 use App\Models\Inventory;
@@ -95,6 +96,8 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('{emplacement:code}', 'show');
 
     });
+
+    Route::post('transfer-order', [TransferController::class, 'store']);
 
 
     Route::prefix('palettes')->controller(PaletteController::class)->group(function () {

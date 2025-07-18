@@ -97,6 +97,8 @@ class PaletteController extends Controller
                 'document_id' => $document->id,
                 'company_id'  => auth()->user()->company_id ?? 1,
                 'user_id'     => auth()->id(),
+                'first_company_id'  => auth()->user()->company_id ?? 1,
+                
             ]);
             $palette->load('lines.article_stock');
         }
@@ -136,6 +138,7 @@ class PaletteController extends Controller
             'document_id' => $document->id,
             'company_id'  => auth()->user()->company_id ?? 1,
             'user_id'     => auth()->id(),
+            'first_company_id'  => auth()->user()->company_id ?? 1,
         ]);
         $palette->load(['lines.article_stock']);
 

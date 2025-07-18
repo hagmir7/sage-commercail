@@ -251,7 +251,7 @@ public function insert(Request $request, Inventory $inventory)
                             "company_id" => intval($request?->company ?? 1),
                             "user_id" => auth()->id(),
                             "type" => "Inventaire",
-                            "inventory_id" => $inventory?->id
+                            "inventory_id" => $inventory?->id,
                         ]);
 
                         $palette->inventoryArticles()->attach($inventory_stock->id, [
