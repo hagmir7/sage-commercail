@@ -198,7 +198,7 @@ class DocenteteController extends Controller
 
     // Faster pagination without total counts
     $results = $query->simplePaginate(30);
-   
+
     return response()->json($results);
 }
 
@@ -362,7 +362,7 @@ class DocenteteController extends Controller
         $userRoles = $user->roles()->pluck('name')->toArray();
         $userRoleIds = $user->roles()->pluck('id')->toArray();
 
-        $docentete = Docentete::with(['document.status', 'document.companies'])
+        $docentete = Docentete::with(['document.status', 'document.companies', 'document.palettes'])
             ->select(
                 "DO_Piece",
                 "DO_Ref",

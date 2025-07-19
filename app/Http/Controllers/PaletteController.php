@@ -98,7 +98,7 @@ class PaletteController extends Controller
                 'company_id'  => auth()->user()->company_id ?? 1,
                 'user_id'     => auth()->id(),
                 'first_company_id'  => auth()->user()->company_id ?? 1,
-                
+
             ]);
             $palette->load('lines.article_stock');
         }
@@ -146,36 +146,79 @@ class PaletteController extends Controller
     }
 
 
-
     public function scanLine(Request $request)
     {
         $validator = Validator::make($request->all(), [
-            'line' => 'required|exists:lines,id',
+            'line' => 'required|string|max:255',
         ]);
 
         if ($validator->fails()) {
-            return response()->json(['message' => "L'article n'existe pas", 'errors' => $validator->errors()], 422);
+            return response()->json([
+                'message' => "L'article n'existe pas",
+                'errors' => $validator->errors()
+            ], 422);
         }
 
         try {
-            $line = Line::with(['docligne' => function ($query) {
-                $query->select("DO_Piece", "cbMarq", "DO_Ref", "CT_Num", "Hauteur", "Largeur", "Chant", "Poignée");
-            }, 'article_stock' => function ($query) {
-                $query->select("code", "name", "height", "width", "depth", "color", "thickness", 'chant');
-            }])->find($request->line);
+            $lineIdentifier = $request->line;
+            $line = null;
 
-            if($line->ref == 'SP000001' && $line->name == null && $line->design == ''){
+            // First, try to find by ID (if it's numeric)
+            if (is_numeric($lineIdentifier)) {
+                $line = Line::with([
+                    'docligne' => function ($query) {
+                        $query->select("DO_Piece", "cbMarq", "DO_Ref", "CT_Num", "Hauteur", "Largeur", "Chant", "Poignée");
+                    },
+                    'article_stock' => function ($query) {
+                        $query->select("code", "name", "height", "width", "depth", "color", "thickness", "chant");
+                    }
+                ])->find($lineIdentifier);
+            }
+
+            // If not found by ID, try to find by article stock reference
+            if (!$line) {
+                $line = Line::with([
+                    'docligne' => function ($query) {
+                        $query->select("DO_Piece", "cbMarq", "DO_Ref", "CT_Num", "Hauteur", "Largeur", "Chant", "Poignée");
+                    },
+                    'article_stock' => function ($query) {
+                        $query->select("code", "name", "height", "width", "depth", "color", "thickness", "chant", "description");
+                    }
+                ])->whereHas('article_stock', function ($query) use ($lineIdentifier) {
+                    $query->where('code', $lineIdentifier);
+                })->first();
+            }
+
+            // Check if line exists
+            if (!$line) {
+                return response()->json(['message' => "L'article n'existe pas"], 422);
+            }
+
+            // Check for special case SP000001
+            if (
+                $line->ref === 'SP000001' &&
+                (empty($line->design) || strtolower(trim($line->design)) === 'special')
+            ) {
                 return response()->json(['message' => "L'article n'existe pas SP000001"], 422);
             }
 
             return response()->json($line);
         } catch (\Exception $e) {
+            \Log::error('Error in scanLine method', [
+                'line_identifier' => $request->line ?? null,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+
             return response()->json([
                 'error' => 'An error occurred while processing the scan.',
                 'message' => $e->getMessage()
             ], 500);
         }
     }
+
+
+
 
 
     public function scanPalette($code)
