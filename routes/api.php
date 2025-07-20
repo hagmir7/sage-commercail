@@ -114,12 +114,13 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('confirm', 'confirm');
         Route::post('confirm/{code}/{piece}', 'confirmPalette');
         Route::put('reset/{code}', 'resetPalette');
+        Route::post('detach', 'detach');
+        Route::post('create', 'create');
 
         Route::delete('{code}/article/{article_id}/inventory/delete', 'detachArticleForInvenotry');
         Route::delete('{code}/article/{article_id}/delete', 'detachArticle');
         Route::put('{code}/article/{article_id}/update', 'updateArticleQuantity');
-        Route::post('detach', 'detach');
-        Route::post('create', 'create');
+
         Route::get('{code}', 'show');
         Route::get('{code}/line/{lineId}', 'controller');
         Route::get('document/{piece}', 'documentPalettes');

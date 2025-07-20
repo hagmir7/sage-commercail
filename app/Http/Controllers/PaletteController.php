@@ -117,32 +117,59 @@ class PaletteController extends Controller
 
     public function create(Request $request)
     {
-
         $validator = Validator::make($request->all(), [
             'document_id' => 'required|exists:documents,piece'
         ]);
 
         if ($validator->fails()) {
-            return response()->json(['errors' => $validator->errors()], 422);
+            return response()->json([
+                'message' => $validator->errors()->first(),
+                'errors' => $validator->errors()
+            ], 422);
         }
 
-        $document =  Document::where('piece', $request->document_id)->first();
+        $document = Document::where('piece', $request->document_id)
+            ->with(['palettes.lines'])
+            ->first();
+
+
 
         if (!$document) {
-            return response()->json(['errors' => ['document_id' => "Document is not exits"]]);
+            return response()->json([
+                'errors' => ['document_id' => "Le document n'existe pas."]
+            ], 404);
+        }
+
+
+        if (in_array($document->status_id, [8, 9, 10, 11, 12, 13, 14])) {
+            return response()->json([
+                'message' => "Le document est en Préparé.",
+            ], 400);
+        }
+
+
+        $emptyPalettes = $document->palettes->filter(function ($palette) {
+            return $palette->lines->isEmpty();
+        });
+
+        if ($emptyPalettes->isNotEmpty()) {
+            return response()->json([
+                'message' => 'Il existe déjà une palette vide ' . $emptyPalettes->pluck('code'),
+            ], 400);
         }
 
         $palette = Palette::create([
-            'code'        => $this->generatePaletteCode(),
-            'type'        => 'Livraison',
-            'document_id' => $document->id,
-            'company_id'  => auth()->user()->company_id ?? 1,
-            'user_id'     => auth()->id(),
-            'first_company_id'  => auth()->user()->company_id ?? 1,
+            'code'             => $this->generatePaletteCode(),
+            'type'             => 'Livraison',
+            'document_id'      => $document->id,
+            'company_id'       => auth()->user()->company_id ?? 1,
+            'user_id'          => auth()->id(),
+            'first_company_id' => auth()->user()->company_id ?? 1,
         ]);
-        $palette->load(['lines.article_stock']);
 
-        return response()->json($palette);
+        $newDocument = $palette->document->load(['palettes.lines.article_stock']);
+
+        return response()->json($newDocument, 201);
     }
 
 
