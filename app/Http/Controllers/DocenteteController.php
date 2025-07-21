@@ -13,8 +13,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Carbon;
 use App\Http\Controllers\SellController;
-
-
+use App\Models\Article;
 
 class DocenteteController extends Controller
 {
@@ -574,6 +573,7 @@ class DocenteteController extends Controller
                     throw new \Exception("Invalid line: {$lineId}");
                 }
 
+
                 if ($currentDocligne->AR_Ref != null) {
                     $line = Line::firstOrCreate([
                         'docligne_id' => $currentDocligne->cbMarq,
@@ -588,9 +588,9 @@ class DocenteteController extends Controller
                         'company_id' => $request->company,
                         'first_company_id'  => $request->company,
                         'document_id' => $document->id,
-
                     ]);
                 }
+
 
                 $lines[] = $line;
             }

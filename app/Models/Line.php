@@ -22,7 +22,7 @@ class Line extends Model
         'complation_date',
         'validated',
         'status_id',
-        'first_company_id'
+        'first_company_id',
     ];
 
 

@@ -189,7 +189,9 @@ Route::middleware('auth:sanctum')->group(function () {
 
 
     Route::prefix('documents')->controller(DocumentController::class)->group(function () {
+
         Route::get('/', 'list');
+        Route::get('{document:piece}', 'show');
         Route::get('/ready', 'ready');
         Route::get('/progress/{piece}', 'progress');
         Route::post('chargement/{document}', 'addChargement');

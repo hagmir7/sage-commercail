@@ -63,6 +63,7 @@ class Document extends Model
     }
 
 
+
     public function validation(): bool
     {
         $this->load('lines.palettes');

@@ -209,7 +209,7 @@ class DocumentController extends Controller
             'companies',
             'docentete:cbMarq,DO_Date,DO_DateLivr,DO_Reliquat'
         ])
-            ->whereHas('lines', function ($query) use($user_roles) {
+            ->whereHas('lines', function ($query) use ($user_roles) {
                 $query->where('company_id', auth()->user()->company_id);
 
                 $common = array_intersect($user_roles->toArray(), ['fabrication', 'montage', 'preparation_cuisine', 'preparation_trailer', 'magasinier']);
@@ -218,7 +218,7 @@ class DocumentController extends Controller
                 }
             })
             ->whereHas('companies', function ($query) {
-                $query->whereIn('document_companies.status_id', [1,2, 3,4,5,6,7]);
+                $query->whereIn('document_companies.status_id', [1, 2, 3, 4, 5, 6, 7]);
             });
 
         if ($request->filled('search')) {
@@ -271,9 +271,9 @@ class DocumentController extends Controller
     public function documentToConvert($piece)
     {
         return Docligne::where(function ($query) use ($piece) {
-                $query->whereIn('DO_Type', [3, 5])
-                      ->where('DO_Piece', $piece);
-            })
+            $query->whereIn('DO_Type', [3, 5])
+                ->where('DO_Piece', $piece);
+        })
             ->orWhere('DL_PieceBC', $piece)
             ->orWhere('DL_PieceBL', $piece)
             ->orWhere('DL_PiecePL', $piece)
@@ -302,10 +302,11 @@ class DocumentController extends Controller
     }
 
 
-    public function readyDocuments(){
+    public function readyDocuments()
+    {
         $this->convertDocument();
 
-         return Document::with('docentete')
+        return Document::with('docentete')
             ->whereNull('piece_bl')
             ->whereIn('status_id', [10, 11])
             ->get();
@@ -333,14 +334,15 @@ class DocumentController extends Controller
         } elseif ($user->hasRole('chargement')) {
             $documents->where([
                 ['status_id', '=', 13],
-            ])->whereHas('palettes', function($query){
+            ])->whereHas('palettes', function ($query) {
                 $query->where("delivered_by", auth()->id());
             });
         } elseif ($user->hasRole('preparation')) {
             $status = $request->input('status');
-            $documents->when($status,
+            $documents->when(
+                $status,
                 fn($query) => $query->where('status_id', $status),
-                fn($query) => $query->whereIn('status_id', [11, 12,13])
+                fn($query) => $query->whereIn('status_id', [11, 12, 13])
             );
         }
 
@@ -357,16 +359,51 @@ class DocumentController extends Controller
         return $documents->orderByDesc('created_at')->paginate(20);
     }
 
-
-
-
-    public function show($piece)
+    public function show(Document $document)
     {
-        $document = Document::with(['docentete' => function ($docentete) {
-            $docentete->select('DO_Type', 'DO_Piece', 'DO_Date', 'DO_DateLivr', 'cbMarq');
-        }, 'status'])->where('piece', $piece);
+        $document->load([
+            'lines.status',
+            'lines.role',
+            'lines.company',
+            'lines.article_stock',
+            'lines.docligne' => function ($query) {
+                $query->select([
+                    'DO_Domaine',
+                    'DO_Type',
+                    'CT_Num',
+                    'DO_Piece',
+                    'DL_Design',
+                    'DO_Ref',
+                    'DL_PieceDE',
+                    'DL_PieceBC',
+                    'DL_PiecePL',
+                    'DL_PieceBL',
+                    'DL_Qte',
+                    'AR_Ref',
+                    'cbMarq',
+                    'Nom',
+                    'Hauteur',
+                    'Largeur',
+                    'Profondeur',
+                    'Langeur',
+                    'Couleur',
+                    'Chant',
+                    'Episseur',
+                    'Description',
+                    'Poignée',
+                    'Rotation'
+                ]);
+            }
+        ]);
+
         return $document;
     }
+
+
+
+
+
+
 
 
 
@@ -414,23 +451,24 @@ class DocumentController extends Controller
 
     public function deliveredPalettes($piece)
     {
-        $document = Document::withCount('palettes')->with(['palettes' => function($query) {
+        $document = Document::withCount('palettes')->with(['palettes' => function ($query) {
             $query->whereNotNull('delivered_at');
         }])->where('piece', $piece)->first();
-        
+
         if (!$document) {
             return response()->json([
                 'error' => 'Document not found',
                 'message' => 'Document non trouvée'
             ], 404);
         }
-        
+
         return $document;
     }
 
-    public function palettes($piece){
+    public function palettes($piece)
+    {
         $document = Document::with(['palettes'])->where('piece', $piece)->first();
-        
+
         if (!$document) {
             return response()->json([
                 'error' => 'Document not found',
