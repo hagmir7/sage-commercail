@@ -388,8 +388,8 @@ class DocenteteController extends Controller
             }
         ])
 
-            ->select("DO_Piece", "AR_Ref", 'DL_Design', 'DL_Qte', "Nom", "Hauteur", "Largeur", "Profondeur", "Langeur", "Couleur", "Chant", "Episseur", "cbMarq", "DL_Ligne")
-            ->OrderByDesc("DL_Ligne")
+            ->select("DO_Piece", "AR_Ref", 'DL_Design', 'DL_Qte', "Nom", "Hauteur", "Largeur", "Profondeur", "Langeur", "Couleur", "Chant", "Episseur", "cbMarq", "DL_Ligne", 'Description', "Poignée as Poignee", "Rotation")
+            ->OrderBy("DL_Ligne")
             ->where('DO_Piece', $id);
 
         if (in_array('preparation', $userRoles)) {

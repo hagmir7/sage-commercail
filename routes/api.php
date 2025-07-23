@@ -191,14 +191,16 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::prefix('documents')->controller(DocumentController::class)->group(function () {
 
         Route::get('/', 'list');
-        Route::get('{document:piece}', 'show');
+        Route::get('preparation-list', 'preparationList');
+        
         Route::get('/ready', 'ready');
         Route::get('/progress/{piece}', 'progress');
         Route::post('chargement/{document}', 'addChargement');
         Route::get('validation-controller', 'validationControllerList');
-        Route::get('preparation-list', 'preparationList');
+        
         Route::get('livraison', 'livraison');
         // All documents routes up to this route !
+        Route::get('{document:piece}', 'show');
         Route::get('/{piece}/palettes', 'documentPalettes');
         Route::get('{piece}/delivered-palettes', 'deliveredPalettes');
         Route::get('/{piece}', 'checkControlled');
