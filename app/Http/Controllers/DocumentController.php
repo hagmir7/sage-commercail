@@ -362,16 +362,23 @@ class DocumentController extends Controller
     public function show(Document $document)
     {
         $document->load([
+            'lines' => function ($query) {
+                $query->join('F_DOCLIGNE', 'lines.docligne_id', '=', 'F_DOCLIGNE.cbMarq')
+                    ->orderBy('F_DOCLIGNE.DL_Ligne')
+                    ->select('lines.*');
+            },
             'lines.status',
             'lines.role',
             'lines.company',
             'lines.article_stock',
+            'lines.palettes',
             'lines.docligne' => function ($query) {
                 $query->select([
                     'DO_Domaine',
                     'DO_Type',
                     'CT_Num',
                     'DO_Piece',
+                    'DL_Ligne',
                     'DL_Design',
                     'DO_Ref',
                     'DL_PieceDE',
@@ -396,8 +403,25 @@ class DocumentController extends Controller
             }
         ]);
 
-        return $document;
+        $required_qte = $document->lines->sum("quantity") ?? 0;
+
+        $current_qte = 0;
+        foreach ($document->lines as $line) {
+            foreach ($line->palettes as $palette) {
+                $current_qte += $palette->pivot->quantity;
+            }
+        }
+
+        $progress = $required_qte > 0 ? round(($current_qte / $required_qte) * 100, 2) : 0;
+
+        return response()->json([
+            'current_qte' => $current_qte,
+            'required_qte' => $required_qte,
+            'progress' => intval($progress),
+            'document' => $document
+        ]);
     }
+
 
 
 
