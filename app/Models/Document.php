@@ -67,9 +67,9 @@ class Document extends Model
     public function validation(): bool
     {
         $this->load('lines.palettes');
-        $lines = $this->lines
-        ->where('ref', '!=', 'SP000001')
-        ->whereNotIn('design', ['Special', '', 'special']);
+            $lines = $this->lines
+            ->where('ref', '!=', 'SP000001')
+            ->whereNotIn('design', ['Special', '', 'special']);
 
 
 

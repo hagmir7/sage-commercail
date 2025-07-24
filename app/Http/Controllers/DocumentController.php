@@ -28,7 +28,6 @@ class DocumentController extends Controller
         return $controlled;
     }
 
-
     public function progress($piece)
     {
         $document = Document::with(['docentete.doclignes', 'lines.palettes'])->where("piece", $piece)->first();
@@ -37,10 +36,14 @@ class DocumentController extends Controller
             return response()->json(["error" => "Document not found"], 404);
         }
 
-        $required_qte = $document->lines->sum("quantity") ?? 0;
+        $lines = $document->lines
+            ->where('ref', '!=', 'SP000001')
+            ->whereNotIn('design', ['Special', '', 'special']);
+
+        $required_qte = $lines->sum("quantity") ?? 0;
 
         $current_qte = 0;
-        foreach ($document->lines as $line) {
+        foreach ($lines as $line) {
             foreach ($line->palettes as $palette) {
                 $current_qte += $palette->pivot->quantity;
             }
@@ -56,6 +59,7 @@ class DocumentController extends Controller
     }
 
 
+
     public function longList()
     {
         $documents = Document::with(['status', 'lines.palettes'])
@@ -64,10 +68,18 @@ class DocumentController extends Controller
             ->get();
 
         $documents = $documents->map(function ($document) {
-            $required_qte = $document->lines->sum('quantity') ?? 0;
+
+            $lines = $document->lines
+                ->where('ref', '!=', 'SP000001')
+                ->whereNotIn('design', ['Special', '', 'special']);
+
+
+            $required_qte = $lines->sum('quantity') ?? 0;
+
+
 
             $current_qte = 0;
-            foreach ($document->lines as $line) {
+            foreach ($lines as $line) {
                 foreach ($line->palettes as $palette) {
                     $current_qte += $palette->pivot->quantity;
                 }
@@ -75,7 +87,6 @@ class DocumentController extends Controller
 
             $progress = $required_qte > 0 ? round(($current_qte / $required_qte) * 100, 2) : 0;
 
-            // Add progress details to each document
             $document->current_qte = $current_qte;
             $document->required_qte = $required_qte;
             $document->progress = intval($progress);
@@ -113,14 +124,19 @@ class DocumentController extends Controller
 
 
         $documents = $documents->get()->map(function ($document) {
-            $required_qte = $document->lines->sum(function ($line) {
+
+            $lines = $document->lines
+                ->where('ref', '!=', 'SP000001')
+                ->whereNotIn('design', ['Special', '', 'special']);
+
+            $required_qte = $lines->sum(function ($line) {
                 return floatval($line->quantity);
             });
 
             $current_qte = 0;
             $companies = [];
 
-            foreach ($document->lines as $line) {
+            foreach ($lines as $line) {
                 if (!in_array($line->company_id, $companies)) {
                     $companies[] = $line->company_id;
                 }
@@ -403,7 +419,10 @@ class DocumentController extends Controller
             }
         ]);
 
-        $required_qte = $document->lines->sum("quantity") ?? 0;
+
+        $required_qte = $document->lines
+            ->where('ref', '!=', 'SP000001')
+            ->whereNotIn('design', ['Special', '', 'special'])->sum("quantity") ?? 0;
 
         $current_qte = 0;
         foreach ($document->lines as $line) {

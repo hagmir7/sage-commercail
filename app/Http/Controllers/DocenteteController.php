@@ -167,13 +167,27 @@ class DocenteteController extends Controller
 
     $query->with('document.status');
 
-    if (!empty($request->status)) {
-        $query->whereHas('document.status', function ($q) use ($request) {
-            $q->where('id', $request->status);
-        });
-    }
+        if (isset($request->status)) {
 
-    if ($request->filled('date')) {
+            if ($request->status == "0") {
+                $query->whereDoesntHave('document');
+            } elseif ($request->status == 1) {
+                $query->whereHas('document', function ($q) {
+                    $q->where('status_id', '>=', 1);
+                });
+            }else if($request->status == 2){
+                $query->whereHas('document', function ($q) {
+                    $q->where('status_id', '>=', 2);
+                });
+            }else {
+                $query->whereHas('document', function ($q) use ($request) {
+                    $q->where('status_id', $request->status);
+                });
+            }
+        }
+
+
+        if ($request->filled('date')) {
         $dates = explode(',', $request->date, 2);
         $start = Carbon::parse(urldecode($dates[0]))->startOfDay();
         $end = Carbon::parse(urldecode($dates[1] ?? $dates[0]))->endOfDay();
