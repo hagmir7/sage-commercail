@@ -100,6 +100,7 @@ class DocumentController extends Controller
     public function list(Request $request)
     {
         $documents = Document::with(['status', 'lines.palettes'])
+            ->whereHas('docentete')
             ->withCount('lines')
             ->orderByDesc('updated_at');
 
