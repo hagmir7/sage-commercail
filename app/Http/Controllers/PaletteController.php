@@ -66,53 +66,84 @@ class PaletteController extends Controller
     }
 
 
-    public function generate(Request $request)
-    {
-        $validator = Validator::make($request->all(), [
-            'document_id' => 'required|exists:documents,piece',
-        ]);
+public function generate(Request $request)
+{
+    $validator = Validator::make($request->all(), [
+        'document_id' => 'required|exists:documents,piece',
+    ]);
 
-        if ($validator->fails()) {
-            return response()->json(['errors' => $validator->errors()], 422);
-        }
-
-        $document = Document::where('piece', $request->document_id)->first();
-
-        if (!$document) {
-            return response()->json(['error' => 'Document not found.'], 404);
-        }
-
-        if ($document->palettes()->where('company_id', auth()->user()->company_id)->exists()) {
-            $query = $document->palettes()->with('lines.article_stock')->where('company_id', auth()->user()->company_id);
-
-            if (!empty($request->palette)) {
-                $palette = $query->where('code', $request->palette)->first();
-            } else {
-                $palette = $query->first();
-            }
-        } else {
-            $palette = Palette::create([
-                'code'        => $this->generatePaletteCode(),
-                'type'        => 'Livraison',
-                'document_id' => $document->id,
-                'company_id'  => auth()->user()->company_id ?? 1,
-                'user_id'     => auth()->id(),
-                'first_company_id'  => auth()->user()->company_id ?? 1,
-
-            ]);
-            $palette->load('lines.article_stock');
-        }
-
-
-        $allPalettes = $document->palettes()->with('lines.article_stock')
-            ->where('company_id', auth()->user()->company_id)->get();
-
-        return response()->json([
-            "palette" => $palette,
-            "palettes" => $allPalettes,
-        ], 201);
+    if ($validator->fails()) {
+        return response()->json(['errors' => $validator->errors()], 422);
     }
 
+    $document = Document::where('piece', $request->document_id)->first();
+
+    if (!$document) {
+        return response()->json(['error' => 'Document not found.'], 404);
+    }
+
+    // Define the relationships to load consistently
+    $relationships = [
+        'lines',
+        'lines.docligne' => function ($query) {
+            $query->select(
+                "cbMarq",
+                "DO_Piece", 
+                "DO_Ref",
+                "CT_Num",
+                "Hauteur",
+                "Largeur",
+                "Poignée",
+                "Chant",
+                "Description",
+                "Rotation",
+                "Couleur",
+                "AR_Ref",
+                "Episseur",
+            )->with(['article' => function ($q) {
+                $q->select("AR_Ref", "Nom", 'cbMarq', 'Hauteur', 'Largeur', 'Chant', 'Profonduer', 'Episseur', 'Description', 'AR_Design', 'Couleur');
+            }]);
+        },
+        'lines.article_stock' => function ($query) {
+            $query->select("code", "name", "height", "width", "depth", "color", "thickness", "chant", "description");
+        }
+    ];
+
+    if ($document->palettes()->where('company_id', auth()->user()->company_id)->exists()) {
+        // Palette exists - retrieve it with relationships
+        $query = $document->palettes()->with($relationships)->where('company_id', auth()->user()->company_id);
+
+        if (!empty($request->palette)) {
+            $palette = $query->where('code', $request->palette)->first();
+        } else {
+            $palette = $query->first();
+        }
+    } else {
+        // Create new palette
+        $palette = Palette::create([
+            'code'             => $this->generatePaletteCode(),
+            'type'             => 'Livraison',
+            'document_id'      => $document->id,
+            'company_id'       => auth()->user()->company_id ?? 1,
+            'user_id'          => auth()->id(),
+            'first_company_id' => auth()->user()->company_id ?? 1,
+        ]);
+
+        // Load relationships for the newly created palette
+        $palette->load($relationships);
+    }
+
+    // Get all palettes for this document and company
+    $allPalettes = $document->palettes()
+        ->with($relationships)
+        ->where('company_id', auth()->user()->company_id)
+        ->get();
+
+    return response()->json([
+        "palette" => $palette,
+        "palettes" => $allPalettes,
+    ], 201);
+}
 
 
     public function create(Request $request)
@@ -177,7 +208,11 @@ class PaletteController extends Controller
     {
         $validator = Validator::make($request->all(), [
             'line' => 'required|string|max:255',
+            'document' => 'nullable|exists:documents,piece'
         ]);
+
+
+        $document = Document::where('piece', $request->document)->first();
 
         if ($validator->fails()) {
             return response()->json([
@@ -190,11 +225,16 @@ class PaletteController extends Controller
             $lineIdentifier = $request->line;
             $line = null;
 
-            // First, try to find by ID (if it's numeric)
             if (is_numeric($lineIdentifier)) {
                 $line = Line::with([
                     'docligne' => function ($query) {
-                        $query->select("DO_Piece", "cbMarq", "DO_Ref", "CT_Num", "Hauteur", "Largeur", "Chant", "Poignée");
+                        $query->select(
+                            "cbMarq", "DO_Piece", "DO_Ref", "CT_Num",
+                            "Hauteur", "Largeur", "Chant", "Poignée",
+                            "Description", "Rotation", "Couleur", "AR_Ref"
+                        )->with(['article' => function ($q) {
+                            $q->select("AR_Ref", "Nom", 'cbMarq', 'Hauteur', 'Largeur', 'Chant', 'Profonduer', 'Episseur', 'Description', 'AR_Design'); 
+                        }]);
                     },
                     'article_stock' => function ($query) {
                         $query->select("code", "name", "height", "width", "depth", "color", "thickness", "chant");
@@ -202,18 +242,24 @@ class PaletteController extends Controller
                 ])->find($lineIdentifier);
             }
 
-            // If not found by ID, try to find by article stock reference
+        // If not found by ID, try to find by article stock reference
             if (!$line) {
                 $line = Line::with([
                     'docligne' => function ($query) {
-                        $query->select("DO_Piece", "cbMarq", "DO_Ref", "CT_Num", "Hauteur", "Largeur", "Chant", "Poignée");
+                        $query->select(
+                            "cbMarq", "DO_Piece", "DO_Ref", "CT_Num",
+                            "Hauteur", "Largeur", "Poignée", "Chant",
+                            "Description", "Rotation", "Couleur", "AR_Ref" // Make sure to include AR_Ref again
+                        )->with(['article' => function ($q) {
+                            $q->select("AR_Ref", "Nom", 'cbMarq', 'Hauteur', 'Largeur', 'Chant', 'Profonduer', 'Episseur', 'Description', 'AR_Design'); 
+                        }]);
                     },
                     'article_stock' => function ($query) {
                         $query->select("code", "name", "height", "width", "depth", "color", "thickness", "chant", "description");
                     }
                 ])->whereHas('article_stock', function ($query) use ($lineIdentifier) {
                     $query->where('code', $lineIdentifier);
-                })->first();
+                })->where("document_id", $document->id)->first();
             }
 
             // Check if line exists
@@ -350,6 +396,7 @@ class PaletteController extends Controller
 
         try {
             DB::transaction(function () use ($document, $request, $line, $palette) {
+
                 $totalQte = $line->palettes->sum(function ($palette) {
                     return $palette->pivot->quantity;
                 });
