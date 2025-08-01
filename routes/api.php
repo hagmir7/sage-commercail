@@ -27,6 +27,7 @@ use App\Models\InventoryMovement;
 use App\Models\StockMovement;
 use App\Models\User;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Route;
 
 
@@ -46,7 +47,7 @@ Route::get("preparation/{piece}/{companyId}", [PaletteController::class, 'valida
 
 
 Route::get('/users', function (Request $request) {
-    return User::all();
+   return DB::connection('sqlsrv_inter')->table('F_CAISSE')->get();
 
 });
 
