@@ -246,10 +246,6 @@ class DocenteteController extends Controller
     }
 
 
-
-
-
-
     public function updateDocStatus($docentete)
     {
         DB::connection('sqlsrv')->beginTransaction();

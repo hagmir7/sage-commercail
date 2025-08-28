@@ -14,6 +14,7 @@ use App\Http\Controllers\EmplacementController;
 use App\Http\Controllers\InventoryController;
 use App\Http\Controllers\InventoryExportController;
 use App\Http\Controllers\InventoryMovementController;
+use App\Http\Controllers\LineController;
 use App\Http\Controllers\PaletteController;
 use App\Http\Controllers\PermissionController;
 use App\Http\Controllers\RoleController;
@@ -127,6 +128,12 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('document/{piece}', 'documentPalettes');
         Route::delete('{palette:code}', 'destroy');
     });
+
+
+    Route::prefix('lines')->controller(LineController::class)->group(function () {
+        Route::post('prepare', 'prepare');
+    });
+
 
     Route::prefix('docentetes')->controller(DocenteteController::class)->group(function () {
         Route::get("commercial", 'commercial');

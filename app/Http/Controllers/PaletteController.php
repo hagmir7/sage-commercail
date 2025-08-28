@@ -66,84 +66,84 @@ class PaletteController extends Controller
     }
 
 
-public function generate(Request $request)
-{
-    $validator = Validator::make($request->all(), [
-        'document_id' => 'required|exists:documents,piece',
-    ]);
-
-    if ($validator->fails()) {
-        return response()->json(['errors' => $validator->errors()], 422);
-    }
-
-    $document = Document::where('piece', $request->document_id)->first();
-
-    if (!$document) {
-        return response()->json(['error' => 'Document not found.'], 404);
-    }
-
-    // Define the relationships to load consistently
-    $relationships = [
-        'lines',
-        'lines.docligne' => function ($query) {
-            $query->select(
-                "cbMarq",
-                "DO_Piece", 
-                "DO_Ref",
-                "CT_Num",
-                "Hauteur",
-                "Largeur",
-                "Poignée",
-                "Chant",
-                "Description",
-                "Rotation",
-                "Couleur",
-                "AR_Ref",
-                "Episseur",
-            )->with(['article' => function ($q) {
-                $q->select("AR_Ref", "Nom", 'cbMarq', 'Hauteur', 'Largeur', 'Chant', 'Profonduer', 'Episseur', 'Description', 'AR_Design', 'Couleur');
-            }]);
-        },
-        'lines.article_stock' => function ($query) {
-            $query->select("code", "name", "height", "width", "depth", "color", "thickness", "chant", "description");
-        }
-    ];
-
-    if ($document->palettes()->where('company_id', auth()->user()->company_id)->exists()) {
-        // Palette exists - retrieve it with relationships
-        $query = $document->palettes()->with($relationships)->where('company_id', auth()->user()->company_id);
-
-        if (!empty($request->palette)) {
-            $palette = $query->where('code', $request->palette)->first();
-        } else {
-            $palette = $query->first();
-        }
-    } else {
-        // Create new palette
-        $palette = Palette::create([
-            'code'             => $this->generatePaletteCode(),
-            'type'             => 'Livraison',
-            'document_id'      => $document->id,
-            'company_id'       => auth()->user()->company_id ?? 1,
-            'user_id'          => auth()->id(),
-            'first_company_id' => auth()->user()->company_id ?? 1,
+    public function generate(Request $request)
+    {
+        $validator = Validator::make($request->all(), [
+            'document_id' => 'required|exists:documents,piece',
         ]);
 
-        // Load relationships for the newly created palette
-        $palette->load($relationships);
+        if ($validator->fails()) {
+            return response()->json(['errors' => $validator->errors()], 422);
+        }
+
+        $document = Document::where('piece', $request->document_id)->first();
+
+        if (!$document) {
+            return response()->json(['error' => 'Document not found.'], 404);
+        }
+
+        // Define the relationships to load consistently
+        $relationships = [
+            'lines',
+            'lines.docligne' => function ($query) {
+                $query->select(
+                    "cbMarq",
+                    "DO_Piece",
+                    "DO_Ref",
+                    "CT_Num",
+                    "Hauteur",
+                    "Largeur",
+                    "Poignée",
+                    "Chant",
+                    "Description",
+                    "Rotation",
+                    "Couleur",
+                    "AR_Ref",
+                    "Episseur",
+                )->with(['article' => function ($q) {
+                    $q->select("AR_Ref", "Nom", 'cbMarq', 'Hauteur', 'Largeur', 'Chant', 'Profonduer', 'Episseur', 'Description', 'AR_Design', 'Couleur');
+                }]);
+            },
+            'lines.article_stock' => function ($query) {
+                $query->select("code", "name", "height", "width", "depth", "color", "thickness", "chant", "description");
+            }
+        ];
+
+        if ($document->palettes()->where('company_id', auth()->user()->company_id)->exists()) {
+            // Palette exists - retrieve it with relationships
+            $query = $document->palettes()->with($relationships)->where('company_id', auth()->user()->company_id);
+
+            if (!empty($request->palette)) {
+                $palette = $query->where('code', $request->palette)->first();
+            } else {
+                $palette = $query->first();
+            }
+        } else {
+            // Create new palette
+            $palette = Palette::create([
+                'code'             => $this->generatePaletteCode(),
+                'type'             => 'Livraison',
+                'document_id'      => $document->id,
+                'company_id'       => auth()->user()->company_id ?? 1,
+                'user_id'          => auth()->id(),
+                'first_company_id' => auth()->user()->company_id ?? 1,
+            ]);
+
+            // Load relationships for the newly created palette
+            $palette->load($relationships);
+        }
+
+        // Get all palettes for this document and company
+        $allPalettes = $document->palettes()
+            ->with($relationships)
+            ->where('company_id', auth()->user()->company_id)
+            ->get();
+
+        return response()->json([
+            "palette" => $palette,
+            "palettes" => $allPalettes,
+        ], 201);
     }
-
-    // Get all palettes for this document and company
-    $allPalettes = $document->palettes()
-        ->with($relationships)
-        ->where('company_id', auth()->user()->company_id)
-        ->get();
-
-    return response()->json([
-        "palette" => $palette,
-        "palettes" => $allPalettes,
-    ], 201);
-}
 
 
     public function create(Request $request)
@@ -231,9 +231,9 @@ public function generate(Request $request)
                         $query->select(
                             "cbMarq", "DO_Piece", "DO_Ref", "CT_Num",
                             "Hauteur", "Largeur", "Chant", "Poignée",
-                            "Description", "Rotation", "Couleur", "AR_Ref"
+                            "Description", "Rotation", "Couleur", "AR_Ref", 'Profondeur'
                         )->with(['article' => function ($q) {
-                            $q->select("AR_Ref", "Nom", 'cbMarq', 'Hauteur', 'Largeur', 'Chant', 'Profonduer', 'Episseur', 'Description', 'AR_Design'); 
+                            $q->select("AR_Ref", "Nom", 'cbMarq', 'Hauteur', 'Largeur', 'Chant', 'Profonduer', 'Episseur', 'Description', 'AR_Design', 'Couleur'); 
                         }]);
                     },
                     'article_stock' => function ($query) {
@@ -249,9 +249,9 @@ public function generate(Request $request)
                         $query->select(
                             "cbMarq", "DO_Piece", "DO_Ref", "CT_Num",
                             "Hauteur", "Largeur", "Poignée", "Chant",
-                            "Description", "Rotation", "Couleur", "AR_Ref" // Make sure to include AR_Ref again
+                            "Description", "Rotation", "Couleur", "AR_Ref", "Profondeur"
                         )->with(['article' => function ($q) {
-                            $q->select("AR_Ref", "Nom", 'cbMarq', 'Hauteur', 'Largeur', 'Chant', 'Profonduer', 'Episseur', 'Description', 'AR_Design'); 
+                            $q->select("AR_Ref", "Nom", 'cbMarq', 'Hauteur', 'Largeur', 'Chant', 'Profonduer', 'Episseur', 'Description', 'AR_Design', "Couleur"); 
                         }]);
                     },
                     'article_stock' => function ($query) {
@@ -487,7 +487,13 @@ public function generate(Request $request)
      */
     public function show($code)
     {
-        $palette = Palette::with(['lines.article_stock', 'document', 'user'])->where('code', $code)->first();
+     $palette = Palette::with([
+            'lines.docligne:DL_No,cbMarq,AR_Ref,Nom,DL_Design,Description,Hauteur,Largeur,Profondeur,Couleur,Chant,Episseur,DL_Qte,Poignée',
+            'document',
+            'user',
+            'lines.docligne.article:cbMarq,AR_Ref,Nom,Hauteur,Largeur,Couleur,Profonduer,Episseur,Chant'
+        ])->where('code', $code)->first();
+
         if (!$palette) {
             return response()->json(['error' => "Palette not found"], 404);
         }
