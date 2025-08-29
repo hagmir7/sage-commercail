@@ -47,13 +47,14 @@ class LineController extends Controller
         $line = Line::find($request->line);
         $document = $line->document;
 
-        // update line status
         $line->update(['status_id' => 8]);
 
         // check if document already has palettes
-        if ($document->palettes->count()) {
-            $palette = $document->palettes->first(); 
-        } else {
+        $palette = $document->palettes
+            ->where('company_id', auth()->user()->company_id)
+            ->first();
+
+        if (!$palette) {
             $palette = Palette::create([
                 'document_id' => $document->id,
                 'company_id'  => auth()?->user()?->company_id ?? 1,
@@ -63,19 +64,27 @@ class LineController extends Controller
             ]);
         }
 
+
         // attach palette to line
         $line->update(['palette_id' => $palette->id]);
 
-        $line->palettes()->attach($palette->id, ['quantity' => floatval($line->docligne->DL_Qte)]);
+        $quantity = floatval($line->docligne->DL_Qte);
 
-        // update document status depending on validation
+        if ($line->palettes->contains($palette->id)) {
+            // If the palette already exists, update the pivot quantity
+            $line->palettes()->updateExistingPivot($palette->id, ['quantity' => $quantity]);
+        } else {
+            // Otherwise, attach it
+            $line->palettes()->attach($palette->id, ['quantity' => $quantity]);
+        }
+
+
         if ($document->validation()) {
             $document->update(['status_id' => 8]);
         } elseif ($document->status_id != 7) {
             $document->update(['status_id' => 7]);
         }
 
-        // update pivot for company if validated
         if ($document->validationCompany(auth()?->user()?->company_id)) {
             $document->companies()->updateExistingPivot(auth()->user()->company_id, [
                 'status_id'  => 8,

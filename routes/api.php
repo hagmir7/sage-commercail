@@ -48,7 +48,7 @@ Route::get("preparation/{piece}/{companyId}", [PaletteController::class, 'valida
 
 
 Route::get('/users', function (Request $request) {
-   return DB::connection('sqlsrv_inter')->table('F_CAISSE')->get();
+   return User::all();
 
 });
 
@@ -200,12 +200,12 @@ Route::middleware('auth:sanctum')->group(function () {
 
         Route::get('/', 'list');
         Route::get('preparation-list', 'preparationList');
-        
+
         Route::get('/ready', 'ready');
         Route::get('/progress/{piece}', 'progress');
         Route::post('chargement/{document}', 'addChargement');
         Route::get('validation-controller', 'validationControllerList');
-        
+
         Route::get('livraison', 'livraison');
         // All documents routes up to this route !
         Route::get('{document:piece}', 'show');
