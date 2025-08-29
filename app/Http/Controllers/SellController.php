@@ -125,11 +125,11 @@ class SellController extends Controller
             );
 
 
-            // DB::connection('sqlsrv')->unprepared("
-            //     SET NOCOUNT ON;
-            //     SET XACT_ABORT ON;
-            //     DISABLE TRIGGER ALL ON F_DOCLIGNEEMPL;
-            // ");
+            DB::connection('sqlsrv')->unprepared("
+                SET NOCOUNT ON;
+                SET XACT_ABORT ON;
+                DISABLE TRIGGER ALL ON F_DOCLIGNEEMPL;
+            ");
 
             DB::table('F_DOCLIGNEEMPL')->insert([
                 'DL_No'            => $dl_no,
@@ -139,11 +139,11 @@ class SellController extends Controller
                 'cbCreationUser'   => '69C8CD64-D06F-4097-9CAC-E488AC2610F9',
             ]);
 
-            // DB::connection('sqlsrv')->unprepared("
-            //     SET NOCOUNT ON;
-            //     SET XACT_ABORT ON;
-            //     DISABLE TRIGGER ALL ON F_DOCLIGNEEMPL;
-            // ");
+            DB::connection('sqlsrv')->unprepared("
+                SET NOCOUNT ON;
+                SET XACT_ABORT ON;
+                DISABLE TRIGGER ALL ON F_DOCLIGNEEMPL;
+            ");
 
 
             // Incrémentation des stocks
@@ -154,11 +154,11 @@ class SellController extends Controller
 
             try {
 
-            //     DB::connection('sqlsrv')->unprepared("
-            //     SET NOCOUNT ON;
-            //     SET XACT_ABORT ON;
-            //     DISABLE TRIGGER ALL ON F_ARTSTOCK;
-            // ");
+                DB::connection('sqlsrv')->unprepared("
+                SET NOCOUNT ON;
+                SET XACT_ABORT ON;
+                DISABLE TRIGGER ALL ON F_ARTSTOCK;
+            ");
 
 
                 $updated = DB::table('F_ARTSTOCK')
@@ -167,18 +167,18 @@ class SellController extends Controller
                         'AS_QteSto'  => DB::raw("AS_QteSto + {$qte}"),
                     ]);
 
-            //     DB::connection('sqlsrv')->unprepared("
-            //     SET NOCOUNT ON;
-            //     SET XACT_ABORT ON;
-            //     DISABLE TRIGGER ALL ON F_ARTSTOCK;
-            // ");
+                DB::connection('sqlsrv')->unprepared("
+                SET NOCOUNT ON;
+                SET XACT_ABORT ON;
+                DISABLE TRIGGER ALL ON F_ARTSTOCK;
+            ");
 
             } catch (\Throwable $th) {
-            //     DB::connection('sqlsrv')->unprepared("
-            //     SET NOCOUNT ON;
-            //     SET XACT_ABORT ON;
-            //     DISABLE TRIGGER ALL ON F_ARTSTOCK;
-            // ");
+                DB::connection('sqlsrv')->unprepared("
+                SET NOCOUNT ON;
+                SET XACT_ABORT ON;
+                DISABLE TRIGGER ALL ON F_ARTSTOCK;
+            ");
             }
 
 
@@ -203,11 +203,11 @@ class SellController extends Controller
             DB::beginTransaction();
 
             // Disable triggers before the insert
-            // DB::connection('sqlsrv')->unprepared("
-            //     SET NOCOUNT ON;
-            //     SET XACT_ABORT ON;
-            //     DISABLE TRIGGER ALL ON F_DOCENTETE;
-            // ");
+            DB::connection('sqlsrv')->unprepared("
+                SET NOCOUNT ON;
+                SET XACT_ABORT ON;
+                DISABLE TRIGGER ALL ON F_DOCENTETE;
+            ");
 
             // Insert the document
 
@@ -363,11 +363,11 @@ class SellController extends Controller
                 DB::beginTransaction();
 
                 // Disable triggers before the insert
-                // DB::connection('sqlsrv')->unprepared("
-                //     SET NOCOUNT ON;
-                //     SET XACT_ABORT ON;
-                //     DISABLE TRIGGER ALL ON F_DOCENTETE;
-                // ");
+                DB::connection('sqlsrv')->unprepared("
+                    SET NOCOUNT ON;
+                    SET XACT_ABORT ON;
+                    DISABLE TRIGGER ALL ON F_DOCENTETE;
+                ");
 
                 // Insert the document
                 $newDocument = Docentete::create($insertData);
@@ -382,9 +382,9 @@ class SellController extends Controller
                 throw $e;
             } finally {
                 // Ensure triggers are always re-enabled
-                // DB::connection('sqlsrv')->unprepared("
-                //     ENABLE TRIGGER ALL ON F_DOCENTETE;
-                // ");
+                DB::connection('sqlsrv')->unprepared("
+                    ENABLE TRIGGER ALL ON F_DOCENTETE;
+                ");
             }
 
             return $newDocument->id ?? true;
@@ -596,17 +596,17 @@ class SellController extends Controller
                     'cbCreationUser' => '69C8CD64-D06F-4097-9CAC-E488AC2610F9',
                 ];
 
-                // DB::connection('sqlsrv')->unprepared("
-                //     SET NOCOUNT ON;
-                //     SET XACT_ABORT ON;
-                //     DISABLE TRIGGER ALL ON F_DOCLIGNE;
-                // ");
+                DB::connection('sqlsrv')->unprepared("
+                    SET NOCOUNT ON;
+                    SET XACT_ABORT ON;
+                    DISABLE TRIGGER ALL ON F_DOCLIGNE;
+                ");
 
                 $newDocLine = Docligne::create($insertData);
 
-                // DB::connection('sqlsrv')->unprepared("
-                //     ENABLE TRIGGER ALL ON F_DOCLIGNE;
-                // ");
+                DB::connection('sqlsrv')->unprepared("
+                    ENABLE TRIGGER ALL ON F_DOCLIGNE;
+                ");
 
                 return $newDocLine->id ?? true;
             });
