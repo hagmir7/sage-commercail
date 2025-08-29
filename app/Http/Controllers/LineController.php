@@ -71,10 +71,8 @@ class LineController extends Controller
         $quantity = floatval($line->docligne->DL_Qte);
 
         if ($line->palettes->contains($palette->id)) {
-            // If the palette already exists, update the pivot quantity
             $line->palettes()->updateExistingPivot($palette->id, ['quantity' => $quantity]);
         } else {
-            // Otherwise, attach it
             $line->palettes()->attach($palette->id, ['quantity' => $quantity]);
         }
 
