@@ -108,7 +108,6 @@ Route::middleware('auth:sanctum')->group(function () {
 
 
 
-
     Route::prefix('palettes')->controller(PaletteController::class)->group(function () {
         Route::post('generate', 'generate');
         Route::post('scan', 'scanLine');
@@ -152,7 +151,9 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::prefix('stock')->controller(StockMovementController::class)->group(function(){
         Route::post('in', 'in');
         Route::post('out', 'out');
+        Route::get('movements', 'listGeneral');
         Route::get('movements/{company}', 'list');
+        Route::put('movements/update/{stock_movement}', 'update');
     });
 
 

@@ -33,7 +33,7 @@ class StockMovement extends Model
 
     public function emplacement()
     {
-        return $this->belongsTo(Emplacement::class, 'from_emplacement_id');
+        return $this->belongsTo(Emplacement::class, 'emplacement_id');
     }
 
     public function toEmplacement()
