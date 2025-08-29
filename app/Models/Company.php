@@ -12,4 +12,11 @@ class Company extends Model
     {
         return $this->belongsToMany(company::class, 'document_companies');
     }
+
+    public function movements(){
+        return $this->hasMany(StockMovement::class);
+    }
 }
+
+
+

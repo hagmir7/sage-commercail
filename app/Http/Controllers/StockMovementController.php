@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\ArticleStock;
+use App\Models\Company;
 use App\Models\CompanyStock;
 use App\Models\Emplacement;
 use App\Models\StockMovement;
@@ -16,6 +17,65 @@ use Illuminate\Support\Facades\Validator;
 
 class StockMovementController extends Controller
 {
+
+
+
+
+    public function list(Request $request, Company $company)
+    {
+        $request->validate([
+            'per_page' => 'nullable|integer|min:1',
+            'dates' => 'nullable|string',
+            'types' => 'nullable|string',
+        ]);
+
+        $types = $request->filled('types') ? explode(',', $request->types) : null;
+
+        if ($types && array_diff($types, ['IN', 'OUT', 'TRANSFER'])) {
+            return response()->json(['error' => 'Invalid types provided'], 422);
+        }
+
+        $movements = $company->movements()
+            ->with(['movedBy:id,full_name'])
+            ->when($types, fn($q) => $q->whereIn('movement_type', $types));
+
+        if (!auth()->user()->hasRole('admin') && !auth()->user()->hasRole('supper_admin')) {
+            $movements->where("moved_by", auth()->id());
+        }
+
+        $depots = $request->filled('depots') ? explode(',', $request->depots) : null;
+        $users = $request->filled('users') ? explode(',', $request->users) : null;
+
+        if (!empty($depots)) {
+            $movements->filterByDepots($depots);
+        }
+
+        if ($request->filled('emplacement') && $request->emplacement !== '') {
+            $movements->filterByEmplacement($request->emplacement);
+        }
+
+        if (!empty($users)) {
+            $movements->filterByUsers($users);
+        }
+
+        if ($request->filled('search') && $request->search !== '') {
+            $movements->search($request->search);
+        }
+
+        if ($request->filled('category') && $request->category !== '') {
+            $movements->filterByCategory($request->category);
+        }
+
+        if ($request->filled('dates') && $request->dates !== ',') {
+            $movements->filterByDates($request->dates);
+        }
+
+        return response()->json([
+            'company' => $company,
+            'movements' => $movements->orderBy('created_at', 'desc')
+                ->paginate($request->input('per_page', 30)),
+        ]);
+    }
 
     public function generatePaletteCode()
     {

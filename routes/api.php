@@ -152,6 +152,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::prefix('stock')->controller(StockMovementController::class)->group(function(){
         Route::post('in', 'in');
         Route::post('out', 'out');
+        Route::get('movements/{company}', 'list');
     });
 
 
