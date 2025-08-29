@@ -8,14 +8,21 @@ class StockMovement extends Model
 {
     protected $fillable = [
         'article_id',
-        'from_palette_id',
+        'designation',
+        'from_emplacement_id',
+        'to_emplacement_id',
+        'emplacement_id',
         'to_palette_id',
+        'article_stock_id',
         'quantity',
         'movement_type',
         'movement_date',
         'moved_by',
-        'note'
+        'note',
+        'code_article',
+        'company_id'
     ];
+
 
     public function article()
     {
