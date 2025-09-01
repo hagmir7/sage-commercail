@@ -259,7 +259,7 @@ class PaletteController extends Controller
                     }
                 ])->whereHas('article_stock', function ($query) use ($lineIdentifier) {
                     $query->where('code', $lineIdentifier);
-                })->where("document_id", $document->id)->first();
+                })->where("document_id", $document->id)->where('status_id', 7)->get();
             }
 
             // Check if line exists
@@ -268,12 +268,12 @@ class PaletteController extends Controller
             }
 
             // Check for special case SP000001
-            if (
-                $line->ref === 'SP000001' &&
-                (empty($line->design) || strtolower(trim($line->design)) === 'special')
-            ) {
-                return response()->json(['message' => "L'article n'existe pas SP000001"], 422);
-            }
+            // if (
+            //     $line->ref === 'SP000001' &&
+            //     (empty($line->design) || strtolower(trim($line->design)) === 'special')
+            // ) {
+            //     return response()->json(['message' => "L'article n'existe pas SP000001"], 422);
+            // }
 
             return response()->json($line);
         } catch (\Exception $e) {

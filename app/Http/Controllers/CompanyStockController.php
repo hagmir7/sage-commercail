@@ -8,7 +8,7 @@ use Illuminate\Http\Request;
 
 class CompanyStockController extends Controller
 {
-       public function index(Request $request)
+    public function index(Request $request)
     {
         CompanyStock::select('code_article', 'designation', 'company_id', 'quantity', 'min_quantity');
         $query = ArticleStock::query();

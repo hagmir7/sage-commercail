@@ -258,7 +258,7 @@ class DocumentController extends Controller
     {
         $query = Document::with([
             'companies',
-            'docentete:cbMarq,DO_Date,DO_DateLivr,DO_Reliquat'
+            'docentete:cbMarq,DO_Date,DO_DateLivr,DO_Reliquat',
         ])
             ->whereHas('lines', function ($query) {
                 $query->where('company_id', auth()->user()->company_id);

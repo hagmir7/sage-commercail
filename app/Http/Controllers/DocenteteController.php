@@ -96,7 +96,6 @@ class DocenteteController extends Controller
             $line->update([
                 'role_id' => $line->next_role_id ? $line->next_role_id : null,
                 'next_role_id' => null,
-                // 4 End of Fabrication & 6 for Montage
                 'status_id' => $line->next_role_id ? 7 : ($user->hasRole("fabrication") ? 4 : 6)
             ]);
 
@@ -270,7 +269,7 @@ class DocenteteController extends Controller
                 ENABLE TRIGGER ALL ON F_DOCENTETE;
             ");
 
-            throw $e; // or handle it as needed
+            throw $e;
         }
     }
 

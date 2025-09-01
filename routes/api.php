@@ -23,12 +23,8 @@ use App\Http\Controllers\StockMovementController;
 use App\Http\Controllers\TransferController;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\UserPermissionController;
-use App\Models\Inventory;
-use App\Models\InventoryMovement;
-use App\Models\StockMovement;
 use App\Models\User;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Route;
 
 
