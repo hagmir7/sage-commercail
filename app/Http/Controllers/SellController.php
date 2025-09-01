@@ -333,6 +333,7 @@ class SellController extends Controller
         try {
             // Disable triggers temporarily to avoid xp_CBIsFileLock issues
             $this->disableTriggersTemporarily();
+             $this->enableTriggersAfterOperation();
             $docentete = Docentete::where('DO_Piece', $piece)
                 ->select('DO_Domaine', 'DO_Type', 'DO_Piece', 'DO_Ref', 'DO_Tiers', 'DO_TotalHTNet', 'DO_NetAPayer')
                 ->firstOrFail();
