@@ -332,8 +332,7 @@ class SellController extends Controller
 
         try {
             // Disable triggers temporarily to avoid xp_CBIsFileLock issues
-            $this->disableTriggersTemporarily();
-             $this->enableTriggersAfterOperation();
+            // $this->disableTriggersTemporarily();
             $docentete = Docentete::where('DO_Piece', $piece)
                 ->select('DO_Domaine', 'DO_Type', 'DO_Piece', 'DO_Ref', 'DO_Tiers', 'DO_TotalHTNet', 'DO_NetAPayer')
                 ->firstOrFail();
@@ -403,10 +402,10 @@ class SellController extends Controller
             ]);
 
             // Re-enable triggers
-            $this->enableTriggersAfterOperation();
+            // $this->enableTriggersAfterOperation();
         } catch (Exception $e) {
             // Ensure triggers are re-enabled even if operation fails
-            $this->enableTriggersAfterOperation();
+            // $this->enableTriggersAfterOperation();
             Log::error('Calculator operation failed: ' . $e->getMessage());
             return response()->json(['error' => $e->getMessage()], 500);
         }
