@@ -83,31 +83,13 @@ class PaletteController extends Controller
         }
 
         // Define the relationships to load consistently
-        $relationships = [
-            'lines',
-            'lines.docligne' => function ($query) {
-                $query->select(
-                    "cbMarq",
-                    "DO_Piece",
-                    "DO_Ref",
-                    "CT_Num",
-                    "Hauteur",
-                    "Largeur",
-                    "Poignée",
-                    "Chant",
-                    "Description",
-                    "Rotation",
-                    "Couleur",
-                    "AR_Ref",
-                    "Episseur",
-                )->with(['article' => function ($q) {
-                    $q->select("AR_Ref", "Nom", 'cbMarq', 'Hauteur', 'Largeur', 'Chant', 'Profonduer', 'Episseur', 'Description', 'AR_Design', 'Couleur');
-                }]);
-            },
-            'lines.article_stock' => function ($query) {
-                $query->select("code", "name", "height", "width", "depth", "color", "thickness", "chant", "description");
-            }
-        ];
+       $relationships = [
+        'lines',
+        'lines.docligne:cbMarq,DO_Piece,DO_Ref,CT_Num,Hauteur,Largeur,Poignée,Chant,Description,Rotation,Couleur,AR_Ref,Episseur',
+        'lines.docligne.article:AR_Ref,Nom,cbMarq,Hauteur,Largeur,Chant,Profonduer,Episseur,Description,AR_Design,Couleur',
+        'lines.article_stock:code,name,height,width,depth,color,thickness,chant,description',
+    ];
+
 
         if ($document->palettes()->where('company_id', auth()->user()->company_id)->exists()) {
             // Palette exists - retrieve it with relationships
