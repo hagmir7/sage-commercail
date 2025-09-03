@@ -121,7 +121,7 @@ class SellController extends Controller
             }
 
             $currentDate = Carbon::now()->format('Y-m-d H:i:s');
-            $defaultDate = '1753-01-01 00:00:00';
+            $defaultDate = '2025-01-01 00:00:00';
 
             // Use raw SQL INSERT to bypass triggers
             $sql = "
@@ -237,7 +237,7 @@ class SellController extends Controller
             $montantTTC = round($quantity * $calculatedPriceTTC, 2);
 
             $currentDate = Carbon::now()->format('Y-m-d H:i:s');
-            $defaultDate = '1753-01-01 00:00:00';
+            $defaultDate = '2025-01-01 00:00:00';
             $pfNum = $sourceDocLine->PF_Num ?? '';
             $dlPieceDE = $sourceDocLine->DL_PieceDE ?? '';
             $euEnumere = $sourceDocLine->EU_Enumere ?? '';
@@ -634,94 +634,121 @@ class SellController extends Controller
             // Use correct quantity (BL or standard)
             $quantity = (float) ($sourceDocLine->DL_QteBL ?? $sourceDocLine->DL_Qte);
 
-            $insertData = [
-                'DO_Domaine' => $DO_DOMAINE_SALES,
-                'DO_Type' => $DO_TYPE_CUSTOM,
-                'CT_Num' => $ctNum,
-                'DO_Piece' => $doPiece,
-                'DL_PieceBC' => '', // Empty string instead of null
-                'DL_PieceBL' => '', // Empty string instead of null
-                'DO_Date' => $doDate,
-                'DL_DateBC' => $doDate,
-                'DL_DateBL' => $doDate,
-                'DL_Ligne' => $sourceDocLine->DL_Ligne,
-                'DO_Ref' => $doRef,
-                'DL_TNomencl' => 0,
-                'DL_TRemPied' => 0,
-                'DL_TRemExep' => 0,
-                'AR_Ref' => $sourceDocLine->AR_Ref,
-                'DL_Design' => $sourceDocLine->DL_Design,
-                'DL_Qte' => $quantity,
-                'DL_QteBC' => $quantity,
-                'DL_QteBL' => $quantity,
-                'DL_PoidsNet' => 0,
-                'DL_PoidsBrut' => 0,
-                'DL_Remise01REM_Valeur' => 0,
-                'DL_Remise01REM_Type' => 0,
-                'DL_Remise02REM_Valeur' => 0,
-                'DL_Remise02REM_Type' => 0,
-                'DL_Remise03REM_Valeur' => 0,
-                'DL_Remise03REM_Type' => 0,
-                'DL_PrixUnitaire' => $calculatedPrice,
-                'DL_PUBC' => 0,
-                'DL_QteDE' => $quantity,
-                'EU_Qte' => $quantity,
-                'EU_Enumere' => $sourceDocLine->EU_Enumere ?? null,
-                'DL_Taxe1' => $TAXE_STANDARD,
-                'DL_TypeTaux1' => 0,
-                'DL_Taxe2' => 0,
-                'DL_TypeTaux2' => 0,
-                'CO_No' => 0,
-                'AG_No1' => 0,
-                'AG_No2' => 0,
-                'DL_PrixRU' => 0,
-                'DL_CMUP' => 0,
-                'DL_MvtStock' => 1,
-                'DT_No' => 0,
-                'AF_RefFourniss' => $afRefFourniss,
-                'DL_TTC' => 0,
-                'DE_No' => 1,
-                'DL_NoRef' => 1,
-                'DL_TypePL' => 0,
-                'DL_PUDevise' => $calculatedPrice,
-                'DL_PUTTC' => $calculatedPriceTTC,
-                'DO_DateLivr' => '1753-01-01 00:00:00',
-                'CA_Num' => '', // Empty string instead of null
-                'DL_Taxe3' => 0,
-                'DL_TypeTaux3' => 0,
-                'DL_TypeTaxe3' => 0,
-                'DL_Frais' => 0,
-                'DL_Valorise' => 1,
-                'DL_NonLivre' => 0,
-                'AC_RefClient' => '', // Empty string instead of null
-                'DL_MontantHT' => round($quantity * $calculatedPrice, 2),
-                'DL_MontantTTC' => round($quantity * $calculatedPriceTTC, 2),
-                'DL_FactPoids' => 0,
-                'DL_No' => $DO_NO,
-                'DL_TypeTaxe1' => 0,
-                'DL_TypeTaxe2' => 0,
-                'DL_Escompte' => 0,
-                'DL_PiecePL' => '', // Empty string instead of null
-                'DL_DatePL' => '1753-01-01 00:00:00',
-                'DL_QtePL' => 0,
-                'DL_NoColis' => '', // Empty string instead of null
-                'DL_NoLink' => 0,
-                'DL_QteRessource' => 0,
-                'DL_DateAvancement' => '1753-01-01 00:00:00',
-                'PF_Num' => $sourceDocLine->PF_Num ?? '', // Use source value or empty string
-                'DL_PieceOFProd' => 0,
-                'DL_PieceDE' => $sourceDocLine->DL_PieceDE ?? null,
-                'DL_DateDE' => $doDate,
-                'DL_Operation' => '', // Empty string instead of null
-                'DL_NoSousTotal' => 0,
-                'CA_No' => 0,
-                'DO_DocType' => $DO_TYPE_CUSTOM,
-                'DL_CodeTaxe1' => 'D20',
-                'cbCreationUser' => self::CB_CREATION_USER,
-            ];
+            // Format the date properly for SQL Server
+            $formattedDate = date('Y-m-d H:i:s.v', strtotime($doDate));
+            Log::info("---------------------------");
 
-            $newDocLine = Docligne::create($insertData);
-            return $newDocLine ? true : false;
+            Log::info("---------------------------");
+
+
+            // Use DB::insert instead of Eloquent
+            $result = DB::connection('sqlsrv')->table('F_DOCLIGNE')->insert([
+                // Core document info
+                'DO_Domaine'       => $DO_DOMAINE_SALES,
+                'DO_Type'          => $DO_TYPE_CUSTOM,
+                'CT_Num'           => $ctNum,
+                'DO_Piece'         => $doPiece,
+                'DL_PieceBC'       => '',
+                'DL_PieceBL'       => '',
+                'DO_Date'          => $formattedDate,
+                'DL_DateBC'        => $formattedDate,
+                'DL_DateBL'        => $formattedDate,
+                'DL_Ligne'         => (int) $sourceDocLine->DL_Ligne,
+                'DO_Ref'           => $doRef,
+                'DL_TNomencl'      => 0,
+                'DL_TRemPied'      => 0,
+                'DL_TRemExep'      => 0,
+
+                // Article info
+                'AR_Ref'           => $sourceDocLine->AR_Ref,
+                'DL_Design'        => $sourceDocLine->DL_Design,
+                'DL_Qte'           => $quantity,
+                'DL_QteBC'         => $quantity,
+                'DL_QteBL'         => $quantity,
+                'DL_PoidsNet'      => 0,
+                'DL_PoidsBrut'     => 0,
+
+                // Discounts
+                'DL_Remise01REM_Valeur' => 0,
+                'DL_Remise01REM_Type'   => 0,
+                'DL_Remise02REM_Valeur' => 0,
+                'DL_Remise02REM_Type'   => 0,
+                'DL_Remise03REM_Valeur' => 0,
+                'DL_Remise03REM_Type'   => 0,
+
+                // Pricing
+                'DL_PrixUnitaire'  => $calculatedPrice,
+                'DL_PUBC'          => 0,
+                'DL_QteDE'         => $quantity,
+                'EU_Qte'           => $quantity,
+                'EU_Enumere'       => $sourceDocLine->EU_Enumere ?? '',
+
+                // Taxes
+                'DL_Taxe1'         => $TAXE_STANDARD,
+                'DL_TypeTaux1'     => 0,
+                'DL_Taxe2'         => 0,
+                'DL_TypeTaux2'     => 0,
+
+                // References
+                'CO_No'            => 0,
+                'AG_No1'           => 0,
+                'AG_No2'           => 0,
+                'DL_PrixRU'        => 0,
+                'DL_CMUP'          => 0,
+                'DL_MvtStock'      => 1,
+                'DT_No'            => 0,
+                'AF_RefFourniss'   => $afRefFourniss,
+                'DL_TTC'           => 0,
+                'DE_No'            => 1,
+                'DL_NoRef'         => 1,
+                'DL_TypePL'        => 0,
+                'DL_PUDevise'      => $calculatedPrice,
+                'DL_PUTTC'         => $calculatedPriceTTC,
+                'DO_DateLivr'      => '2025-01-01 00:00:00',
+                'CA_Num'           => '',
+                'DL_Taxe3'         => 0,
+                'DL_TypeTaux3'     => 0,
+                'DL_TypeTaxe3'     => 0,
+                'DL_Frais'         => 0,
+                'DL_Valorise'      => 1,
+                'DL_NonLivre'      => 0,
+                'AC_RefClient'     => '',
+                'DL_MontantHT'     => round($quantity * $calculatedPrice, 2),
+                'DL_MontantTTC'    => round($quantity * $calculatedPriceTTC, 2),
+                'DL_FactPoids'     => 0,
+                'DL_No'            => $DO_NO,
+                'DL_TypeTaxe1'     => 0,
+                'DL_TypeTaxe2'     => 0,
+                'DL_Escompte'      => 0,
+                'DL_PiecePL'       => '',
+                'DL_DatePL'        => '2025-01-01 00:00:00',
+                'DL_QtePL'         => 0,
+                'DL_NoColis'       => '',
+                'DL_NoLink'        => 0,
+                'DL_QteRessource'  => 0,
+                'DL_DateAvancement' => '2025-01-01 00:00:00',
+
+                // Production
+                'PF_Num'           => $sourceDocLine->PF_Num ?? '',
+                'DL_PieceOFProd'   => 0,
+                'DL_PieceDE'       => $sourceDocLine->DL_PieceDE ?? '',
+                'DL_DateDE'        => $formattedDate,
+                'DL_Operation'     => '',
+                'DL_NoSousTotal'   => 0,
+
+                // Accounting
+                'CA_No'            => 0,
+                'DO_DocType'       => $DO_TYPE_CUSTOM,
+                'DL_CodeTaxe1'     => 'D20',
+
+                // Audit
+                'cbCreationUser'   => self::CB_CREATION_USER,
+                'cbModification'   => $formattedDate,
+                'cbCreation'       => $formattedDate,
+            ]);
+
+
+            return $result;
         } catch (Exception $e) {
             Log::error('Document line creation failed: ' . $e->getMessage());
             throw $e;
