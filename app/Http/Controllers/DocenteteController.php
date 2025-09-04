@@ -745,6 +745,7 @@ class DocenteteController extends Controller
             })
             ->orderByDesc('created_at')
             ->get();
+
         return response()->json($documents);
 
 

@@ -340,7 +340,7 @@ class DocumentController extends Controller
 
         $user = auth()->user();
         $documents = Document::with([
-            'docentete' => fn($query) => $query->select('DO_Type', 'DO_Piece', 'DO_Date', 'DO_DateLivr', 'cbMarq', 'DO_Statut'),
+            'docentete:DO_Type,DO_Piece,DO_Date,DO_DateLivr,cbMarq,DO_Statut',
             'status',
             'companies'
         ])->withCount('palettes');
@@ -379,46 +379,21 @@ class DocumentController extends Controller
     public function show(Document $document)
     {
         $document->load([
-            'lines' => function ($query) {
-                $query->join('F_DOCLIGNE', 'lines.docligne_id', '=', 'F_DOCLIGNE.cbMarq')
-                    ->orderBy('F_DOCLIGNE.DL_Ligne')
-                    ->select('lines.*');
-            },
-            'lines.status',
-            'lines.role',
-            'lines.company',
-            'lines.article_stock',
-            'lines.palettes',
-            'lines.docligne' => function ($query) {
-                $query->select([
-                    'DO_Domaine',
-                    'DO_Type',
-                    'CT_Num',
-                    'DO_Piece',
-                    'DL_Ligne',
-                    'DL_Design',
-                    'DO_Ref',
-                    'DL_PieceDE',
-                    'DL_PieceBC',
-                    'DL_PiecePL',
-                    'DL_PieceBL',
-                    'DL_Qte',
-                    'AR_Ref',
-                    'cbMarq',
-                    'Nom',
-                    'Hauteur',
-                    'Largeur',
-                    'Profondeur',
-                    'Langeur',
-                    'Couleur',
-                    'Chant',
-                    'Episseur',
-                    'Description',
-                    'Poignée',
-                    'Rotation'
-                ]);
-            }
-        ]);
+        // Eager load lines with join + ordering
+        'lines' => fn($query) =>
+            $query->join('F_DOCLIGNE', 'lines.docligne_id', '=', 'F_DOCLIGNE.cbMarq')
+                  ->orderBy('F_DOCLIGNE.DL_Ligne')
+                  ->select('lines.*'),
+
+        'lines.status',
+        'lines.role',
+        'lines.company',
+        'lines.article_stock',
+        'lines.palettes',
+
+       
+        'lines.docligne:DO_Domaine,DO_Type,CT_Num,DO_Piece,DL_Ligne,DL_Design,DO_Ref,DL_PieceDE,DL_PieceBC,DL_PiecePL,DL_PieceBL,DL_Qte,AR_Ref,cbMarq,Nom,Hauteur,Largeur,Profondeur,Langeur,Couleur,Chant,Episseur,Description,Poignée,Rotation',
+    ]);
 
 
         $required_qte = $document->lines
