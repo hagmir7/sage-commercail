@@ -40,8 +40,8 @@ class SellController extends Controller
     public function calculator($sourcePiece)
     {
         try {
-            DB::beginTransaction();
-            
+            // DB::beginTransaction();
+
             $doclignes = Docligne::where('DO_Piece', $sourcePiece)->get();
             $DO_Piece = $this->generatePiece();
 
@@ -68,12 +68,11 @@ class SellController extends Controller
                         'AS_QteSto' => DB::raw("AS_QteSto + " . floatval($line->DL_Qte))
                     ]);
             }
-            
-            DB::commit();
+
+            // DB::commit();
             return response()->json(['success' => true]);
-            
         } catch (Exception $e) {
-            DB::rollback();
+            // DB::rollback();
             Log::error('Calculator operation failed: ' . $e->getMessage());
             return response()->json(['error' => $e->getMessage()], 500);
         }
@@ -127,7 +126,7 @@ class SellController extends Controller
             // First, get the next DL_No
             $nextDL_No = DB::connection('sqlsrv')->select("SELECT ISNULL(MAX(DL_No), 0) + 1 AS NextDL_No FROM F_DOCLIGNE")[0]->NextDL_No;
 
-         
+
 
 
             $sql = "
@@ -265,7 +264,6 @@ class SellController extends Controller
             ]);
 
             return $nextDL_No;
-
         } catch (Exception $e) {
             Log::error('Document line creation failed: ' . $e->getMessage());
             throw $e;

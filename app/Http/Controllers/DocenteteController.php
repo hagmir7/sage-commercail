@@ -20,6 +20,8 @@ class DocenteteController extends Controller
 
     public function preparation(Request $request)
     {
+
+
         $user_roles = auth()->user()->roles()->pluck('name', 'id');
 
         if ($user_roles->isEmpty()) {
@@ -28,6 +30,7 @@ class DocenteteController extends Controller
 
         $documents = Document::whereHas("lines", function ($query) use ($user_roles) {
             $line = $query->where("company_id", auth()->user()->company_id)
+
                 ->whereIn('status_id', [1, 2, 3, 4, 5, 6, 7, 8, 9]);
 
             $common = array_intersect($user_roles->toArray(), ['fabrication', 'montage', 'preparation_cuisine', 'preparation_trailer', 'magasinier']);
@@ -247,28 +250,10 @@ class DocenteteController extends Controller
 
     public function updateDocStatus($docentete)
     {
-        DB::connection('sqlsrv')->beginTransaction();
-
         try {
-            DB::connection('sqlsrv')->unprepared("
-                SET NOCOUNT ON;
-                SET XACT_ABORT ON;
-                DISABLE TRIGGER ALL ON F_DOCENTETE;
-            ");
 
             $docentete->update(['DO_Statut' => 2]);
-
-            DB::connection('sqlsrv')->unprepared("
-                ENABLE TRIGGER ALL ON F_DOCENTETE;
-            ");
-
-            DB::connection('sqlsrv')->commit();
         } catch (\Exception $e) {
-            DB::connection('sqlsrv')->rollBack();
-            DB::connection('sqlsrv')->unprepared("
-                ENABLE TRIGGER ALL ON F_DOCENTETE;
-            ");
-
             throw $e;
         }
     }
@@ -314,8 +299,6 @@ class DocenteteController extends Controller
             // Achate d'article
             $sellController = new SellController();
             $sellController->calculator($document?->docentete->DO_Piece);
-
-
 
             return response()->json(["message" => "Le document est validé avec succès"]);
         });
@@ -410,7 +393,10 @@ class DocenteteController extends Controller
 
             $docligneQuery->whereHas('line', function ($query) use ($userCompanyId, $userRoleIds) {
                 $query->where('company_id', $userCompanyId)
-                    ->whereIn('role_id', $userRoleIds);
+                    ->where(function ($subQuery) use ($userRoleIds) {
+                        $subQuery->whereIn('role_id', $userRoleIds)
+                            ->orWhereIn('next_role_id', $userRoleIds);
+                    });
             });
         }
 
@@ -491,7 +477,25 @@ class DocenteteController extends Controller
         }
 
         try {
-            $lines = Line::whereIn("id", $request->lines)->get();
+            // Handle both old format (array of IDs) and new format (array of objects)
+            $lineData = $request->lines;
+            $lineIds = [];
+            $quantities = [];
+
+            if (is_array($lineData) && !empty($lineData)) {
+                // Check if it's new format with objects containing line_id and quantity
+                if (is_array($lineData[0]) && isset($lineData[0]['line_id'])) {
+                    foreach ($lineData as $item) {
+                        $lineIds[] = $item['line_id'];
+                        $quantities[$item['line_id']] = $item['quantity'];
+                    }
+                } else {
+                    // Old format - just array of line IDs
+                    $lineIds = $lineData;
+                }
+            }
+
+            $lines = Line::whereIn("id", $lineIds)->get();
 
             // Update status
             $document = $lines[0]->document;
@@ -501,19 +505,32 @@ class DocenteteController extends Controller
                 ]);
             }
 
-
             $document->companies()->updateExistingPivot(auth()->user()->company_id, [
                 'status_id' => $status,
                 'updated_at' => now(),
             ]);
 
-
             foreach ($lines as $line) {
-                $line->update([
+                $updateData = [
                     'role_id' => intval($request->roles),
                     'status_id' => $status,
                     'next_role_id' => $next_role
-                ]);
+                ];
+
+                // If we have quantity data, update the transfer quantity
+                if (!empty($quantities) && isset($quantities[$line->id])) {
+                    $updateData['transfer_quantity'] = $quantities[$line->id];
+                    // You might also want to create a transfer record in a separate table
+                    // TransferRecord::create([
+                    //     'line_id' => $line->id,
+                    //     'original_quantity' => $line->quantity,
+                    //     'transfer_quantity' => $quantities[$line->id],
+                    //     'transferred_by' => auth()->id(),
+                    //     'transferred_at' => now(),
+                    // ]);
+                }
+
+                $line->update($updateData);
             }
 
             DB::commit();
@@ -521,7 +538,8 @@ class DocenteteController extends Controller
             return response()->json([
                 'status' => 'success',
                 'message' => 'Document transferred successfully',
-                'lines' => $lines
+                'lines' => $lines,
+                'quantities' => $quantities ?? null
             ], 200);
         } catch (\Exception $e) {
             DB::rollBack();
