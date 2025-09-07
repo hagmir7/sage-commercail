@@ -14,14 +14,13 @@ use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Carbon;
 use App\Http\Controllers\SellController;
 use App\Models\Article;
+use App\Models\RoleQuantityLine;
 
 class DocenteteController extends Controller
 {
 
     public function preparation(Request $request)
     {
-
-
         $user_roles = auth()->user()->roles()->pluck('name', 'id');
 
         if ($user_roles->isEmpty()) {
@@ -375,6 +374,7 @@ class DocenteteController extends Controller
             },
             'line.palettes',
             'line.status',
+            'line.roleQuantity',
             'stock' => function ($query) {
                 $query->select('code', 'qte_inter', 'qte_serie');
             }
@@ -517,17 +517,18 @@ class DocenteteController extends Controller
                     'next_role_id' => $next_role
                 ];
 
-                // If we have quantity data, update the transfer quantity
                 if (!empty($quantities) && isset($quantities[$line->id])) {
                     $updateData['transfer_quantity'] = $quantities[$line->id];
-                    // You might also want to create a transfer record in a separate table
-                    // TransferRecord::create([
-                    //     'line_id' => $line->id,
-                    //     'original_quantity' => $line->quantity,
-                    //     'transfer_quantity' => $quantities[$line->id],
-                    //     'transferred_by' => auth()->id(),
-                    //     'transferred_at' => now(),
-                    // ]);
+
+                    if(floatval($quantities[$line->id]) != floatval($line?->docligne?->DL_Qte)){
+                        RoleQuantityLine::create([
+                            'line_id' => $line->id,
+                            'quantity' => $quantities[$line->id],
+                            'role_id' => $role->id
+
+                        ]);
+                    }
+
                 }
 
                 $line->update($updateData);
