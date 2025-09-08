@@ -14,6 +14,8 @@ use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Carbon;
 use App\Http\Controllers\SellController;
 use App\Models\Article;
+use App\Models\Palette;
+use App\Models\RoleQuantityLine;
 
 class DocenteteController extends Controller
 {
@@ -28,6 +30,7 @@ class DocenteteController extends Controller
 
         $documents = Document::whereHas("lines", function ($query) use ($user_roles) {
             $line = $query->where("company_id", auth()->user()->company_id)
+
                 ->whereIn('status_id', [1, 2, 3, 4, 5, 6, 7, 8, 9]);
 
             $common = array_intersect($user_roles->toArray(), ['fabrication', 'montage', 'preparation_cuisine', 'preparation_trailer', 'magasinier']);
@@ -251,7 +254,33 @@ class DocenteteController extends Controller
             return response()->json(["error" => "L'utilisateur n'est pas autorisé"], 401);
         }
 
-        $lines = $request->lines;
+        $lineData = $request->lines;
+        $lineIds = [];
+        $quantities = [];
+
+        if (is_array($lineData) && !empty($lineData)) {
+            if (is_array($lineData[0]) && isset($lineData[0]['line_id'])) {
+                foreach ($lineData as $item) {
+                    $lineIds[] = $item['line_id'];
+                    $quantities[$item['line_id']] = $item['quantity'];
+                }
+            } else {
+                // Old format - just array of line IDs
+                $lineIds = $lineData;
+            }
+        }
+
+        $lines = Line::whereIn('id', $lineIds)->get();
+
+        $invalidLine = $lines->first(function ($line) {
+            return !in_array($line->status_id, [8, 9, 10]);
+        });
+
+        if ($invalidLine) {
+            return response()->json([
+                'message' => "Article {$invalidLine->ref} n'a pas un status valide."
+            ], 422);
+        }
 
         $document = Document::where('piece', $piece)->first();
 
@@ -259,34 +288,45 @@ class DocenteteController extends Controller
             return response()->json(["error" => "Le document n'existe pas"], 404);
         }
 
-        DB::transaction(function () use ($document) {
+        DB::transaction(function () use ($document, $lines) {
 
-            foreach ($document->lines->where('company_id', auth()->user()->company_id) as $line) {
-                $line->update(['status_id' => 11]);
-            }
 
-            $allLinesValidated = $document->lines
-                ->every(fn($line) => $line->status_id == 11);
+        $new_document = Document::create([
+                'piece' => $document->piece,
+                'type' => $document->type,
+                'ref' => $document->ref,
+                'expedition' => $document->expedition,
+                'transfer_by' => $document->transfer_by,
+                'validated_by' => auth()->id(),
+                'controlled_by' => $document->controlled_by,
+                'status_id' => 11,
+                'client_id' => $document->client_id,
+            ]);
 
-            if ($allLinesValidated) {
-                $document->update([
-                    'status_id' => 11,
-                    'validated_by' => auth()->id()
+            $palettes = [];
+
+            foreach ($lines as $line) {
+                $line->update([
+                    'status_id'   => 11,
+                    'document_id' => $new_document->id,
                 ]);
 
-                // Update Docentete Status
-                // $this->updateDocStatus($document?->docentete);
+                
+                $palettes = array_merge($palettes, $line->palettes->pluck('id')->toArray());
+    
             }
 
-            $document->companies()->updateExistingPivot(auth()->user()->company_id, [
-                'status_id' => 11,
-                'validated_by' => auth()->id(),
-                'validated_at' => now()
-            ]);
+            if (!empty($palettes)) {
+                Palette::whereIn('id', array_unique($palettes))
+                    ->update(['document_id' => $new_document->id]);
+            }
+
+
+
 
             // Achate d'article
             $sellController = new SellController();
-            $sellController->calculator($document?->docentete->DO_Piece);
+            $sellController->calculator($document?->docentete->DO_Piece, $lines->pluck('docligne_id'));
 
 
 
@@ -298,6 +338,7 @@ class DocenteteController extends Controller
     public function updateDocStatus($docentete)
     {
         try {
+
             $docentete->update(['DO_Statut' => 2]);
         } catch (\Exception $e) {
             throw $e;
@@ -345,8 +386,6 @@ class DocenteteController extends Controller
             // Achate d'article
             $sellController = new SellController();
             $sellController->calculator($document?->docentete->DO_Piece);
-
-
 
             return response()->json(["message" => "Le document est validé avec succès"]);
         });
@@ -423,6 +462,7 @@ class DocenteteController extends Controller
             },
             'line.palettes',
             'line.status',
+            'line.roleQuantity',
             'stock' => function ($query) {
                 $query->select('code', 'qte_inter', 'qte_serie');
             }
@@ -441,7 +481,10 @@ class DocenteteController extends Controller
 
             $docligneQuery->whereHas('line', function ($query) use ($userCompanyId, $userRoleIds) {
                 $query->where('company_id', $userCompanyId)
-                    ->whereIn('role_id', $userRoleIds);
+                    ->where(function ($subQuery) use ($userRoleIds) {
+                        $subQuery->whereIn('role_id', $userRoleIds)
+                            ->orWhereIn('next_role_id', $userRoleIds);
+                    });
             });
         }
 
@@ -497,7 +540,6 @@ class DocenteteController extends Controller
 
 
     // Transfer to Role (Fabrication, Montage, Preparation)
-
     public function roleTransfer($request)
     {
         DB::beginTransaction();
@@ -523,7 +565,6 @@ class DocenteteController extends Controller
         }
 
         try {
-            // Handle both old format (array of IDs) and new format (array of objects)
             $lineData = $request->lines;
             $lineIds = [];
             $quantities = [];
@@ -596,6 +637,7 @@ class DocenteteController extends Controller
             ], 500);
         }
     }
+
 
 
 

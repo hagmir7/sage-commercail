@@ -140,6 +140,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post("transfer", 'transfer');
         Route::get("shipping", 'shipping');
         Route::post('palettes/validate/{piece}', 'validate');
+        Route::post('palettes/validate-partial/{piece}', 'validatePartial');
         Route::get("{id}", 'show');
     });
 

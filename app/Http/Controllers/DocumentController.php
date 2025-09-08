@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Docentete;
 use App\Models\Docligne;
 use App\Models\Document;
+use Carbon\Carbon;
 use Illuminate\Http\Request;
 use DateTime;
 use Illuminate\Support\Facades\DB;
@@ -301,22 +302,22 @@ class DocumentController extends Controller
     /**
      * Convert documents by linking them to their corresponding docentete based on related Docligne entries.
      */
-    public function convertDocument()
-    {
-        Document::doesntHave('docentete')
-            ->get()
-            ->each(function ($document) {
-                $doc = $this->documentToConvert($document->piece);
-                $cbMarq = $doc?->docentete?->cbMarq;
-                $doPiece = $doc?->docentete?->DO_Piece;
-                $document->update([
-                    'docentete_id' => $cbMarq ?? $document->docentete_id,
-                    'status_id' => str_contains($doPiece, 'BL') ? 12 : $document->status_id,
-                    'piece_bl'     => str_contains($doPiece, 'BL') ? $doPiece : $document->piece_bl,
-                    'piece_fa'     => str_contains($doPiece, 'FA') ? $doPiece : $document->piece_fa,
-                ]);
-            });
-    }
+    // public function convertDocument()
+    // {
+    //     Document::doesntHave('docentete')
+    //         ->get()
+    //         ->each(function ($document) {
+    //             $doc = $this->documentToConvert($document->piece);
+    //             $cbMarq = $doc?->docentete?->cbMarq;
+    //             $doPiece = $doc?->docentete?->DO_Piece;
+    //             $document->update([
+    //                 'docentete_id' => $cbMarq ?? $document->docentete_id,
+    //                 'status_id' => str_contains($doPiece, 'BL') ? 12 : $document->status_id,
+    //                 'piece_bl'     => str_contains($doPiece, 'BL') ? $doPiece : $document->piece_bl,
+    //                 'piece_fa'     => str_contains($doPiece, 'FA') ? $doPiece : $document->piece_fa,
+    //             ]);
+    //         });
+    // }
 
 
     public function readyDocuments()
@@ -329,60 +330,94 @@ class DocumentController extends Controller
             ->get();
     }
 
+    public function convertDocument(Document $document)
+    {
+        $doc = $this->documentToConvert($document->piece);
 
+        if (!$doc || !$doc->docentete) {
+            return $document;
+        }
 
-    /**
-     * Entry point to convert documents and return updated list.
-     */
- public function livraison(Request $request)
-{
-    $this->convertDocument();
+        $cbMarq  = $doc->docentete->cbMarq;
+        $doPiece = $doc->docentete->DO_Piece;
 
-    $user = auth()->user();
-    
-    $documents = Document::with([
-        'docentete' => function ($query) {
-            $query->select('id', 'document_id', 'DO_Type', 'DO_Piece', 'DO_Date', 'DO_DateLivr', 'cbMarq', 'DO_Statut')
-                ->where('DO_Type', '!=', '7');
-        },
-        'status',
-        'companies'
-    ])->whereHas('docentete', function ($query) {
-        $query->where('DO_Type', '!=','7');
-    })->withCount('palettes');
+        $document->update([
+            'docentete_id' => $cbMarq,
+            'status_id'    => str_contains($doPiece, 'BL') ? 12 : $document->status_id,
+            'piece_bl'     => str_contains($doPiece, 'BL') ? $doPiece : $document->piece_bl,
+            'piece_fa'     => str_contains($doPiece, 'FA') ? $doPiece : $document->piece_fa,
+        ]);
 
-    // Role-based filtering
-    if ($user->hasRole('commercial')) {
-        $documents->whereIn('status_id', [11, 12, 13, 14]);
-        
-    } elseif ($user->hasRole('chargement')) {
-        $documents->where('status_id', 13)
-            ->whereHas('palettes', function ($query) {
-                $query->where('delivered_by', auth()->id());
-            });
-            
-    } elseif ($user->hasRole('preparation')) {
-        $status = $request->input('status');
-        $documents->when(
-            $status,
-            fn($query) => $query->where('status_id', $status),
-            fn($query) => $query->whereIn('status_id', [11, 12, 13])
-        );
+        return $document->fresh(); // return updated model
     }
 
-    // Search functionality
-    if ($request->filled('search')) {
-        $search = $request->search;
-        $documents->where(function ($query) use ($search) {
-            $query->where('piece', 'like', "%$search%")
-                ->orWhere('ref', 'like', "%$search%")
-                ->orWhere('client_id', 'like', "%$search%")
-                ->orWhere('piece_bl', 'like', "%$search%");
+    public function livraison(Request $request)
+    {
+        $documents = Document::whereDoesntHave('docentete')->get();
+
+        $documents->map(function ($document) {
+            return $this->convertDocument($document);
         });
-    }
 
-    return $documents->orderByDesc('created_at')->paginate(20);
-}
+        $user = auth()->user();
+
+        $docententes = Docentete::with(['document', 'document.status', 'document.companies'])
+            ->select('DO_Domaine', 'DO_Type', 'DO_Piece', 'DO_Date', 'DO_Ref', 'DO_Tiers', 'DO_Statut', 'cbMarq', 'cbCreation', 'DO_DateLivr', 'DO_Expedit')
+            ->where('DO_Type', 3)
+           ->whereBetween('DO_Date', [
+                Carbon::today()->subDays(40), // 40 days ago
+                Carbon::today()               // today
+            ])
+            ->orderByDesc('DO_Date')
+            ->get();
+
+        return response()->json($docententes);
+
+
+
+
+
+        $documents = Document::with([
+            'docentete' => function ($query) {
+                $query->select('DO_Type', 'DO_Piece', 'DO_Date', 'DO_DateLivr', 'cbMarq', 'DO_Statut')
+                    ->where('DO_Type', '!=', '7');
+            },
+            'status',
+            'companies'
+        ])->whereHas('docentete', function ($query) {
+            $query->where('DO_Type', '!=', '7');
+        })->withCount('palettes');
+
+        // Role-based filtering
+        if ($user->hasRole('commercial')) {
+            $documents->whereIn('status_id', [11, 12, 13, 14]);
+        } elseif ($user->hasRole('chargement')) {
+            $documents->where('status_id', 13)
+                ->whereHas('palettes', function ($query) {
+                    $query->where('delivered_by', auth()->id());
+                });
+        } elseif ($user->hasRole('preparation')) {
+            $status = $request->input('status');
+            $documents->when(
+                $status,
+                fn($query) => $query->where('status_id', $status),
+                fn($query) => $query->whereIn('status_id', [11, 12, 13])
+            );
+        }
+
+        // Search functionality
+        if ($request->filled('search')) {
+            $search = $request->search;
+            $documents->where(function ($query) use ($search) {
+                $query->where('piece', 'like', "%$search%")
+                    ->orWhere('ref', 'like', "%$search%")
+                    ->orWhere('client_id', 'like', "%$search%")
+                    ->orWhere('piece_bl', 'like', "%$search%");
+            });
+        }
+
+        return $documents->orderByDesc('created_at')->paginate(20);
+    }
 
     public function show(Document $document)
     {

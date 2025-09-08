@@ -36,6 +36,8 @@ class Line extends Model
         return $this->belongsTo(Company::class);
     }
 
+
+
     public function first_company()
     {
         return $this->belongsTo(Company::class, 'first_company');
@@ -71,4 +73,22 @@ class Line extends Model
         return $this->belongsTo(Status::class);
     }
 
+
+    public function roleQuantity()
+    {
+        $user = auth()->user();
+
+        // If the user has the "controller" role, return all
+        if ($user && $user->roles->contains('name', 'controller')) {
+            return $this->belongsToMany(Role::class, 'role_quantity_line')
+                ->withPivot('quantity');
+        }
+
+        // Otherwise filter by user's roles
+        $roleIds = $user ? $user->roles->pluck('id')->toArray() : [];
+
+        return $this->belongsToMany(Role::class, 'role_quantity_line')
+            ->withPivot('quantity')
+            ->whereIn('role_id', $roleIds);
+    }
 }
