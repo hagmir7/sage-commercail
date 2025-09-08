@@ -146,25 +146,25 @@ class DocenteteController extends Controller
     }
 
 
- public function commercial(Request $request)
-{
-    $query = Docentete::query()
-        ->select([
-            'DO_Reliquat',
-            'DO_Piece',
-            'DO_Ref',
-            'DO_Tiers',
-            'cbMarq',
-            'DO_Date',
-            'DO_DateLivr',
-            'DO_Expedit'
-        ])
-        ->orderByDesc("DO_Date")
-        ->where('DO_Domaine', 0)
-        ->where('DO_Statut', 1)
-        ->where('DO_Type', $request->type ?? 2);
+    public function commercial(Request $request)
+    {
+        $query = Docentete::query()
+            ->select([
+                'DO_Reliquat',
+                'DO_Piece',
+                'DO_Ref',
+                'DO_Tiers',
+                'cbMarq',
+                'DO_Date',
+                'DO_DateLivr',
+                'DO_Expedit'
+            ])
+            ->orderByDesc("DO_Date")
+            ->where('DO_Domaine', 0)
+            ->where('DO_Statut', 1)
+            ->where('DO_Type', $request->type ?? 2);
 
-    $query->with('document.status');
+        $query->with('document.status');
 
         if (isset($request->status)) {
 
@@ -174,11 +174,11 @@ class DocenteteController extends Controller
                 $query->whereHas('document', function ($q) {
                     $q->where('status_id', '>=', 1);
                 });
-            }else if($request->status == 2){
+            } else if ($request->status == 2) {
                 $query->whereHas('document', function ($q) {
                     $q->where('status_id', '>=', 2);
                 });
-            }else {
+            } else {
                 $query->whereHas('document', function ($q) use ($request) {
                     $q->where('status_id', $request->status);
                 });
@@ -187,32 +187,31 @@ class DocenteteController extends Controller
 
 
         if ($request->filled('date')) {
-        $dates = explode(',', $request->date, 2);
-        $start = Carbon::parse(urldecode($dates[0]))->startOfDay();
-        $end = Carbon::parse(urldecode($dates[1] ?? $dates[0]))->endOfDay();
+            $dates = explode(',', $request->date, 2);
+            $start = Carbon::parse(urldecode($dates[0]))->startOfDay();
+            $end = Carbon::parse(urldecode($dates[1] ?? $dates[0]))->endOfDay();
 
-        $query->where(function ($query) use ($start, $end) {
-            $query->whereDate('cbCreation', '>=', $start)
-                ->whereDate('cbCreation', '<=', $end);
-        });
+            $query->where(function ($query) use ($start, $end) {
+                $query->whereDate('cbCreation', '>=', $start)
+                    ->whereDate('cbCreation', '<=', $end);
+            });
+        }
 
+        if ($request->filled('search')) {
+            $search = $request->search;
+            $query->where(function ($q) use ($search) {
+                $q->where('DO_Ref', 'like', "%$search%")
+                    ->orWhere('DO_Piece', 'like', "%$search%")
+                    ->orWhere('DO_Tiers', 'like', "%$search%")
+                    ->orWhere('DO_Reliquat', 'like', "%$search%");
+            });
+        }
+
+        // Faster pagination without total counts
+        $results = $query->simplePaginate(30);
+
+        return response()->json($results);
     }
-
-    if ($request->filled('search')) {
-        $search = $request->search;
-        $query->where(function ($q) use ($search) {
-            $q->where('DO_Ref', 'like', "%$search%")
-                ->orWhere('DO_Piece', 'like', "%$search%")
-                ->orWhere('DO_Tiers', 'like', "%$search%")
-                ->orWhere('DO_Reliquat', 'like', "%$search%");
-        });
-    }
-
-    // Faster pagination without total counts
-    $results = $query->simplePaginate(30);
-
-    return response()->json($results);
-}
 
 
 
@@ -245,30 +244,62 @@ class DocenteteController extends Controller
     }
 
 
+
+    public function validatePartial(Request $request, $piece)
+    {
+        if (!$request->user()->hasRole('controleur')) {
+            return response()->json(["error" => "L'utilisateur n'est pas autorisé"], 401);
+        }
+
+        $lines = $request->lines;
+
+        $document = Document::where('piece', $piece)->first();
+
+        if (!$document) {
+            return response()->json(["error" => "Le document n'existe pas"], 404);
+        }
+
+        DB::transaction(function () use ($document) {
+
+            foreach ($document->lines->where('company_id', auth()->user()->company_id) as $line) {
+                $line->update(['status_id' => 11]);
+            }
+
+            $allLinesValidated = $document->lines
+                ->every(fn($line) => $line->status_id == 11);
+
+            if ($allLinesValidated) {
+                $document->update([
+                    'status_id' => 11,
+                    'validated_by' => auth()->id()
+                ]);
+
+                // Update Docentete Status
+                // $this->updateDocStatus($document?->docentete);
+            }
+
+            $document->companies()->updateExistingPivot(auth()->user()->company_id, [
+                'status_id' => 11,
+                'validated_by' => auth()->id(),
+                'validated_at' => now()
+            ]);
+
+            // Achate d'article
+            $sellController = new SellController();
+            $sellController->calculator($document?->docentete->DO_Piece);
+
+
+
+            return response()->json(["message" => "Le document est validé avec succès"]);
+        });
+    }
+
+
     public function updateDocStatus($docentete)
     {
-        DB::connection('sqlsrv')->beginTransaction();
-
         try {
-            DB::connection('sqlsrv')->unprepared("
-                SET NOCOUNT ON;
-                SET XACT_ABORT ON;
-                DISABLE TRIGGER ALL ON F_DOCENTETE;
-            ");
-
             $docentete->update(['DO_Statut' => 2]);
-
-            DB::connection('sqlsrv')->unprepared("
-                ENABLE TRIGGER ALL ON F_DOCENTETE;
-            ");
-
-            DB::connection('sqlsrv')->commit();
         } catch (\Exception $e) {
-            DB::connection('sqlsrv')->rollBack();
-            DB::connection('sqlsrv')->unprepared("
-                ENABLE TRIGGER ALL ON F_DOCENTETE;
-            ");
-
             throw $e;
         }
     }
@@ -466,6 +497,7 @@ class DocenteteController extends Controller
 
 
     // Transfer to Role (Fabrication, Montage, Preparation)
+
     public function roleTransfer($request)
     {
         DB::beginTransaction();
@@ -491,7 +523,25 @@ class DocenteteController extends Controller
         }
 
         try {
-            $lines = Line::whereIn("id", $request->lines)->get();
+            // Handle both old format (array of IDs) and new format (array of objects)
+            $lineData = $request->lines;
+            $lineIds = [];
+            $quantities = [];
+
+            if (is_array($lineData) && !empty($lineData)) {
+                // Check if it's new format with objects containing line_id and quantity
+                if (is_array($lineData[0]) && isset($lineData[0]['line_id'])) {
+                    foreach ($lineData as $item) {
+                        $lineIds[] = $item['line_id'];
+                        $quantities[$item['line_id']] = $item['quantity'];
+                    }
+                } else {
+                    // Old format - just array of line IDs
+                    $lineIds = $lineData;
+                }
+            }
+
+            $lines = Line::whereIn("id", $lineIds)->get();
 
             // Update status
             $document = $lines[0]->document;
@@ -501,19 +551,32 @@ class DocenteteController extends Controller
                 ]);
             }
 
-
             $document->companies()->updateExistingPivot(auth()->user()->company_id, [
                 'status_id' => $status,
                 'updated_at' => now(),
             ]);
 
-
             foreach ($lines as $line) {
-                $line->update([
+                $updateData = [
                     'role_id' => intval($request->roles),
                     'status_id' => $status,
                     'next_role_id' => $next_role
-                ]);
+                ];
+
+                if (!empty($quantities) && isset($quantities[$line->id])) {
+                    $updateData['transfer_quantity'] = $quantities[$line->id];
+
+                    if (floatval($quantities[$line->id]) != floatval($line?->docligne?->DL_Qte)) {
+                        RoleQuantityLine::create([
+                            'line_id' => $line->id,
+                            'quantity' => $quantities[$line->id],
+                            'role_id' => $role->id
+
+                        ]);
+                    }
+                }
+
+                $line->update($updateData);
             }
 
             DB::commit();
@@ -521,7 +584,8 @@ class DocenteteController extends Controller
             return response()->json([
                 'status' => 'success',
                 'message' => 'Document transferred successfully',
-                'lines' => $lines
+                'lines' => $lines,
+                'quantities' => $quantities ?? null
             ], 200);
         } catch (\Exception $e) {
             DB::rollBack();
@@ -532,6 +596,7 @@ class DocenteteController extends Controller
             ], 500);
         }
     }
+
 
 
     // Transfer to Company controller (Adill)

@@ -334,66 +334,74 @@ class DocumentController extends Controller
     /**
      * Entry point to convert documents and return updated list.
      */
-    public function livraison(Request $request)
-    {
-        $this->convertDocument();
+ public function livraison(Request $request)
+{
+    $this->convertDocument();
 
-        $user = auth()->user();
-        $documents = Document::with([
-            'docentete:DO_Type,DO_Piece,DO_Date,DO_DateLivr,cbMarq,DO_Statut',
-            'status',
-            'companies'
-        ])->withCount('palettes');
+    $user = auth()->user();
+    
+    $documents = Document::with([
+        'docentete' => function ($query) {
+            $query->select('id', 'document_id', 'DO_Type', 'DO_Piece', 'DO_Date', 'DO_DateLivr', 'cbMarq', 'DO_Statut')
+                ->where('DO_Type', '!=', '7');
+        },
+        'status',
+        'companies'
+    ])->whereHas('docentete', function ($query) {
+        $query->where('DO_Type', '!=','7');
+    })->withCount('palettes');
 
-        if ($user->hasRole('commercial')) {
-            $documents->whereIn('status_id', [11, 12, 13, 14])
-                ->whereNull('piece_fa');
-        } elseif ($user->hasRole('chargement')) {
-            $documents->where([
-                ['status_id', '=', 13],
-            ])->whereHas('palettes', function ($query) {
-                $query->where("delivered_by", auth()->id());
+    // Role-based filtering
+    if ($user->hasRole('commercial')) {
+        $documents->whereIn('status_id', [11, 12, 13, 14]);
+        
+    } elseif ($user->hasRole('chargement')) {
+        $documents->where('status_id', 13)
+            ->whereHas('palettes', function ($query) {
+                $query->where('delivered_by', auth()->id());
             });
-        } elseif ($user->hasRole('preparation')) {
-            $status = $request->input('status');
-            $documents->when(
-                $status,
-                fn($query) => $query->where('status_id', $status),
-                fn($query) => $query->whereIn('status_id', [11, 12, 13])
-            );
-        }
-
-        if ($request->has('search') && $request->search != '') {
-            $search = $request->search;
-            $documents->where(function ($query) use ($search) {
-                $query->where('piece', 'like', "%$search%")
-                    ->orWhere('ref', 'like', "%$search%")
-                    ->orWhere('client_id', 'like', "%$search%")
-                    ->orWhere('piece_bl', "%$search%");
-            });
-        }
-
-        return $documents->orderByDesc('created_at')->paginate(20);
+            
+    } elseif ($user->hasRole('preparation')) {
+        $status = $request->input('status');
+        $documents->when(
+            $status,
+            fn($query) => $query->where('status_id', $status),
+            fn($query) => $query->whereIn('status_id', [11, 12, 13])
+        );
     }
+
+    // Search functionality
+    if ($request->filled('search')) {
+        $search = $request->search;
+        $documents->where(function ($query) use ($search) {
+            $query->where('piece', 'like', "%$search%")
+                ->orWhere('ref', 'like', "%$search%")
+                ->orWhere('client_id', 'like', "%$search%")
+                ->orWhere('piece_bl', 'like', "%$search%");
+        });
+    }
+
+    return $documents->orderByDesc('created_at')->paginate(20);
+}
 
     public function show(Document $document)
     {
         $document->load([
-        // Eager load lines with join + ordering
-        'lines' => fn($query) =>
+            // Eager load lines with join + ordering
+            'lines' => fn($query) =>
             $query->join('F_DOCLIGNE', 'lines.docligne_id', '=', 'F_DOCLIGNE.cbMarq')
-                  ->orderBy('F_DOCLIGNE.DL_Ligne')
-                  ->select('lines.*'),
+                ->orderBy('F_DOCLIGNE.DL_Ligne')
+                ->select('lines.*'),
 
-        'lines.status',
-        'lines.role',
-        'lines.company',
-        'lines.article_stock',
-        'lines.palettes',
+            'lines.status',
+            'lines.role',
+            'lines.company',
+            'lines.article_stock',
+            'lines.palettes',
 
-       
-        'lines.docligne:DO_Domaine,DO_Type,CT_Num,DO_Piece,DL_Ligne,DL_Design,DO_Ref,DL_PieceDE,DL_PieceBC,DL_PiecePL,DL_PieceBL,DL_Qte,AR_Ref,cbMarq,Nom,Hauteur,Largeur,Profondeur,Langeur,Couleur,Chant,Episseur,Description,Poignée,Rotation',
-    ]);
+
+            'lines.docligne:DO_Domaine,DO_Type,CT_Num,DO_Piece,DL_Ligne,DL_Design,DO_Ref,DL_PieceDE,DL_PieceBC,DL_PiecePL,DL_PieceBL,DL_Qte,AR_Ref,cbMarq,Nom,Hauteur,Largeur,Profondeur,Langeur,Couleur,Chant,Episseur,Description,Poignée,Rotation',
+        ]);
 
 
         $required_qte = $document->lines
