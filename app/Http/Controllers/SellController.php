@@ -37,7 +37,7 @@ class SellController extends Controller
         return '25BLX000001';
     }
 
-    public function calculator($sourcePiece, $lines)
+    public function calculator($sourcePiece, $lines = [])
     {
         try {
             if (!empty($lines) && (is_array($lines) || $lines instanceof \Illuminate\Support\Collection)) {

@@ -348,76 +348,61 @@ class DocumentController extends Controller
             'piece_fa'     => str_contains($doPiece, 'FA') ? $doPiece : $document->piece_fa,
         ]);
 
-        return $document->fresh(); // return updated model
+        return $document->fresh();
     }
 
     public function livraison(Request $request)
     {
-        $documents = Document::whereDoesntHave('docentete')->get();
 
-        $documents->map(function ($document) {
-            return $this->convertDocument($document);
-        });
-
-        $user = auth()->user();
-
-        $docententes = Docentete::with(['document', 'document.status', 'document.companies'])
-            ->select('DO_Domaine', 'DO_Type', 'DO_Piece', 'DO_Date', 'DO_Ref', 'DO_Tiers', 'DO_Statut', 'cbMarq', 'cbCreation', 'DO_DateLivr', 'DO_Expedit')
-            ->where('DO_Type', 3)
-           ->whereBetween('DO_Date', [
-                Carbon::today()->subDays(40), // 40 days ago
-                Carbon::today()               // today
-            ])
-            ->orderByDesc('DO_Date')
-            ->get();
-
-        return response()->json($docententes);
-
-
-
-
-
-        $documents = Document::with([
-            'docentete' => function ($query) {
-                $query->select('DO_Type', 'DO_Piece', 'DO_Date', 'DO_DateLivr', 'cbMarq', 'DO_Statut')
-                    ->where('DO_Type', '!=', '7');
-            },
-            'status',
-            'companies'
-        ])->whereHas('docentete', function ($query) {
-            $query->where('DO_Type', '!=', '7');
-        })->withCount('palettes');
-
-        // Role-based filtering
-        if ($user->hasRole('commercial')) {
-            $documents->whereIn('status_id', [11, 12, 13, 14]);
-        } elseif ($user->hasRole('chargement')) {
-            $documents->where('status_id', 13)
-                ->whereHas('palettes', function ($query) {
-                    $query->where('delivered_by', auth()->id());
+        if (!$request->filled('search')) {
+            $documents = Document::whereDoesntHave('docentete')->get();
+            if (count($documents)) {
+                $documents->map(function ($document) {
+                    return $this->convertDocument($document);
                 });
-        } elseif ($user->hasRole('preparation')) {
-            $status = $request->input('status');
-            $documents->when(
-                $status,
-                fn($query) => $query->where('status_id', $status),
-                fn($query) => $query->whereIn('status_id', [11, 12, 13])
-            );
+            }
         }
+   
 
-        // Search functionality
+        $query = Docentete::with([
+                'document',
+                'document.status',
+                'document.companies',
+            ])
+            ->select(
+                'DO_Domaine', 'DO_Type', 'DO_Piece',
+                'DO_Date', 'DO_Ref', 'DO_Tiers', 'DO_Statut', 'cbMarq',
+                'cbCreation', 'DO_DateLivr', 'DO_Expedit'
+            )
+            ->addSelect([
+                'palettes_count' => Document::selectRaw('COUNT(palettes.id)')
+                    ->join('palettes', 'palettes.document_id', '=', 'documents.id')
+                    ->whereColumn('documents.docentete_id', 'F_DOCENTETE.cbMarq')
+            ])
+            ->where('DO_Type', 3)
+            ->whereBetween('DO_Date', [
+                Carbon::today()->subDays(40),
+                Carbon::today()
+            ])
+            ->orderByDesc('DO_Date');
+
+
+
+        // Apply search filter before get()
         if ($request->filled('search')) {
             $search = $request->search;
-            $documents->where(function ($query) use ($search) {
-                $query->where('piece', 'like', "%$search%")
-                    ->orWhere('ref', 'like', "%$search%")
-                    ->orWhere('client_id', 'like', "%$search%")
-                    ->orWhere('piece_bl', 'like', "%$search%");
+            $query->where(function ($q) use ($search) {
+                $q->where('DO_Piece', 'like', "%$search%")
+                ->orWhere('DO_Tiers', 'like', "%$search%")
+                ->orWhere('DO_Ref', 'like', "%$search%");
             });
         }
 
-        return $documents->orderByDesc('created_at')->paginate(20);
+        $docententes = $query->get();
+
+        return response()->json($docententes);
     }
+
 
     public function show(Document $document)
     {

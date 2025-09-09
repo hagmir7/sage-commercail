@@ -423,7 +423,13 @@ class PaletteController extends Controller
 
     public function documentPalettes($piece)
     {
-        $document = Document::with([
+  
+        if (!auth()->check()) {
+            return response()->json(['message' => 'Unauthorized'], 401);
+        }
+
+
+        $documents = Document::with([
             'status',
             'palettes' => function ($query) {
                 $query->with('user')->withCount('lines');
@@ -432,7 +438,19 @@ class PaletteController extends Controller
                     $query->where('company_id', auth()->user()->company_id);
                 }
             }
-        ])->where('piece', $piece)->first();
+        ])
+            ->where('piece', $piece)
+            ->orWhere('piece_bl', $piece)
+            ->orWhere('piece_fa', $piece)
+            ->get();
+
+        // Log if more than one found
+        if ($documents->count() > 1) {
+            \Log::alert("There is more than one document for this piece: " . $piece);
+        }
+
+
+        $document = $documents->first();
 
         if (!$document) {
             return response()->json(['message' => 'No documents found.'], 404);
@@ -440,6 +458,7 @@ class PaletteController extends Controller
 
         return response()->json($document);
     }
+
 
 
 
