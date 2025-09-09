@@ -13,6 +13,9 @@ class EmplacementController extends Controller
 {
     public function show(Emplacement $emplacement)
     {
+        if(!$emplacement){
+            return response()->json(["message" => "Emplacement not found"]);
+        }
         $emplacement->load([
             'depot',
             'palettes' => function ($query) {

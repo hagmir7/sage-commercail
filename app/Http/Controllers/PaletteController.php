@@ -360,7 +360,8 @@ class PaletteController extends Controller
         $validator = Validator::make($request->all(), [
             'quantity' => 'required|integer|max:1000|min:1',
             'line' => 'required|exists:lines,id',
-            'palette' => 'required|exists:palettes,code'
+            'palette' => 'required|exists:palettes,code',
+            'emplacement' => 'nullable|exists:emplacements,code'
         ]);
 
         if ($validator->fails()) {
@@ -410,6 +411,14 @@ class PaletteController extends Controller
                         'updated_at' => now()
                     ]);
                 }
+
+
+                $article_stock = ArticleStock::find($line->ref);
+                if($article_stock){
+                    $article_stock->quantity = ($article_stock->quantity + floatval($request->quantity));
+                }
+
+                
             });
 
             return response()->json($palette);
@@ -496,7 +505,7 @@ class PaletteController extends Controller
         ])->where('code', $code)->first();
 
         if (!$palette) {
-            return response()->json(['error' => "Palette not found"], 404);
+            return response()->json(['message' => "Palette not found"], 404);
         }
 
         $allConfirmed = !$palette->lines()->wherePivotNull('controlled_at')->exists();
