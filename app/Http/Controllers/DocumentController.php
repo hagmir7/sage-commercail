@@ -364,27 +364,35 @@ class DocumentController extends Controller
         }
    
 
-        $query = Docentete::with([
-                'document',
-                'document.status',
-                'document.companies',
-            ])
-            ->select(
-                'DO_Domaine', 'DO_Type', 'DO_Piece',
-                'DO_Date', 'DO_Ref', 'DO_Tiers', 'DO_Statut', 'cbMarq',
-                'cbCreation', 'DO_DateLivr', 'DO_Expedit'
-            )
-            ->addSelect([
-                'palettes_count' => Document::selectRaw('COUNT(palettes.id)')
-                    ->join('palettes', 'palettes.document_id', '=', 'documents.id')
-                    ->whereColumn('documents.docentete_id', 'F_DOCENTETE.cbMarq')
-            ])
-            ->where('DO_Type', 3)
-            ->whereBetween('DO_Date', [
-                Carbon::today()->subDays(40),
-                Carbon::today()
-            ])
-            ->orderByDesc('DO_Date');
+
+    $query = Docentete::with([
+            'document' => function ($q) {
+                $q->with(['status', 'companies'])
+                ->withCount('palettes');
+            },
+        ])
+        ->select(
+            'DO_Domaine', 'DO_Type', 'DO_Piece',
+            'DO_Date', 'DO_Ref', 'DO_Tiers', 'DO_Statut', 'cbMarq',
+            'cbCreation', 'DO_DateLivr', 'DO_Expedit'
+        )
+        ->where('DO_Type', 3)
+        ->whereBetween('DO_Date', [
+            Carbon::today()->subDays(40),
+            Carbon::today()
+        ]);
+
+
+        if(auth()->user()->hasRole("controleur")){
+            $query->whereHas('document.companies', function ($query) {
+                $query->where('companies.id', auth()->user()->company_id);
+            });
+        }
+        
+        $query->orderByDesc('DO_Date');
+
+
+
 
 
 

@@ -5,6 +5,8 @@ namespace App\Http\Controllers;
 use App\Http\Controllers\Controller;
 use App\Imports\ArticleStockImport;
 use App\Models\ArticleStock;
+use App\Models\Docligne;
+use App\Models\Line;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
@@ -36,10 +38,44 @@ class ArticleStockController extends Controller
             });
         }
 
-
         $articles = $query->paginate(100);
+
+        // Map stock quantity for each article
+        $articles->getCollection()->transform(function ($article) {
+            $article->stock_prepare = $this->calculateStockPrepare($article->code); 
+            $article->stock_prepartion = $this->calculateZoonPrepartion($article->code); 
+
+            return $article;
+        });
+
         return response()->json($articles);
     }
+
+
+
+
+    public function calculateStockPrepare($ref_article)
+    {
+        return Docligne::where('AR_Ref', $ref_article)
+            ->whereHas('line', function ($query) {
+                $query->whereIn('status_id', [8, 9, 10]);
+            })
+            ->sum('DL_Qte');
+    }
+
+        public function calculateZoonPrepartion($ref_article)
+    {
+        return Docligne::where('AR_Ref', $ref_article)
+            ->whereHas('line', function ($query) {
+                $query->whereIn('status_id', [3, 4, 5, 6, 7]);
+            })
+            ->sum('DL_Qte');
+    }
+
+
+
+ 
+
 
 
 
@@ -190,4 +226,8 @@ class ArticleStockController extends Controller
 
         return response()->json(['message' => 'Article deleted successfully']);
     }
+
+
+ 
+    
 }
