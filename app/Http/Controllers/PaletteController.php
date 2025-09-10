@@ -361,7 +361,7 @@ class PaletteController extends Controller
             'quantity' => 'required|integer|max:1000|min:1',
             'line' => 'required|exists:lines,id',
             'palette' => 'required|exists:palettes,code',
-            'emplacement' => 'nullable|exists:emplacements,code'
+            'emplacement' => 'nullable'
         ]);
 
         if ($validator->fails()) {
@@ -380,11 +380,9 @@ class PaletteController extends Controller
         try {
             DB::transaction(function () use ($document, $request, $line, $palette) {
 
-                $totalQte = $line->palettes->sum(function ($palette) {
-                    return $palette->pivot->quantity;
-                });
+                $totalQte = $line->palettes->sum(fn($palette) => $palette->pivot->quantity);
 
-                if (intval($line->quantity) < ($totalQte + intval($request->quantity))) {
+                if ($line->quantity < ($totalQte + intval($request->quantity))) {
                     throw new \Exception("La quantité n'est pas valide", 422);
                 }
 
@@ -393,12 +391,11 @@ class PaletteController extends Controller
                 }
 
                 $line->palettes()->attach($palette->id, ['quantity' => $request->quantity]);
-
                 $line->update(['status_id' => 8]);
 
                 $palette->load(['lines.article_stock']);
 
-                // Check if all line with status_id 8 (Prepare)
+                // Document status update
                 if ($document->validation()) {
                     $document->update(['status_id' => 8]);
                 } elseif ($document->status_id != 7) {
@@ -412,22 +409,26 @@ class PaletteController extends Controller
                     ]);
                 }
 
-
-                $article_stock = ArticleStock::find($line->ref);
-                if($article_stock){
-                    $article_stock->quantity = ($article_stock->quantity + floatval($request->quantity));
+                if ($request->filled('emplacement')) {
+                    $article_stock = ArticleStock::where('code', $line->ref)->first();
+                    if ($article_stock) {
+                        $article_stock->quantity += floatval($request->quantity);
+                        $article_stock->save();
+                    }
                 }
 
-                
+                Docligne::where('cbMarq', $line->docligne_id)->increment('DL_QteBL', floatval($request->quantity));
+
             });
 
             return response()->json($palette);
         } catch (\Exception $e) {
             return response()->json([
                 'message' => $e->getMessage()
-            ], $e->getCode() ?: 500);
+            ], in_array($e->getCode(), [404, 422]) ? $e->getCode() : 500);
         }
     }
+
 
 
     public function documentPalettes($piece)

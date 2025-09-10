@@ -14,6 +14,7 @@ use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Carbon;
 use App\Http\Controllers\SellController;
 use App\Models\Article;
+use App\Models\DocumentCompany;
 use App\Models\Palette;
 use App\Models\RoleQuantityLine;
 
@@ -313,6 +314,17 @@ class DocenteteController extends Controller
 
                 
                 $palettes = array_merge($palettes, $line->palettes->pluck('id')->toArray());
+
+               $new_document->companies()->syncWithoutDetaching([
+                    $line->company_id => [
+                        "status_id"     => 11,
+                        "validated_by"  => auth()->id(),
+                        "controlled_by" => auth()->id(),
+                        "validated_at"  => now(),
+                        "controlled_at" => now(),
+                    ]
+                ]);
+
     
             }
 
@@ -320,6 +332,10 @@ class DocenteteController extends Controller
                 Palette::whereIn('id', array_unique($palettes))
                     ->update(['document_id' => $new_document->id]);
             }
+
+
+
+            
 
 
 
@@ -681,6 +697,11 @@ class DocenteteController extends Controller
 
             foreach ($request->lines as $lineId) {
                 $currentDocligne = Docligne::where('cbMarq', $lineId)->first();
+
+                $currentDocligne->DL_QteBL = 0;
+                $currentDocligne->save();
+
+
                 if (!$currentDocligne) {
                     throw new \Exception("Invalid line: {$lineId}");
                 }

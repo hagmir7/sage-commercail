@@ -283,133 +283,102 @@ class DocumentController extends Controller
     }
 
 
-    /**
-     * Find the corresponding Docligne entry to convert from a given piece.
-     */
-    public function documentToConvert($piece)
-    {
-        return Docligne::where(function ($query) use ($piece) {
-            $query->whereIn('DO_Type', [3, 5])
-                ->where('DO_Piece', $piece);
-        })
+        
+        public function documentToConvert($piece)
+        {
+            return Docligne::where(function ($query) use ($piece) {
+                $query->whereIn('DO_Type', [3, 5]) // BL or FA
+                    ->where('DO_Piece', $piece);
+            })
             ->orWhere('DL_PieceBC', $piece)
             ->orWhere('DL_PieceBL', $piece)
             ->orWhere('DL_PiecePL', $piece)
             ->orWhere('DL_PieceDE', $piece)
             ->first();
-    }
-
-    /**
-     * Convert documents by linking them to their corresponding docentete based on related Docligne entries.
-     */
-    // public function convertDocument()
-    // {
-    //     Document::doesntHave('docentete')
-    //         ->get()
-    //         ->each(function ($document) {
-    //             $doc = $this->documentToConvert($document->piece);
-    //             $cbMarq = $doc?->docentete?->cbMarq;
-    //             $doPiece = $doc?->docentete?->DO_Piece;
-    //             $document->update([
-    //                 'docentete_id' => $cbMarq ?? $document->docentete_id,
-    //                 'status_id' => str_contains($doPiece, 'BL') ? 12 : $document->status_id,
-    //                 'piece_bl'     => str_contains($doPiece, 'BL') ? $doPiece : $document->piece_bl,
-    //                 'piece_fa'     => str_contains($doPiece, 'FA') ? $doPiece : $document->piece_fa,
-    //             ]);
-    //         });
-    // }
-
-
-    public function readyDocuments()
-    {
-        $this->convertDocument();
-
-        return Document::with('docentete')
-            ->whereNull('piece_bl')
-            ->whereIn('status_id', [10, 11])
-            ->get();
-    }
-
-    public function convertDocument(Document $document)
-    {
-        $doc = $this->documentToConvert($document->piece);
-
-        if (!$doc || !$doc->docentete) {
-            return $document;
         }
 
-        $cbMarq  = $doc->docentete->cbMarq;
-        $doPiece = $doc->docentete->DO_Piece;
 
-        $document->update([
-            'docentete_id' => $cbMarq,
-            'status_id'    => str_contains($doPiece, 'BL') ? 12 : $document->status_id,
-            'piece_bl'     => str_contains($doPiece, 'BL') ? $doPiece : $document->piece_bl,
-            'piece_fa'     => str_contains($doPiece, 'FA') ? $doPiece : $document->piece_fa,
-        ]);
+        public function convertDocument(Document $document)
+        {
+            // Find latest BL linked to this PL
+            $doc = Docentete::where('DO_Type', 3) // BL type
+                ->where('DO_Ref', $document->piece) // PL reference
+                ->orderByDesc('DO_Date')
+                ->first();
 
-        return $document->fresh();
-    }
+            if (!$doc) {
+                return $document; // nothing found
+            }
 
-    public function livraison(Request $request)
-    {
+            $document->update([
+                'docentete_id' => $doc->cbMarq,
+                'status_id'    => str_contains($doc->DO_Piece, 'BL') ? 12 : $document->status_id,
+                'piece_bl'     => str_contains($doc->DO_Piece, 'BL') ? $doc->DO_Piece : $document->piece_bl,
+                'piece_fa'     => str_contains($doc->DO_Piece, 'FA') ? $doc->DO_Piece : $document->piece_fa,
+            ]);
 
-        if (!$request->filled('search')) {
-            $documents = Document::whereDoesntHave('docentete')->get();
-            if (count($documents)) {
-                $documents->map(function ($document) {
-                    return $this->convertDocument($document);
+            return $document->fresh();
+        }
+
+
+        public function livraison(Request $request)
+        {
+            // Auto-convert orphan documents if no search
+            if (!$request->filled('search')) {
+                $documents = Document::whereDoesntHave('docentete')->get();
+                if ($documents->count()) {
+                    $documents->each(fn ($doc) => $this->convertDocument($doc));
+                }
+            }
+
+            $query = Docentete::with([
+                'document' => function ($q) {
+                    $q->with(['status', 'companies'])
+                    ->withCount('palettes');
+                },
+            ])
+            ->select(
+                'DO_Domaine',
+                'DO_Type',
+                'DO_Piece',
+                'DO_Date',
+                'DO_Ref',
+                'DO_Tiers',
+                'DO_Statut',
+                'cbMarq',
+                'cbCreation',
+                'DO_DateLivr',
+                'DO_Expedit'
+            )
+            ->where('DO_Type', 3) // BL only
+            ->whereBetween('DO_Date', [
+                Carbon::today()->subDays(40),
+                Carbon::today()
+            ]);
+
+            // Restrict by company if controleur
+            if (auth()->user()->hasRole("controleur")) {
+                $query->whereHas('document.companies', function ($q) {
+                    $q->where('companies.id', auth()->user()->company_id);
                 });
             }
-        }
-   
 
+            // Apply search
+            if ($request->filled('search')) {
+                $search = $request->search;
+                $query->where(function ($q) use ($search) {
+                    $q->where('DO_Piece', 'like', "%$search%")
+                    ->orWhere('DO_Tiers', 'like', "%$search%")
+                    ->orWhere('DO_Ref', 'like', "%$search%");
+                });
+            }
 
-    $query = Docentete::with([
-            'document' => function ($q) {
-                $q->with(['status', 'companies'])
-                ->withCount('palettes');
-            },
-        ])
-        ->select(
-            'DO_Domaine', 'DO_Type', 'DO_Piece',
-            'DO_Date', 'DO_Ref', 'DO_Tiers', 'DO_Statut', 'cbMarq',
-            'cbCreation', 'DO_DateLivr', 'DO_Expedit'
-        )
-        ->where('DO_Type', 3)
-        ->whereBetween('DO_Date', [
-            Carbon::today()->subDays(40),
-            Carbon::today()
-        ]);
+            $docentetes = $query->orderByDesc('DO_Date')->get();
 
-
-        if(auth()->user()->hasRole("controleur")){
-            $query->whereHas('document.companies', function ($query) {
-                $query->where('companies.id', auth()->user()->company_id);
-            });
-        }
-        
-        $query->orderByDesc('DO_Date');
-
-
-
-
-
-
-        // Apply search filter before get()
-        if ($request->filled('search')) {
-            $search = $request->search;
-            $query->where(function ($q) use ($search) {
-                $q->where('DO_Piece', 'like', "%$search%")
-                ->orWhere('DO_Tiers', 'like', "%$search%")
-                ->orWhere('DO_Ref', 'like', "%$search%");
-            });
+            return response()->json($docentetes);
         }
 
-        $docententes = $query->get();
 
-        return response()->json($docententes);
-    }
 
 
     public function show(Document $document)
