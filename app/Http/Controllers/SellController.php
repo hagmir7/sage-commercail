@@ -173,9 +173,9 @@ class SellController extends Controller
                 s.DL_TRemExep,
                 LEFT(s.AR_Ref, 19),
                 LEFT(s.DL_Design, 69),
-                ?,                          -- DL_Qte
-                s.DL_QteBC,
-                s.DL_QteBL,
+                ?,                                      -- DL_Qte
+                ?,                                      -- s.DL_QteBC,
+                ?,                                      -- s.DL_QteBL,
                 s.DL_PoidsNet,
                 s.DL_PoidsBrut,
                 s.DL_Remise01REM_Valeur,
@@ -201,7 +201,7 @@ class SellController extends Controller
                 s.DT_No,
                 s.AF_RefFourniss,
                 LEFT(s.EU_Enumere, 35),
-                s.EU_Qte,
+                ?,                               -- EU_Qte
                 s.DL_TTC,
                 s.DE_No,
                 s.DL_TypePL,
@@ -223,7 +223,7 @@ class SellController extends Controller
                 s.DL_Escompte,
                 LEFT(s.DL_PiecePL, 13),
                 s.DL_DatePL,
-                s.DL_QtePL,
+                ?,                                      -- DL_QtePL
                 LEFT(s.RP_Code, 11),
                 s.DL_QteRessource,
                 s.DL_DateAvancement,
@@ -260,8 +260,11 @@ class SellController extends Controller
                 $DO_Piece,   // DO_Piece
                 $DO_Date,    // DO_Date
                 $DL_QteBL,
+                $DL_QteBL,
+                $DL_QteBL,
+                $DL_QteBL,
                 $nextDL_No,  // NextDL_No
-              
+                $DL_QteBL,
                 $DL_No       // source DL_No
             ]);
 

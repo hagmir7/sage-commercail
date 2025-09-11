@@ -276,7 +276,7 @@ class DocenteteController extends Controller
             return !in_array($line->status_id, [8, 9, 10]);
         });
 
-        
+
 
         if ($invalidLine) {
             return response()->json([
@@ -284,7 +284,7 @@ class DocenteteController extends Controller
             ], 422);
         }
 
-        $invalidQte = $lines->first(function ($line) { 
+        $invalidQte = $lines->first(function ($line) {
             $qte = (float) ($line->docligne->DL_QteBL ?? 0);
             \Log::alert("Line {$line->id} | Ref {$line->ref} | DL_QteBL = {$qte}");
             return $qte <= 0;
@@ -310,7 +310,7 @@ class DocenteteController extends Controller
 
         DB::transaction(function () use ($document, $lines) {
 
-        $new_document = Document::create([
+            $new_document = Document::create([
                 'piece' => $document->piece,
                 'type' => $document->type,
                 'ref' => $document->ref,
@@ -327,7 +327,7 @@ class DocenteteController extends Controller
             foreach ($lines as $line) {
 
                 $line->update([
-                        'quantity_prepare' => floatval($line->docligne->DL_QteBL),
+                    'quantity_prepare' => floatval($line->docligne->DL_QteBL),
                 ]);
 
                 if (floatval($line->docligne->DL_Qte) == floatval($line->docligne->DL_QteBL)) {
@@ -336,8 +336,7 @@ class DocenteteController extends Controller
                         'status_id' => 11,
                         'document_id' => $new_document->id,
                     ]);
-
-                }else{
+                } else {
                     Line::create([
                         'ref' => $line->ref,
                         'quantity' => $line->quantity,
@@ -353,15 +352,14 @@ class DocenteteController extends Controller
                         'complation_date' => now(),
                         'validated' => true,
                         'status_id' => 11,
-                        'first_company_id' => $line->first_company_id ,
+                        'first_company_id' => $line->first_company_id,
                     ]);
-
                 }
-                
-                
+
+
                 $palettes = array_merge($palettes, $line->palettes->pluck('id')->toArray());
 
-               $new_document->companies()->syncWithoutDetaching([
+                $new_document->companies()->syncWithoutDetaching([
                     $line->company_id => [
                         "status_id"     => 11,
                         "validated_by"  => auth()->id(),
@@ -370,8 +368,6 @@ class DocenteteController extends Controller
                         "controlled_at" => now(),
                     ]
                 ]);
-
-    
             }
 
             if (!empty($palettes)) {
@@ -511,7 +507,7 @@ class DocenteteController extends Controller
             ->firstOrFail();
 
 
-        
+
 
 
         $docligneQuery = Docligne::with([
@@ -627,75 +623,77 @@ class DocenteteController extends Controller
     {
         DB::beginTransaction();
 
-        $request_roles = explode(',', $request->roles);
-
-        if (count($request_roles) == 1) {
-            $role = Role::find($request_roles[0]);
-            $next_role = false;
-        } else {
-            $role = Role::find($request_roles[0]);
-            $next_role = $request_roles[1];
-        }
-
-        if ($role->name  == 'fabrication') {
-            $status = 3; // Fabrication
-        } elseif ($role->name  == 'montage') {
-            $status = 5; // Montage
-        } elseif ($role->name  == 'magasinier') {
-            $status = 7; // Preparation
-        } elseif ($role->name  == "preparation_cuisine" || $role->name == "preparation_trailer") {
-            $status = 7; // Preparation
-        }
-
         try {
+            $request_roles = is_string($request->roles)
+                ? explode(',', $request->roles)
+                : (array) $request->roles;
+
+            $role = Role::find($request_roles[0] ?? null);
+            $next_role = $request_roles[1] ?? null;
+
+            if (!$role) {
+                throw new \Exception("Role not found");
+            }
+
+            // Map role to status
+            $status = match ($role->name) {
+                'fabrication' => 3,
+                'montage' => 5,
+                'magasinier', 'preparation_cuisine', 'preparation_trailer' => 7,
+                default => throw new \Exception("Unknown role: {$role->name}"),
+            };
+
             $lineData = $request->lines;
             $lineIds = [];
             $quantities = [];
 
             if (is_array($lineData) && !empty($lineData)) {
-                // Check if it's new format with objects containing line_id and quantity
+                // New format (objects with line_id + quantity)
                 if (is_array($lineData[0]) && isset($lineData[0]['line_id'])) {
                     foreach ($lineData as $item) {
                         $lineIds[] = $item['line_id'];
                         $quantities[$item['line_id']] = $item['quantity'];
                     }
                 } else {
-                    // Old format - just array of line IDs
+                    // Old format (just IDs)
                     $lineIds = $lineData;
                 }
             }
 
             $lines = Line::whereIn("id", $lineIds)->get();
 
-            // Update status
-            $document = $lines[0]->document;
+
+
+            // Update document
             if ($lines->isNotEmpty()) {
+                $document = $lines->first()->document;
+
                 $document->update([
                     'status_id' => $status == 7 ? 7 : 2
                 ]);
+
+                $document->companies()->updateExistingPivot(auth()->user()->company_id, [
+                    'status_id' => $status,
+                    'updated_at' => now(),
+                ]);
             }
 
-            $document->companies()->updateExistingPivot(auth()->user()->company_id, [
-                'status_id' => $status,
-                'updated_at' => now(),
-            ]);
-
+            // Update each line
             foreach ($lines as $line) {
                 $updateData = [
-                    'role_id' => intval($request->roles),
+                    'role_id' => $role->id,
                     'status_id' => $status,
-                    'next_role_id' => $next_role
+                    'next_role_id' => $next_role,
                 ];
 
                 if (!empty($quantities) && isset($quantities[$line->id])) {
                     $updateData['transfer_quantity'] = $quantities[$line->id];
 
-                    if (floatval($quantities[$line->id]) != floatval($line?->docligne?->DL_Qte)) {
+                    if ((float) $quantities[$line->id] !== (float) ($line?->docligne?->DL_Qte)) {
                         RoleQuantityLine::create([
                             'line_id' => $line->id,
                             'quantity' => $quantities[$line->id],
-                            'role_id' => $role->id
-
+                            'role_id' => $role->id,
                         ]);
                     }
                 }
@@ -709,17 +707,18 @@ class DocenteteController extends Controller
                 'status' => 'success',
                 'message' => 'Document transferred successfully',
                 'lines' => $lines,
-                'quantities' => $quantities ?? null
+                'quantities' => $quantities ?: null,
             ], 200);
         } catch (\Exception $e) {
             DB::rollBack();
 
             return response()->json([
                 'status' => 'error',
-                'message' => $e->getMessage()
+                'message' => $e->getMessage(),
             ], 500);
         }
     }
+
 
 
 
@@ -765,7 +764,7 @@ class DocenteteController extends Controller
             foreach ($request->lines as $lineId) {
 
                 $currentDocligne = Docligne::where('cbMarq', $lineId)->first();
-                
+
                 $currentDocligne->DL_QteBL = 0;
                 $currentDocligne->save();
 
