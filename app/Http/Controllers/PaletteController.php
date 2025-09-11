@@ -83,12 +83,12 @@ class PaletteController extends Controller
         }
 
         // Define the relationships to load consistently
-       $relationships = [
-        'lines',
-        'lines.docligne:cbMarq,DO_Piece,DO_Ref,CT_Num,Hauteur,Largeur,Poignée,Chant,Description,Rotation,Couleur,AR_Ref,Episseur',
-        'lines.docligne.article:AR_Ref,Nom,cbMarq,Hauteur,Largeur,Chant,Profonduer,Episseur,Description,AR_Design,Couleur',
-        'lines.article_stock:code,name,height,width,depth,color,thickness,chant,description',
-    ];
+        $relationships = [
+            'lines',
+            'lines.docligne:cbMarq,DO_Piece,DO_Ref,CT_Num,Hauteur,Largeur,Poignée,Chant,Description,Rotation,Couleur,AR_Ref,Episseur',
+            'lines.docligne.article:AR_Ref,Nom,cbMarq,Hauteur,Largeur,Chant,Profonduer,Episseur,Description,AR_Design,Couleur',
+            'lines.article_stock:code,name,height,width,depth,color,thickness,chant,description',
+        ];
 
 
         if ($document->palettes()->where('company_id', auth()->user()->company_id)->exists()) {
@@ -211,11 +211,21 @@ class PaletteController extends Controller
                 $line = Line::with([
                     'docligne' => function ($query) {
                         $query->select(
-                            "cbMarq", "DO_Piece", "DO_Ref", "CT_Num",
-                            "Hauteur", "Largeur", "Chant", "Poignée",
-                            "Description", "Rotation", "Couleur", "AR_Ref", 'Profondeur'
+                            "cbMarq",
+                            "DO_Piece",
+                            "DO_Ref",
+                            "CT_Num",
+                            "Hauteur",
+                            "Largeur",
+                            "Chant",
+                            "Poignée",
+                            "Description",
+                            "Rotation",
+                            "Couleur",
+                            "AR_Ref",
+                            'Profondeur'
                         )->with(['article' => function ($q) {
-                            $q->select("AR_Ref", "Nom", 'cbMarq', 'Hauteur', 'Largeur', 'Chant', 'Profonduer', 'Episseur', 'Description', 'AR_Design', 'Couleur'); 
+                            $q->select("AR_Ref", "Nom", 'cbMarq', 'Hauteur', 'Largeur', 'Chant', 'Profonduer', 'Episseur', 'Description', 'AR_Design', 'Couleur');
                         }]);
                     },
                     'article_stock' => function ($query) {
@@ -224,16 +234,26 @@ class PaletteController extends Controller
                 ])->find($lineIdentifier);
             }
 
-        // If not found by ID, try to find by article stock reference
+            // If not found by ID, try to find by article stock reference
             if (!$line) {
                 $line = Line::with([
                     'docligne' => function ($query) {
                         $query->select(
-                            "cbMarq", "DO_Piece", "DO_Ref", "CT_Num",
-                            "Hauteur", "Largeur", "Poignée", "Chant",
-                            "Description", "Rotation", "Couleur", "AR_Ref", "Profondeur"
+                            "cbMarq",
+                            "DO_Piece",
+                            "DO_Ref",
+                            "CT_Num",
+                            "Hauteur",
+                            "Largeur",
+                            "Poignée",
+                            "Chant",
+                            "Description",
+                            "Rotation",
+                            "Couleur",
+                            "AR_Ref",
+                            "Profondeur"
                         )->with(['article' => function ($q) {
-                            $q->select("AR_Ref", "Nom", 'cbMarq', 'Hauteur', 'Largeur', 'Chant', 'Profonduer', 'Episseur', 'Description', 'AR_Design', "Couleur"); 
+                            $q->select("AR_Ref", "Nom", 'cbMarq', 'Hauteur', 'Largeur', 'Chant', 'Profonduer', 'Episseur', 'Description', 'AR_Design', "Couleur");
                         }]);
                     },
                     'article_stock' => function ($query) {
@@ -241,7 +261,7 @@ class PaletteController extends Controller
                     }
                 ])->whereHas('article_stock', function ($query) use ($lineIdentifier) {
                     $query->where('code', $lineIdentifier);
-                })->where("document_id", $document->id)->where('status_id', 7)->get();
+                })->where("document_id", $document->id)->whereIN('status_id', [7, 8])->get();
             }
 
             // Check if line exists
@@ -380,9 +400,7 @@ class PaletteController extends Controller
         try {
             DB::transaction(function () use ($document, $request, $line, $palette) {
 
-                $totalQte = $line->palettes->sum(fn($palette) => $palette->pivot->quantity);
-
-                if ($line->quantity < ($totalQte + intval($request->quantity))) {
+                if (floatval($line?->docligne?->DL_Qte) < ($line?->docligne?->DL_QteBL + floatval($request->quantity))) {
                     throw new \Exception("La quantité n'est pas valide", 422);
                 }
 
@@ -418,7 +436,6 @@ class PaletteController extends Controller
                 }
 
                 Docligne::where('cbMarq', $line->docligne_id)->increment('DL_QteBL', floatval($request->quantity));
-
             });
 
             return response()->json($palette);
@@ -433,7 +450,7 @@ class PaletteController extends Controller
 
     public function documentPalettes($piece)
     {
-  
+
         if (!auth()->check()) {
             return response()->json(['message' => 'Unauthorized'], 401);
         }
@@ -498,7 +515,7 @@ class PaletteController extends Controller
      */
     public function show($code)
     {
-     $palette = Palette::with([
+        $palette = Palette::with([
             'lines.docligne:DL_No,cbMarq,AR_Ref,Nom,DL_Design,Description,Hauteur,Largeur,Profondeur,Couleur,Chant,Episseur,DL_Qte,Poignée',
             'document',
             'user',
@@ -650,43 +667,60 @@ class PaletteController extends Controller
 
     public function detach(Request $request)
     {
-
         $validator = Validator::make($request->all(), [
             'line' => 'required|exists:lines,id',
             'palette' => 'required|exists:palettes,code'
         ]);
 
-        // return response()->json(['data' => $request->palette]);
-
         if ($validator->fails()) {
             return response()->json(['errors' => $validator->errors()], 422);
         }
 
-        $line = Line::find($request->line);
-        $palette = Palette::where("code", $request->palette)->first();
+        try {
+            $palette = DB::transaction(function () use ($request) {
+                $line = Line::findOrFail($request->line);
+                $palette = Palette::where("code", $request->palette)->firstOrFail();
 
-        $line->palettes()->detach($palette->id);
+                $pivot = $line->palettes()->where('palette_id', $palette->id)->first();
 
-        // Update document status if preparation validated_by
-        $line->update([
-            'status_id' => 7
-        ]);
+                if ($pivot) {
+                    $quantity = $pivot->pivot->quantity;
+                    $line->docligne->update([
+                        'DL_QteBL' => floatval($line->docligne->DL_QteBL) - $quantity
+                    ]);
+                }
 
+                $line->palettes()->detach($palette->id);
 
-        if (!$line->document->status_id) {
-            $line->document->update([
-                'status_id' => 7,
-            ]);
+                // Update document status if preparation validated_by
+                $line->update([
+                    'status_id' => 7
+                ]);
+
+                if (!$line->document->status_id) {
+                    $line->document->update([
+                        'status_id' => 7,
+                    ]);
+                }
+
+                $palette->document->companies()->updateExistingPivot(auth()->user()->company_id, [
+                    'status_id' => 7,
+                ]);
+
+                $palette->load(['lines.article_stock']);
+                return $palette;
+            });
+
+            return response()->json($palette);
+        } catch (\Throwable $e) {
+            return response()->json([
+                'error' => 'Transaction failed',
+                'message' => $e->getMessage()
+            ], 500);
         }
-
-        $palette->document->companies()->updateExistingPivot(auth()->user()->company_id, [
-            'status_id' => 7,
-        ]);
-
-
-        $palette->load(['lines.article_stock']);
-        return response()->json($palette);
     }
+
+    
 
     public function resetPalette($code)
     {

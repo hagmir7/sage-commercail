@@ -53,7 +53,7 @@ class SellController extends Controller
 
             foreach ($doclignes as $line) {
                 // Create line and get the new DL_No
-                $newDL_No = $this->createDocumentLineFromTemplate($line->DL_No, $DO_Piece, $DO_Date);
+                $newDL_No = $this->createDocumentLineFromTemplate($line->DL_No, $DO_Piece, $DO_Date, intval($line->DL_QteBC));
 
                 // Insert into F_DOCLIGNEEMPL
                 DB::table('F_DOCLIGNEEMPL')->insert([
@@ -121,16 +121,13 @@ class SellController extends Controller
         }
     }
 
-    public function createDocumentLineFromTemplate(int $DL_No, $DO_Piece, $DO_Date): int
+    public function createDocumentLineFromTemplate(int $DL_No, $DO_Piece, $DO_Date, $DL_QteBL): int
     {
         try {
             $CT_Num = "FR001";
 
             // First, get the next DL_No
             $nextDL_No = DB::connection('sqlsrv')->select("SELECT ISNULL(MAX(DL_No), 0) + 1 AS NextDL_No FROM F_DOCLIGNE")[0]->NextDL_No;
-
-
-
 
             $sql = "
             INSERT INTO F_DOCLIGNE (
@@ -176,7 +173,7 @@ class SellController extends Controller
                 s.DL_TRemExep,
                 LEFT(s.AR_Ref, 19),
                 LEFT(s.DL_Design, 69),
-                s.DL_Qte,
+                ?,                          -- DL_Qte
                 s.DL_QteBC,
                 s.DL_QteBL,
                 s.DL_PoidsNet,
@@ -262,7 +259,9 @@ class SellController extends Controller
                 $CT_Num,     // CT_Num
                 $DO_Piece,   // DO_Piece
                 $DO_Date,    // DO_Date
+                $DL_QteBL,
                 $nextDL_No,  // NextDL_No
+              
                 $DL_No       // source DL_No
             ]);
 

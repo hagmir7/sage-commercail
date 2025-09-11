@@ -23,6 +23,7 @@ class Docligne extends Model
         return $this->belongsTo(Docentete::class, "DO_Piece");
     }
 
+
     public function article()
     {
         return $this->belongsTo(Article::class, 'AR_Ref', 'AR_Ref'); // adjust if needed

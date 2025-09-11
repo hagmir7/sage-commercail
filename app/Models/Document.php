@@ -79,7 +79,7 @@ class Document extends Model
                 return $palette->pivot->quantity ?? 0;
             });
 
-            if ($totalPrepared < $line->quantity) {
+            if ($totalPrepared < $line->docligne->DL_Qte) {
                 return false;
             }
         }
@@ -108,7 +108,7 @@ class Document extends Model
                 return $palette->pivot->quantity ?? 0;
             });
 
-            if ($totalPrepared < $line->quantity) {
+            if ($totalPrepared < $line->docligne->DL_Qte) {
                 return false;
             }
         }

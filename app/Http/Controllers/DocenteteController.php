@@ -28,7 +28,6 @@ class DocenteteController extends Controller
         if ($user_roles->isEmpty()) {
             return response()->json([]);
         }
-
         $documents = Document::whereHas("lines", function ($query) use ($user_roles) {
             $line = $query->where("company_id", auth()->user()->company_id)
 
@@ -277,9 +276,29 @@ class DocenteteController extends Controller
             return !in_array($line->status_id, [8, 9, 10]);
         });
 
+        
+
         if ($invalidLine) {
             return response()->json([
                 'message' => "Article {$invalidLine->ref} n'a pas un status valide."
+            ], 422);
+        }
+
+        $invalidQte = $lines->first(function ($line) { 
+            $qte = (float) ($line->docligne->DL_QteBL ?? 0);
+            \Log::alert("Line {$line->id} | Ref {$line->ref} | DL_QteBL = {$qte}");
+            return $qte <= 0;
+        });
+
+        if ($invalidQte) {
+            return response()->json([
+                'message' => "L'article {$invalidQte->ref} n'a pas une quantité valide."
+            ], 422);
+        }
+
+        if ($invalidQte) {
+            return response()->json([
+                'message' => "L'article {$invalidQte->ref} n'a pas une quantité valide."
             ], 422);
         }
 
@@ -290,7 +309,6 @@ class DocenteteController extends Controller
         }
 
         DB::transaction(function () use ($document, $lines) {
-
 
         $new_document = Document::create([
                 'piece' => $document->piece,
@@ -307,11 +325,39 @@ class DocenteteController extends Controller
             $palettes = [];
 
             foreach ($lines as $line) {
+
                 $line->update([
-                    'status_id'   => 11,
-                    'document_id' => $new_document->id,
+                        'quantity_prepare' => floatval($line->docligne->DL_QteBL),
                 ]);
 
+                if (floatval($line->docligne->DL_Qte) == floatval($line->docligne->DL_QteBL)) {
+
+                    $line->update([
+                        'status_id' => 11,
+                        'document_id' => $new_document->id,
+                    ]);
+
+                }else{
+                    Line::create([
+                        'ref' => $line->ref,
+                        'quantity' => $line->quantity,
+                        'design' => $line->design,
+                        'dimensions' => $line->dimensions,
+                        'document_id' => $new_document->id,
+                        'docligne_id' => $line->docligne_id,
+                        'company_id' => $line->company_id,
+                        'role_id' => null,
+                        'next_role_id' => null,
+                        'palette_id' => $line->palette_id,
+                        'received' => $line->received,
+                        'complation_date' => now(),
+                        'validated' => true,
+                        'status_id' => 11,
+                        'first_company_id' => $line->first_company_id ,
+                    ]);
+
+                }
+                
                 
                 $palettes = array_merge($palettes, $line->palettes->pluck('id')->toArray());
 
@@ -332,13 +378,6 @@ class DocenteteController extends Controller
                 Palette::whereIn('id', array_unique($palettes))
                     ->update(['document_id' => $new_document->id]);
             }
-
-
-
-            
-
-
-
 
             // Achate d'article
             $sellController = new SellController();
@@ -425,10 +464,10 @@ class DocenteteController extends Controller
             });
 
             // Compare with required_quantity
-            if ($totalPaletteQuantity < $line->quantity) {
+            if ($totalPaletteQuantity < floatval($line->docligne->DL_Qte)) {
                 $invalidLines[] = [
                     'line_id' => $line->id,
-                    'quantity' => $line->quantity,
+                    'quantity' => floatval($line->docligne->DL_Qte),
                     'total_palette_quantity' => $totalPaletteQuantity
                 ];
             }
@@ -472,6 +511,9 @@ class DocenteteController extends Controller
             ->firstOrFail();
 
 
+        
+
+
         $docligneQuery = Docligne::with([
             'article' => function ($query) {
                 $query->select("AR_Ref", "Nom", 'Hauteur', 'Largeur', 'Profonduer', 'Longueur', 'Couleur', 'Chant', 'Episseur', 'Description');
@@ -484,9 +526,34 @@ class DocenteteController extends Controller
             }
         ])
 
-            ->select("DO_Piece", "AR_Ref", 'DL_Design', 'DL_Qte', "Nom", "Hauteur", "Largeur", "Profondeur", "Langeur", "Couleur", "Chant", "Episseur", "cbMarq", "DL_Ligne", 'Description', "Poignée as Poignee", "Rotation")
+            ->select("DO_Piece", "AR_Ref", 'DL_Design', 'DL_Qte', "Nom", "Hauteur", "Largeur", "Profondeur", "Langeur", "Couleur", "Chant", "Episseur", "cbMarq", "DL_Ligne", 'Description', "Poignée as Poignee", "Rotation", 'DL_QteBL')
             ->OrderBy("DL_Ligne")
             ->where('DO_Piece', $id);
+
+
+        // Reliqa rest
+
+        DB::transaction(function () use ($docentete, $docligneQuery) {
+            if ($docentete->DO_Reliquat == "1") {
+                foreach ($docligneQuery->get() as $docligne) {
+                    $prepared = (float) ($docligne->line->quantity_prepare ?? 0);
+                    $delivered = (float) ($docligne->DL_QteBL ?? 0);
+
+                    if ($prepared > 0) {
+                        $docligne->update([
+                            "DL_QteBL" => max(0, $delivered - $prepared)
+                        ]);
+
+                        $line = $docligne->line;
+                        $line->quantity_prepare = 0;
+                        $line->save();
+                    }
+                }
+            }
+        });
+
+
+
 
         if (in_array('preparation', $userRoles)) {
 
@@ -696,8 +763,9 @@ class DocenteteController extends Controller
             $lines = [];
 
             foreach ($request->lines as $lineId) {
-                $currentDocligne = Docligne::where('cbMarq', $lineId)->first();
 
+                $currentDocligne = Docligne::where('cbMarq', $lineId)->first();
+                
                 $currentDocligne->DL_QteBL = 0;
                 $currentDocligne->save();
 

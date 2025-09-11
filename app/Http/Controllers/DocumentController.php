@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Docentete;
 use App\Models\Docligne;
 use App\Models\Document;
+use App\Models\Line;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use DateTime;
@@ -132,7 +133,7 @@ class DocumentController extends Controller
                 ->whereNotIn('design', ['Special', '', 'special']);
 
             $required_qte = $lines->sum(function ($line) {
-                return floatval($line->quantity);
+                return floatval($line->docligne->DL_Qte);
             });
 
             $current_qte = 0;
@@ -283,60 +284,79 @@ class DocumentController extends Controller
     }
 
 
-        
-        public function documentToConvert($piece)
-        {
-            return Docligne::where(function ($query) use ($piece) {
-                $query->whereIn('DO_Type', [3, 5]) // BL or FA
-                    ->where('DO_Piece', $piece);
-            })
-            ->orWhere('DL_PieceBC', $piece)
-            ->orWhere('DL_PieceBL', $piece)
-            ->orWhere('DL_PiecePL', $piece)
-            ->orWhere('DL_PieceDE', $piece)
-            ->first();
+
+    public function getDocumentsBL($piece)
+    {
+        return Docligne::with('docentete')
+            ->where("DL_PiecePL", $piece)
+            ->get()
+            ->unique('DO_Piece');
+    }
+
+    public function convertDocument(Document $document)
+    {
+        $docs = $this->getDocumentsBL($document->piece);
+
+        if ($docs->isEmpty()) {
+            // No BL/FA linked → nothing to update
+            return $document;
         }
 
+        // ✅ Exactly one BL/FA
+        $doc = $docs->first()->docentete;
 
-        public function convertDocument(Document $document)
-        {
-            // Find latest BL linked to this PL
-            $doc = Docentete::where('DO_Type', 3) // BL type
-                ->where('DO_Ref', $document->piece) // PL reference
-                ->orderByDesc('DO_Date')
+        if ($docs->count() > 1) {
+            // ❌ Conflict: multiple BLs/FA for the same PL (should not happen)
+            $doc = Docentete::whereIn("DO_Piece", $docs->pluck('DO_Piece'))->whereDoesntHave('document')->first();;
+            \Log::error("Multiple BL/FA found for PL {$document->piece}: " . $docs->pluck('DO_Piece')->join(', '));
+        }
+
+        
+
+        $document->update([
+            'docentete_id' => $doc->cbMarq,
+            'status_id'    => str_contains($doc->DO_Piece, 'BL') ? 12 : $document->status_id,
+            'piece_bl'     => str_contains($doc->DO_Piece, 'BL') ? $doc->DO_Piece : $document->piece_bl,
+            'piece_fa'     => str_contains($doc->DO_Piece, 'FA') ? $doc->DO_Piece : $document->piece_fa,
+        ]);
+
+        $lines = Line::where('document_id', $document->id)->get();
+
+        foreach ($lines as $line) {
+            $docligne = $doc->doclignes
+                ->where('AR_Ref', $line->ref)
                 ->first();
 
-            if (!$doc) {
-                return $document; // nothing found
+            if ($docligne) {
+                $line->update([
+                    'docligne_id' => $docligne->cbMarq, // or correct PK
+                ]);
             }
-
-            $document->update([
-                'docentete_id' => $doc->cbMarq,
-                'status_id'    => str_contains($doc->DO_Piece, 'BL') ? 12 : $document->status_id,
-                'piece_bl'     => str_contains($doc->DO_Piece, 'BL') ? $doc->DO_Piece : $document->piece_bl,
-                'piece_fa'     => str_contains($doc->DO_Piece, 'FA') ? $doc->DO_Piece : $document->piece_fa,
-            ]);
-
-            return $document->fresh();
         }
 
 
-        public function livraison(Request $request)
-        {
-            // Auto-convert orphan documents if no search
-            if (!$request->filled('search')) {
-                $documents = Document::whereDoesntHave('docentete')->get();
-                if ($documents->count()) {
-                    $documents->each(fn ($doc) => $this->convertDocument($doc));
-                }
-            }
 
-            $query = Docentete::with([
-                'document' => function ($q) {
-                    $q->with(['status', 'companies'])
+        return $document->fresh();
+    }
+
+    public function livraison(Request $request)
+    {
+        // 🔹 Try to auto-link orphan documents (no docentete)
+        if (!$request->filled('search')) {
+            $documents = Document::whereDoesntHave('docentete')->whereNull('piece_bl')->get();
+
+            if ($documents->isNotEmpty()) {
+                $documents->each(fn($document) => $this->convertDocument($document));
+            }
+        }
+
+        // 🔹 Main query for BLs
+        $query = Docentete::with([
+            'document' => function ($q) {
+                $q->with(['status', 'companies'])
                     ->withCount('palettes');
-                },
-            ])
+            },
+        ])
             ->select(
                 'DO_Domaine',
                 'DO_Type',
@@ -350,34 +370,34 @@ class DocumentController extends Controller
                 'DO_DateLivr',
                 'DO_Expedit'
             )
-            ->where('DO_Type', 3) // BL only
+            ->where('DO_Type', 3)
             ->whereBetween('DO_Date', [
                 Carbon::today()->subDays(40),
                 Carbon::today()
             ]);
 
-            // Restrict by company if controleur
-            if (auth()->user()->hasRole("controleur")) {
-                $query->whereHas('document.companies', function ($q) {
-                    $q->where('companies.id', auth()->user()->company_id);
-                });
-            }
-
-            // Apply search
-            if ($request->filled('search')) {
-                $search = $request->search;
-                $query->where(function ($q) use ($search) {
-                    $q->where('DO_Piece', 'like', "%$search%")
-                    ->orWhere('DO_Tiers', 'like', "%$search%")
-                    ->orWhere('DO_Ref', 'like', "%$search%");
-                });
-            }
-
-            $docentetes = $query->orderByDesc('DO_Date')->get();
-
-            return response()->json($docentetes);
+        // 🔹 Restrict for controleur role
+        if (auth()->user()->hasRole("controleur")) {
+            $query->whereHas('document.companies', function ($q) {
+                $q->where('companies.id', auth()->user()->company_id);
+            });
         }
 
+        // 🔹 Order by date (latest first)
+        $query->orderByDesc('DO_Date');
+
+        // 🔹 Apply search
+        if ($request->filled('search')) {
+            $search = $request->search;
+            $query->where(function ($q) use ($search) {
+                $q->where('DO_Piece', 'like', "%$search%")
+                    ->orWhere('DO_Tiers', 'like', "%$search%")
+                    ->orWhere('DO_Ref', 'like', "%$search%");
+            });
+        }
+
+        return response()->json($query->get());
+    }
 
 
 
@@ -421,14 +441,6 @@ class DocumentController extends Controller
             'document' => $document
         ]);
     }
-
-
-
-
-
-
-
-
 
 
     public function addChargement(Document $document, Request $request)
