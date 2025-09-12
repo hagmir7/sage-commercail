@@ -1,0 +1,15 @@
+-- ✅Update DL_QteBL in transfer for the only transferred lines
+-- ✅Show Print icon if document printed by the controller of companies
+-- Correct the qte Validate in BLX (vent)
+-- Completion status for document (Verification)
+-- Ping the invoice (Facture)
+-- Assign company to Product
+-- Progress remove conflict between partials commands in open
+-- ✅Show only not prepared lines in the scan
+-- Transfer Qte for roles
+-- ✅Scan Line in Preparation by Ref, Ref supplier, qrcode 
+-- Dimensions for Game Laca is not showing in scan, control palettes...
+-- Update status in validation is not working
+-- ✅Print document with stile mobile Logo
+-- ✅Réinstallation de printer status
+-- Show notification if the document updated
