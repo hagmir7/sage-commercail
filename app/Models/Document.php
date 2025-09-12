@@ -59,7 +59,7 @@ class Document extends Model
 
     public function companies()
     {
-        return $this->belongsToMany(Company::class, 'document_companies')->withPivot(['status_id']);
+        return $this->belongsToMany(Company::class, 'document_companies')->withPivot(['status_id', 'printed', 'updated']);
     }
 
 
@@ -75,9 +75,7 @@ class Document extends Model
 
 
         foreach ($lines as $line) {
-            $totalPrepared = $line->palettes->sum(function ($palette) {
-                return $palette->pivot->quantity ?? 0;
-            });
+            $totalPrepared = floatval($line->docligne->sum('DL_QteBL'));
 
             if ($totalPrepared < $line->docligne->DL_Qte) {
                 return false;
@@ -104,19 +102,17 @@ class Document extends Model
             ->whereNotIn('design', ['Special', '', 'special']);
 
         foreach ($this->lines->where('company_id', $companyId) as $line) {
-            $totalPrepared = $line->palettes->where('company_id', $companyId)->sum(function ($palette) {
-                return $palette->pivot->quantity ?? 0;
-            });
+            $totalPrepared = floatval($line->docligne->sum('DL_QteBL'));
 
             if ($totalPrepared < $line->docligne->DL_Qte) {
                 return false;
             }
         }
 
-         $lines = $this->lines
+        $lines = $this->lines
             ->where('ref', 'SP000001')
             ->whereIn('design', ['', 'Special', 'special']);
-        foreach($lines as $line){
+        foreach ($lines as $line) {
             $line->delete();
         }
 

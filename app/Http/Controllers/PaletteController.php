@@ -193,7 +193,6 @@ class PaletteController extends Controller
             'document' => 'nullable|exists:documents,piece'
         ]);
 
-
         $document = Document::where('piece', $request->document)->first();
 
         if ($validator->fails()) {
@@ -203,79 +202,29 @@ class PaletteController extends Controller
             ], 422);
         }
 
+        $lineIdentifier = $request->line;
+
         try {
-            $lineIdentifier = $request->line;
-            $line = null;
 
-            if (is_numeric($lineIdentifier)) {
-                $line = Line::with([
-                    'docligne' => function ($query) {
-                        $query->select(
-                            "cbMarq",
-                            "DO_Piece",
-                            "DO_Ref",
-                            "CT_Num",
-                            "Hauteur",
-                            "Largeur",
-                            "Chant",
-                            "Poignée",
-                            "Description",
-                            "Rotation",
-                            "Couleur",
-                            "AR_Ref",
-                            'Profondeur'
-                        )->with(['article' => function ($q) {
-                            $q->select("AR_Ref", "Nom", 'cbMarq', 'Hauteur', 'Largeur', 'Chant', 'Profonduer', 'Episseur', 'Description', 'AR_Design', 'Couleur');
-                        }]);
-                    },
-                    'article_stock' => function ($query) {
-                        $query->select("code", "name", "height", "width", "depth", "color", "thickness", "chant");
-                    }
-                ])->find($lineIdentifier);
-            }
-
-            // If not found by ID, try to find by article stock reference
-            if (!$line) {
-                $line = Line::with([
-                    'docligne' => function ($query) {
-                        $query->select(
-                            "cbMarq",
-                            "DO_Piece",
-                            "DO_Ref",
-                            "CT_Num",
-                            "Hauteur",
-                            "Largeur",
-                            "Poignée",
-                            "Chant",
-                            "Description",
-                            "Rotation",
-                            "Couleur",
-                            "AR_Ref",
-                            "Profondeur"
-                        )->with(['article' => function ($q) {
-                            $q->select("AR_Ref", "Nom", 'cbMarq', 'Hauteur', 'Largeur', 'Chant', 'Profonduer', 'Episseur', 'Description', 'AR_Design', "Couleur");
-                        }]);
-                    },
-                    'article_stock' => function ($query) {
-                        $query->select("code", "name", "height", "width", "depth", "color", "thickness", "chant", "description");
-                    }
-                ])->whereHas('article_stock', function ($query) use ($lineIdentifier) {
-                    $query->where('code', $lineIdentifier);
-                })->where("document_id", $document->id)->whereIN('status_id', [7, 8])->get();
-            }
-
-            // Check if line exists
-            if (!$line) {
-                return response()->json(['message' => "L'article n'existe pas"], 422);
-            }
-
-            // Check for special case SP000001
-            // if (
-            //     $line->ref === 'SP000001' &&
-            //     (empty($line->design) || strtolower(trim($line->design)) === 'special')
-            // ) {
-            //     return response()->json(['message' => "L'article n'existe pas SP000001"], 422);
-            // }
+            $line = Line::with([
+                'docligne:cbMarq,DO_Piece,DO_Ref,CT_Num,Hauteur,Largeur,Poignée,Chant,Description,Rotation,Couleur,AR_Ref,Profondeur',
+                'docligne.article:AR_Ref,Nom,cbMarq,Hauteur,Largeur,Chant,Profonduer,Episseur,Description,AR_Design,Couleur',
+                'article_stock:code,name,height,width,depth,color,thickness,chant,description',
+            ])
+                ->where('company_id', auth()->user()->company_id)
+                ->where("document_id", $document->id)
+                ->whereIn('status_id', [7, 8])
+                ->whereHas('docligne', function ($query) {
+                    $query->whereColumn('DL_Qte', '>', 'DL_QteBL');
+                })
+                ->whereHas('article_stock', function ($query) use ($lineIdentifier) {
+                    $query->where(function ($q) use ($lineIdentifier) {
+                        $q->where('code', (string)$lineIdentifier)
+                            ->orWhere('code_supplier', (string)$lineIdentifier)
+                            ->orWhere('code_supplier_2', (string)$lineIdentifier)
+                            ->orWhere('qr_code', (string)$lineIdentifier);
+                    });
+                })->get();
 
             return response()->json($line);
         } catch (\Exception $e) {

@@ -13,8 +13,6 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Carbon;
 use App\Http\Controllers\SellController;
-use App\Models\Article;
-use App\Models\DocumentCompany;
 use App\Models\Palette;
 use App\Models\RoleQuantityLine;
 
@@ -41,6 +39,7 @@ class DocenteteController extends Controller
         });
 
         $query = Docentete::with(['document.status', 'document.companies'])
+    
             ->select([
                 'DO_Reliquat',
                 'DO_Piece',
@@ -151,7 +150,7 @@ class DocenteteController extends Controller
 
     public function commercial(Request $request)
     {
-        $query = Docentete::query()
+        $query = Docentete::with(['document.status', 'document.companies'])
             ->select([
                 'DO_Reliquat',
                 'DO_Piece',
@@ -721,8 +720,6 @@ class DocenteteController extends Controller
 
 
 
-
-
     // Transfer to Company controller (Adill)
     public function transferCompany($request)
     {
@@ -756,17 +753,22 @@ class DocenteteController extends Controller
                 $document->companies()->attach($request->company, [
                     'status_id' => 1,
                     'updated_at' => now(),
+                    'printed' => false 
                 ]);
             }
 
             $lines = [];
 
+
             foreach ($request->lines as $lineId) {
 
-                $currentDocligne = Docligne::where('cbMarq', $lineId)->first();
+        
+            $currentDocligne = Docligne::where('cbMarq', $lineId)->first();
 
+            if ($currentDocligne) {
                 $currentDocligne->DL_QteBL = 0;
                 $currentDocligne->save();
+            }
 
 
                 if (!$currentDocligne) {

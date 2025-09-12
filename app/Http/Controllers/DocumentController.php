@@ -31,32 +31,32 @@ class DocumentController extends Controller
     }
 
     public function progress($piece)
-        {
-            $document = Document::with(['docentete.doclignes', 'lines.docligne', 'lines.palettes'])
-                ->where("piece", $piece)
-                ->first();
+    {
+        $document = Document::with(['docentete.doclignes', 'lines.docligne', 'lines.palettes'])
+            ->where("piece", $piece)
+            ->first();
 
-            if (!$document) {
-                return response()->json(["error" => "Document not found"], 404);
-            }
-
-            $lines = $document->lines
-                ->where('ref', '!=', 'SP000001')
-                ->whereNotIn('design', ['Special', '', 'special']);
-
-            $required_qte = $lines->sum(fn($line) => $line->docligne?->DL_Qte ?? 0);
-            $current_qte  = $lines->sum(fn($line) => $line->docligne?->DL_QteBL ?? 0);
-
-            $progress = $required_qte > 0 
-                ? round(($current_qte / $required_qte) * 100, 2) 
-                : 0;
-
-            return response()->json([
-                'current_qte'  => $current_qte,
-                'required_qte' => $required_qte,
-                'progress'     => intval($progress),
-            ]);
+        if (!$document) {
+            return response()->json(["error" => "Document not found"], 404);
         }
+
+        $lines = $document->lines
+            ->where('ref', '!=', 'SP000001')
+            ->whereNotIn('design', ['Special', '', 'special']);
+
+        $required_qte = $lines->sum(fn($line) => $line->docligne?->DL_Qte ?? 0);
+        $current_qte  = $lines->sum(fn($line) => $line->docligne?->DL_QteBL ?? 0);
+
+        $progress = $required_qte > 0
+            ? round(($current_qte / $required_qte) * 100, 2)
+            : 0;
+
+        return response()->json([
+            'current_qte'  => $current_qte,
+            'required_qte' => $required_qte,
+            'progress'     => intval($progress),
+        ]);
+    }
 
 
     public function longList()
@@ -499,5 +499,27 @@ class DocumentController extends Controller
                 'message' => 'Document non trouvée'
             ], 404);
         }
+    }
+
+
+    public function print(Document $document){
+        $document->companies()->updateExistingPivot(auth()->user()->company_id, [
+            'printed' => true,
+            'updated_at' => now(),
+        ]);
+        return response()->json(['message' => "Document imprimé avec succès"]);
+    }
+
+    public function resetPrint(Document $document)
+    {
+        $companyIds = $document->companies->pluck('id')->toArray();
+
+        $document->companies()->updateExistingPivot($companyIds, [
+            'printed'   => false,
+            'updated'   => true,
+            'updated_at'=> now(),
+        ]);
+
+        return response()->json(['message' => "Réinitialisation d'impression avec succès"]);
     }
 }

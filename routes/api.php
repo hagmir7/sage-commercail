@@ -206,6 +206,8 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('validation-controller', 'validationControllerList');
 
         Route::get('livraison', 'livraison');
+        Route::get('print/{document}', 'print');
+        Route::get('reset-print/{document}', 'resetPrint');
         // All documents routes up to this route !
         Route::get('{document:piece}', 'show');
         Route::get('/{piece}/palettes', 'documentPalettes');

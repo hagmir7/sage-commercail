@@ -7,9 +7,9 @@ use Illuminate\Database\Eloquent\Model;
 class Docligne extends Model
 {
     protected $table = "F_DOCLIGNE";
-    protected $primaryKey = "DO_Piece";
-    protected $keyType = "string"; // <- was integer
-    public $incrementing = false;  // <- must be false for non-numeric PKs
+    protected $primaryKey = "cbMarq";
+    protected $keyType = "string"; 
+    public $incrementing = false; 
 
     protected $guarded = [];
 
@@ -20,13 +20,13 @@ class Docligne extends Model
 
     public function docentete()
     {
-        return $this->belongsTo(Docentete::class, "DO_Piece");
+        return $this->belongsTo(Docentete::class, "DO_Piece", 'DO_Piece');
     }
 
 
     public function article()
     {
-        return $this->belongsTo(Article::class, 'AR_Ref', 'AR_Ref'); // adjust if needed
+        return $this->belongsTo(Article::class, 'AR_Ref', 'AR_Ref'); 
     }
 
     public function line()
