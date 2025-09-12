@@ -13,3 +13,6 @@
 -- ✅Print document with stile mobile Logo
 -- ✅Réinstallation de printer status
 -- Show notification if the document updated
+-- Ping PL, BL, FA For Users
+-- Préparateur can show and Prepare the articles without scan just by select article
+-- The controller can't transfer the line if preperd or in preparatin status and greter 
