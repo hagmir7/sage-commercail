@@ -31,35 +31,32 @@ class DocumentController extends Controller
     }
 
     public function progress($piece)
-    {
-        $document = Document::with(['docentete.doclignes', 'lines.palettes'])->where("piece", $piece)->first();
+        {
+            $document = Document::with(['docentete.doclignes', 'lines.docligne', 'lines.palettes'])
+                ->where("piece", $piece)
+                ->first();
 
-        if (!$document) {
-            return response()->json(["error" => "Document not found"], 404);
-        }
-
-        $lines = $document->lines
-            ->where('ref', '!=', 'SP000001')
-            ->whereNotIn('design', ['Special', '', 'special']);
-
-        $required_qte = $lines->sum("quantity") ?? 0;
-
-        $current_qte = 0;
-        foreach ($lines as $line) {
-            foreach ($line->palettes as $palette) {
-                $current_qte += $palette->pivot->quantity;
+            if (!$document) {
+                return response()->json(["error" => "Document not found"], 404);
             }
+
+            $lines = $document->lines
+                ->where('ref', '!=', 'SP000001')
+                ->whereNotIn('design', ['Special', '', 'special']);
+
+            $required_qte = $lines->sum(fn($line) => $line->docligne?->DL_Qte ?? 0);
+            $current_qte  = $lines->sum(fn($line) => $line->docligne?->DL_QteBL ?? 0);
+
+            $progress = $required_qte > 0 
+                ? round(($current_qte / $required_qte) * 100, 2) 
+                : 0;
+
+            return response()->json([
+                'current_qte'  => $current_qte,
+                'required_qte' => $required_qte,
+                'progress'     => intval($progress),
+            ]);
         }
-
-        $progress = $required_qte > 0 ? round(($current_qte / $required_qte) * 100, 2) : 0;
-
-        return response()->json([
-            'current_qte' => $current_qte,
-            'required_qte' => $required_qte,
-            'progress' => intval($progress)
-        ]);
-    }
-
 
 
     public function longList()
@@ -132,32 +129,26 @@ class DocumentController extends Controller
                 ->where('ref', '!=', 'SP000001')
                 ->whereNotIn('design', ['Special', '', 'special']);
 
-            $required_qte = $lines->sum(function ($line) {
-                return floatval($line->docligne->DL_Qte);
-            });
+            $required_qte = $lines->sum(fn($line) => $line->docligne?->DL_Qte ?? 0);
+            $current_qte  = $lines->sum(fn($line) => $line->docligne?->DL_QteBL ?? 0);
 
-            $current_qte = 0;
-            $companies = [];
-
-            foreach ($lines as $line) {
-                if (!in_array($line->company_id, $companies)) {
-                    $companies[] = $line->company_id;
-                }
-                foreach ($line->palettes as $palette) {
-                    $current_qte += floatval($palette->pivot->quantity);
-                }
-            }
-
-            $progress = $required_qte > 0 ? round(($current_qte / $required_qte) * 100, 2) : 0;
+            $progress = $required_qte > 0
+                ? round(($current_qte / $required_qte) * 100, 2)
+                : 0;
 
 
-            $companyDisplay = '';
-            if (count($companies) > 1) {
-                $companyDisplay = 'Inter & Serie';
-            } elseif (count($companies) === 1) {
-                $company = \App\Models\Company::find($companies[0]);
-                $companyDisplay = $company ? $company->name : 'Unknown Company';
-            }
+
+            $companies = $lines->pluck('company_id')->unique()->values()->all();
+
+
+
+          $companies = $lines->pluck('company_id')->unique()->values();
+                $companyDisplay = match ($companies->count()) {
+                    0       => 'Société inconnue',
+                    1       => optional(\App\Models\Company::find($companies->first()))->name ?? 'Société inconnue',
+                    default => 'Inter & Serie',
+                };
+
 
             return [
                 'id' => $document->id,
@@ -404,7 +395,6 @@ class DocumentController extends Controller
     public function show(Document $document)
     {
         $document->load([
-            // Eager load lines with join + ordering
             'lines' => fn($query) =>
             $query->join('F_DOCLIGNE', 'lines.docligne_id', '=', 'F_DOCLIGNE.cbMarq')
                 ->orderBy('F_DOCLIGNE.DL_Ligne')
@@ -417,22 +407,20 @@ class DocumentController extends Controller
             'lines.palettes',
 
 
-            'lines.docligne:DO_Domaine,DO_Type,CT_Num,DO_Piece,DL_Ligne,DL_Design,DO_Ref,DL_PieceDE,DL_PieceBC,DL_PiecePL,DL_PieceBL,DL_Qte,AR_Ref,cbMarq,Nom,Hauteur,Largeur,Profondeur,Langeur,Couleur,Chant,Episseur,Description,Poignée,Rotation',
+            'lines.docligne:DO_Domaine,DO_Type,CT_Num,DO_Piece,DL_Ligne,DL_Design,DO_Ref,DL_PieceDE,DL_PieceBC,DL_PiecePL,DL_PieceBL,DL_Qte,AR_Ref,cbMarq,Nom,Hauteur,Largeur,Profondeur,Langeur,Couleur,Chant,Episseur,Description,Poignée,Rotation,DL_QteBL',
         ]);
 
 
-        $required_qte = $document->lines
+        $lines = $document->lines
             ->where('ref', '!=', 'SP000001')
-            ->whereNotIn('design', ['Special', '', 'special'])->sum("quantity") ?? 0;
+            ->whereNotIn('design', ['Special', '', 'special']);
 
-        $current_qte = 0;
-        foreach ($document->lines as $line) {
-            foreach ($line->palettes as $palette) {
-                $current_qte += $palette->pivot->quantity;
-            }
-        }
+        $required_qte = $lines->sum(fn($line) => $line->docligne?->DL_Qte ?? 0);
+        $current_qte  = $lines->sum(fn($line) => $line->docligne?->DL_QteBL ?? 0);
 
-        $progress = $required_qte > 0 ? round(($current_qte / $required_qte) * 100, 2) : 0;
+        $progress = $required_qte > 0
+            ? round(($current_qte / $required_qte) * 100, 2)
+            : 0;
 
         return response()->json([
             'current_qte' => $current_qte,
