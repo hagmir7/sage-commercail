@@ -270,6 +270,8 @@ class DocenteteController extends Controller
         }
 
         $lines = Line::whereIn('id', $lineIds)->get();
+        
+
 
         $invalidLine = $lines->first(function ($line) {
             return !in_array($line->status_id, [8, 9, 10]);
@@ -336,6 +338,11 @@ class DocenteteController extends Controller
                         'document_id' => $new_document->id,
                     ]);
                 } else {
+
+                    $line->update([
+                        'status_id' => 8
+                    ]);
+                    
                     Line::create([
                         'ref' => $line->ref,
                         'quantity' => $line->quantity,
@@ -540,8 +547,9 @@ class DocenteteController extends Controller
                         ]);
 
                         $line = $docligne->line;
-                        $line->quantity_prepare = 0;
-                        $line->save();
+                        $line->update([
+                            'quantity_prepare' => 0
+                        ]);
                     }
                 }
             }
@@ -660,8 +668,6 @@ class DocenteteController extends Controller
             }
 
             $lines = Line::whereIn("id", $lineIds)->get();
-
-
 
             // Update document
             if ($lines->isNotEmpty()) {

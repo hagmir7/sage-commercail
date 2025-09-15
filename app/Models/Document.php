@@ -71,13 +71,11 @@ class Document extends Model
             ->where('ref', '!=', 'SP000001')
             ->whereNotIn('design', ['Special', '', 'special']);
 
-
-
-
         foreach ($lines as $line) {
-            $totalPrepared = floatval($line->docligne->sum('DL_QteBL'));
+            $totalToPrepare = floatval($line->docligne->DL_Qte);
+            $totalPrepared = floatval($line->docligne->DL_QteBL);
 
-            if ($totalPrepared < $line->docligne->DL_Qte) {
+            if ($totalToPrepare != $totalPrepared) {
                 return false;
             }
         }
@@ -96,26 +94,30 @@ class Document extends Model
     public function validationCompany($companyId): bool
     {
         $this->load('lines.palettes');
-
-        $lines = $this->lines
+        $lines = $this->lines()
+            ->where('company_id', $companyId)
             ->where('ref', '!=', 'SP000001')
-            ->whereNotIn('design', ['Special', '', 'special']);
+            ->whereNotIn('design', ['Special', '', 'special'])
+            ->get();
 
-        foreach ($this->lines->where('company_id', $companyId) as $line) {
-            $totalPrepared = floatval($line->docligne->sum('DL_QteBL'));
+        foreach ($lines as $line) {
+            $totalPrepared = floatval($line->docligne->DL_QteBL);
 
             if ($totalPrepared < $line->docligne->DL_Qte) {
                 return false;
             }
         }
 
-        $lines = $this->lines
+        // cleanup
+        $specials = $this->lines
             ->where('ref', 'SP000001')
             ->whereIn('design', ['', 'Special', 'special']);
-        foreach ($lines as $line) {
+
+        foreach ($specials as $line) {
             $line->delete();
         }
 
         return true;
     }
+
 }

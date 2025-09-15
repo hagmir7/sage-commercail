@@ -189,42 +189,51 @@ class PaletteController extends Controller
     public function scanLine(Request $request)
     {
         $validator = Validator::make($request->all(), [
-            'line' => 'required|string|max:255',
+            'line' => 'required|max:255',
             'document' => 'nullable|exists:documents,piece'
         ]);
 
         $document = Document::where('piece', $request->document)->first();
 
+
         if ($validator->fails()) {
             return response()->json([
-                'message' => "L'article n'existe pas",
+                'message' => $validator->errors()->first(),
                 'errors' => $validator->errors()
             ], 422);
         }
 
+
+
         $lineIdentifier = $request->line;
 
         try {
-
-            $line = Line::with([
+        $line = Line::with([
                 'docligne:cbMarq,DO_Piece,DO_Ref,CT_Num,Hauteur,Largeur,Poignée,Chant,Description,Rotation,Couleur,AR_Ref,Profondeur',
                 'docligne.article:AR_Ref,Nom,cbMarq,Hauteur,Largeur,Chant,Profonduer,Episseur,Description,AR_Design,Couleur',
                 'article_stock:code,name,height,width,depth,color,thickness,chant,description',
             ])
-                ->where('company_id', auth()->user()->company_id)
-                ->where("document_id", $document->id)
-                ->whereIn('status_id', [7, 8])
-                ->whereHas('docligne', function ($query) {
-                    $query->whereColumn('DL_Qte', '>', 'DL_QteBL');
-                })
-                ->whereHas('article_stock', function ($query) use ($lineIdentifier) {
-                    $query->where(function ($q) use ($lineIdentifier) {
-                        $q->where('code', (string)$lineIdentifier)
-                            ->orWhere('code_supplier', (string)$lineIdentifier)
-                            ->orWhere('code_supplier_2', (string)$lineIdentifier)
-                            ->orWhere('qr_code', (string)$lineIdentifier);
-                    });
-                })->get();
+            ->where('company_id', auth()->user()->company_id)
+            ->where("document_id", $document->id)
+            ->whereIn('status_id', [7, 8])
+            ->whereHas('docligne', function ($query) {
+                $query->whereColumn('DL_Qte', '>', 'DL_QteBL');
+            });
+
+        if (!$request->has('all') || $request->all !== 'true') {
+            $line->whereHas('article_stock', function ($query) use ($lineIdentifier) {
+                $query->where(function ($q) use ($lineIdentifier) {
+                    $q->where('code', (string)$lineIdentifier)
+                        ->orWhere('code_supplier', (string)$lineIdentifier)
+                        ->orWhere('code_supplier_2', (string)$lineIdentifier)
+                        ->orWhere('qr_code', (string)$lineIdentifier);
+                });
+            });
+        }
+
+        $line = $line->get();
+
+                
 
             return response()->json($line);
         } catch (\Exception $e) {
@@ -323,6 +332,40 @@ class PaletteController extends Controller
     }
 
 
+    public function validationCompany($companyId, $document_id): bool
+    {
+        $document = Document::find($document_id);
+
+
+        $document->load('lines.palettes');
+
+
+        $lines = $document->lines()
+            ->where('company_id', $companyId)
+            ->where('ref', '!=', 'SP000001')
+            ->whereNotIn('design', ['Special', '', 'special'])
+            ->get();
+
+        foreach ($lines as $line) {
+
+            if (floatval($line->docligne->DL_QteBL) < floatval($line->docligne->DL_Qte)) {
+                return false;
+            }
+        }
+
+        // cleanup
+        $specials = $document->lines
+            ->where('ref', 'SP000001')
+            ->whereIn('design', ['', 'Special', 'special']);
+
+        foreach ($specials as $line) {
+            $line->delete();
+        }
+
+        return true;
+    }
+
+
 
     public function confirm(Request $request)
     {
@@ -362,19 +405,7 @@ class PaletteController extends Controller
 
                 $palette->load(['lines.article_stock']);
 
-                // Document status update
-                if ($document->validation()) {
-                    $document->update(['status_id' => 8]);
-                } elseif ($document->status_id != 7) {
-                    $document->update(['status_id' => 7]);
-                }
 
-                if ($document->validationCompany(auth()->user()->company_id)) {
-                    $document->companies()->updateExistingPivot(auth()->user()->company_id, [
-                        'status_id' => 8,
-                        'updated_at' => now()
-                    ]);
-                }
 
                 if ($request->filled('emplacement')) {
                     $article_stock = ArticleStock::where('code', $line->ref)->first();
@@ -385,6 +416,22 @@ class PaletteController extends Controller
                 }
 
                 Docligne::where('cbMarq', $line->docligne_id)->increment('DL_QteBL', floatval($request->quantity));
+
+
+                 // Document status update Allwasy must be in the bottm 
+                if ($document->validation()) {
+                    $document->update(['status_id' => 8]);
+                } elseif ($document->status_id != 7) {
+                    $document->update(['status_id' => 7]);
+                }
+
+                $status = $this->validationCompany(auth()->user()->company_id, $document->id) ? 8 : 7;
+
+
+                $document->companies()->updateExistingPivot(auth()->user()->company_id, [
+                    'status_id' => $status,
+                    'updated_at' => now(),
+                ]);
             });
 
             return response()->json($palette);

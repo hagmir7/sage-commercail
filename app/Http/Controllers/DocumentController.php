@@ -158,6 +158,8 @@ class DocumentController extends Controller
                 'expedition' => $document->expedition,
                 'company' => $companyDisplay,
                 'client' => $document->client_id,
+                'piece_bl' => $document->piece_bl,
+                'piece_fa' => $document->piece_fa,
                 'status' => [
                     'id' => $document->status->id ?? null,
                     'name' => $document->status->name ?? null,
@@ -392,8 +394,20 @@ class DocumentController extends Controller
 
 
 
-    public function show(Document $document)
+    public function show($document_piece)
+
     {
+
+        $document = Document::where('piece_fa', $document_piece)->first();
+
+        if (!$document) {
+            $document = Document::where('piece_bl', $document_piece)->first();
+        }
+
+        if (!$document) {
+            $document = Document::where('piece', $document_piece)->first();
+        }
+
         $document->load([
             'lines' => fn($query) =>
             $query->join('F_DOCLIGNE', 'lines.docligne_id', '=', 'F_DOCLIGNE.cbMarq')
