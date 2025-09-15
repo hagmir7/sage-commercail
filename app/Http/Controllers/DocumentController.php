@@ -259,7 +259,7 @@ class DocumentController extends Controller
                 $query->where('company_id', auth()->user()->company_id);
             })
             ->whereHas('companies', function ($query) {
-                $query->whereIn('document_companies.status_id', [8, 9, 10]);
+                $query->whereIn('document_companies.status_id', [8, 9, 10, 11]);
             });
 
         if ($request->filled('search')) {
@@ -334,7 +334,7 @@ class DocumentController extends Controller
 
     public function livraison(Request $request)
     {
-        // 🔹 Try to auto-link orphan documents (no docentete)
+    
         if (!$request->filled('search')) {
             $documents = Document::whereDoesntHave('docentete')->whereNull('piece_bl')->get();
 
@@ -376,7 +376,15 @@ class DocumentController extends Controller
             });
         }
 
-        // 🔹 Order by date (latest first)
+
+      if (auth()->user()->hasRole("chargement")) {
+        $query->whereHas("document.palettes", function ($q) {
+            $q->where('delivered_by', auth()->id());
+        });
+    }
+
+
+
         $query->orderByDesc('DO_Date');
 
         // 🔹 Apply search
@@ -489,9 +497,17 @@ class DocumentController extends Controller
 
     public function deliveredPalettes($piece)
     {
-        $document = Document::withCount('palettes')->with(['palettes' => function ($query) {
-            $query->whereNotNull('delivered_at');
-        }])->where('piece', $piece)->first();
+
+        $document = Document::withCount('palettes')->with(['palettes'])->where('piece_fa', $piece)->first();
+
+        if (!$document) {
+            $document = Document::withCount('palettes')->with(['palettes'])->where('piece_bl', $piece)->first();
+        }
+
+        if (!$document) {
+            $document = Document::withCount('palettes')->with(['palettes'])->where('piece', $piece)->first();
+        }
+
 
         if (!$document) {
             return response()->json([

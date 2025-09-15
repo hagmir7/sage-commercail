@@ -434,6 +434,8 @@ class DocenteteController extends Controller
                 $this->updateDocStatus($document?->docentete);
             }
 
+            
+
             $document->companies()->updateExistingPivot(auth()->user()->company_id, [
                 'status_id' => 11,
                 'validated_by' => auth()->id(),

@@ -287,7 +287,15 @@ class PaletteController extends Controller
     {
         try {
 
-            $document = Document::with('palettes')->where("piece", $piece)->first();
+            $document = Document::with('palettes')->where('piece_fa', $piece)->first();
+
+            if (!$document) {
+                $document = Document::with('palettes')->where('piece_bl', $piece)->first();
+            }
+
+            if (!$document) {
+                $document = Document::with('palettes')->where('piece', $piece)->first();
+            }
 
             if (!$document) {
                 return response()->json([
@@ -297,6 +305,7 @@ class PaletteController extends Controller
             }
 
             $palette = $document->palettes->where('code', $code)->first();
+ 
 
             if (!$palette) {
                 return response()->json([
@@ -305,23 +314,23 @@ class PaletteController extends Controller
                 ], 404);
             }
 
-            // Update delivery timestamp
+
             $palette->delivered_at = now();
             $palette->save();
 
-            // Check if all palettes are delivered
+
             $allPalettesDelivered = $document->palettes->every(fn($p) => !is_null($p->delivered_at));
 
-            // Add status if all delivered
+      
             if ($allPalettesDelivered) {
                 $document->update([
                     'status_id' => 14
                 ]);
             }
 
-            // Add delivery status to palette response
-            $palette->all_palettes_delivered = $allPalettesDelivered;
 
+            $palette->all_palettes_delivered = $allPalettesDelivered;
+    
             return response()->json($palette);
         } catch (\Exception $e) {
             return response()->json([
@@ -454,6 +463,7 @@ class PaletteController extends Controller
 
         $documents = Document::with([
             'status',
+            'companies',
             'palettes' => function ($query) {
                 $query->with('user')->withCount('lines');
 
