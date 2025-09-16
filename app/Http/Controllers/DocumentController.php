@@ -142,12 +142,12 @@ class DocumentController extends Controller
 
 
 
-          $companies = $lines->pluck('company_id')->unique()->values();
-                $companyDisplay = match ($companies->count()) {
-                    0       => 'Société inconnue',
-                    1       => optional(\App\Models\Company::find($companies->first()))->name ?? 'Société inconnue',
-                    default => 'Inter & Serie',
-                };
+            $companies = $lines->pluck('company_id')->unique()->values();
+            $companyDisplay = match ($companies->count()) {
+                0       => 'Société inconnue',
+                1       => optional(\App\Models\Company::find($companies->first()))->name ?? 'Société inconnue',
+                default => 'Inter & Serie',
+            };
 
 
             return [
@@ -212,8 +212,7 @@ class DocumentController extends Controller
         return strval($docligne->docentete->cbMarq);
     }
 
-
-    public function preparationList(Request $request)
+public function preparationList(Request $request)
     {
         $user_roles = auth()->user()->roles()->pluck('name', 'id');
 
@@ -221,30 +220,88 @@ class DocumentController extends Controller
             'companies',
             'docentete:cbMarq,DO_Date,DO_DateLivr,DO_Reliquat'
         ])
-            ->whereHas('lines', function ($query) use ($user_roles) {
-                $query->where('company_id', auth()->user()->company_id);
+        ->whereHas('lines', function ($q) use ($user_roles) {
+            $q->where('company_id', auth()->user()->company_id);
 
-                $common = array_intersect($user_roles->toArray(), ['fabrication', 'montage', 'preparation_cuisine', 'preparation_trailer', 'magasinier']);
-                if (!empty($common)) {
-                    $query->whereIn("role_id", $user_roles->keys());
-                }
-            })
-            ->whereHas('companies', function ($query) {
-                $query->whereIn('document_companies.status_id', [1, 2, 3, 4, 5, 6, 7]);
-            });
+            $common = array_intersect(
+                $user_roles->toArray(),
+                ['fabrication', 'montage', 'preparation_cuisine', 'preparation_trailer', 'magasinier']
+            );
 
+            if (!empty($common)) {
+                $q->whereIn("role_id", $user_roles->keys());
+            }
+        })
+        ->whereHas('companies', function ($q) {
+            $q->whereIn('document_companies.status_id', [1, 2, 3, 4, 5, 6, 7]);
+        });
+
+        // 🔍 Search
         if ($request->filled('search')) {
             $search = $request->search;
+
             $query->where(function ($q) use ($search) {
-                $q->where('ref', 'like', "%$search%")
-                    ->orWhere('piece', 'like', "%$search%")
-                    ->orWhere('client_id', 'like', "%$search%");
+                $q->where('ref', 'like', "%{$search}%")
+                  ->orWhere('piece', 'like', "%{$search}%");
+            })
+            ->orWhereHas('companies', function ($q) use ($search) {
+                $q->where('client_id', 'like', "%{$search}%");
             });
         }
 
         $documents = $query->orderBy('created_at', 'desc')->paginate(20);
 
         return response()->json($documents);
+    }
+
+    /**
+     * Show single document with progress
+     */
+    public function show($document_piece)
+    {
+        $document = Document::where('piece_fa', $document_piece)
+            ->orWhere('piece_bl', $document_piece)
+            ->orWhere('piece', $document_piece)
+            ->first();
+
+        if (!$document) {
+            return response()->json([
+                'message' => 'Document not found'
+            ], 404);
+        }
+
+        $document->load([
+            'lines' => fn($q) =>
+                $q->join('F_DOCLIGNE', 'lines.docligne_id', '=', 'F_DOCLIGNE.cbMarq')
+                  ->orderBy('F_DOCLIGNE.DL_Ligne')
+                  ->select('lines.*'),
+
+            'lines.status',
+            'lines.role',
+            'lines.company',
+            'lines.article_stock',
+            'lines.palettes',
+
+            'lines.docligne:DO_Domaine,DO_Type,CT_Num,DO_Piece,DL_Ligne,DL_Design,DO_Ref,DL_PieceDE,DL_PieceBC,DL_PiecePL,DL_PieceBL,DL_Qte,AR_Ref,cbMarq,Nom,Hauteur,Largeur,Profondeur,Langeur,Couleur,Chant,Episseur,Description,Poignée,Rotation,DL_QteBL',
+        ]);
+
+        $lines = $document->lines
+            ->where('ref', '!=', 'SP000001')
+            ->whereNotIn('design', ['Special', '', 'special']);
+
+        $required_qte = $lines->sum(fn($line) => $line->docligne?->DL_Qte ?? 0);
+        $current_qte  = $lines->sum(fn($line) => $line->docligne?->DL_QteBL ?? 0);
+
+        $progress = $required_qte > 0
+            ? round(($current_qte / $required_qte) * 100, 2)
+            : 0;
+
+        return response()->json([
+            'current_qte'  => $current_qte,
+            'required_qte' => $required_qte,
+            'progress'     => intval($progress),
+            'document'     => $document,
+        ]);
     }
 
 
@@ -274,7 +331,7 @@ class DocumentController extends Controller
 
         $documents = $query->orderBy('created_at', 'desc')->paginate(20);
         return response()->json($documents);
-}
+    }
 
     public function getDocumentsBL($piece)
     {
@@ -293,16 +350,14 @@ class DocumentController extends Controller
             return $document;
         }
 
-        // ✅ Exactly one BL/FA
+
         $doc = $docs->first()->docentete;
 
         if ($docs->count() > 1) {
-            // ❌ Conflict: multiple BLs/FA for the same PL (should not happen)
             $doc = Docentete::whereIn("DO_Piece", $docs->pluck('DO_Piece'))->whereDoesntHave('document')->first();;
-            \Log::error("Multiple BL/FA found for PL {$document->piece}: " . $docs->pluck('DO_Piece')->join(', '));
         }
 
-        
+
 
         $document->update([
             'docentete_id' => $doc->cbMarq,
@@ -332,7 +387,7 @@ class DocumentController extends Controller
 
     public function livraison(Request $request)
     {
-    
+
         if (!$request->filled('search')) {
             $documents = Document::whereDoesntHave('docentete')->whereNull('piece_bl')->get();
 
@@ -375,11 +430,11 @@ class DocumentController extends Controller
         }
 
 
-      if (auth()->user()->hasRole("chargement")) {
-        $query->whereHas("document.palettes", function ($q) {
-            $q->where('delivered_by', auth()->id());
-        });
-    }
+        if (auth()->user()->hasRole("chargement")) {
+            $query->whereHas("document.palettes", function ($q) {
+                $q->where('delivered_by', auth()->id());
+            });
+        }
 
 
 
@@ -400,55 +455,8 @@ class DocumentController extends Controller
 
 
 
-    public function show($document_piece)
+  
 
-    {
-
-        $document = Document::where('piece_fa', $document_piece)->first();
-
-        if (!$document) {
-            $document = Document::where('piece_bl', $document_piece)->first();
-        }
-
-        if (!$document) {
-            $document = Document::where('piece', $document_piece)->first();
-        }
-
-        $document->load([
-            'lines' => fn($query) =>
-            $query->join('F_DOCLIGNE', 'lines.docligne_id', '=', 'F_DOCLIGNE.cbMarq')
-                ->orderBy('F_DOCLIGNE.DL_Ligne')
-                ->select('lines.*'),
-
-            'lines.status',
-            'lines.role',
-            'lines.company',
-            'lines.article_stock',
-            'lines.palettes',
-
-
-            'lines.docligne:DO_Domaine,DO_Type,CT_Num,DO_Piece,DL_Ligne,DL_Design,DO_Ref,DL_PieceDE,DL_PieceBC,DL_PiecePL,DL_PieceBL,DL_Qte,AR_Ref,cbMarq,Nom,Hauteur,Largeur,Profondeur,Langeur,Couleur,Chant,Episseur,Description,Poignée,Rotation,DL_QteBL',
-        ]);
-
-
-        $lines = $document->lines
-            ->where('ref', '!=', 'SP000001')
-            ->whereNotIn('design', ['Special', '', 'special']);
-
-        $required_qte = $lines->sum(fn($line) => $line->docligne?->DL_Qte ?? 0);
-        $current_qte  = $lines->sum(fn($line) => $line->docligne?->DL_QteBL ?? 0);
-
-        $progress = $required_qte > 0
-            ? round(($current_qte / $required_qte) * 100, 2)
-            : 0;
-
-        return response()->json([
-            'current_qte' => $current_qte,
-            'required_qte' => $required_qte,
-            'progress' => intval($progress),
-            'document' => $document
-        ]);
-    }
 
 
     public function addChargement(Document $document, Request $request)
@@ -495,22 +503,21 @@ class DocumentController extends Controller
 
     public function deliveredPalettes($piece)
     {
+        $makeQuery = fn() => Document::withCount([
+            'palettes as delivered_palettes_count' => fn($q) => $q->whereNotNull('delivered_at'),
+        ])
+            ->with([
+                'palettes' => fn($q) => $q->whereNotNull('delivered_at'),
+            ]);
 
-        $document = Document::withCount('palettes')->with(['palettes'])->where('piece_fa', $piece)->first();
-
-        if (!$document) {
-            $document = Document::withCount('palettes')->with(['palettes'])->where('piece_bl', $piece)->first();
-        }
-
-        if (!$document) {
-            $document = Document::withCount('palettes')->with(['palettes'])->where('piece', $piece)->first();
-        }
-
+        $document = $makeQuery()->where('piece_fa', $piece)->first()
+            ?? $makeQuery()->where('piece_bl', $piece)->first()
+            ?? $makeQuery()->where('piece', $piece)->first();
 
         if (!$document) {
             return response()->json([
                 'error' => 'Document not found',
-                'message' => 'Document non trouvée'
+                'message' => "Document non trouvée {$piece}",
             ], 404);
         }
 
@@ -530,7 +537,8 @@ class DocumentController extends Controller
     }
 
 
-    public function print(Document $document){
+    public function print(Document $document)
+    {
         $document->companies()->updateExistingPivot(auth()->user()->company_id, [
             'printed' => true,
             'updated' => false,
@@ -546,7 +554,7 @@ class DocumentController extends Controller
         $document->companies()->updateExistingPivot($companyIds, [
             'printed'   => false,
             'updated'   => true,
-            'updated_at'=> now(),
+            'updated_at' => now(),
         ]);
 
         return response()->json(['message' => "Réinitialisation d'impression avec succès"]);
