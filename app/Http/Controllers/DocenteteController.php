@@ -311,17 +311,21 @@ class DocenteteController extends Controller
 
         DB::transaction(function () use ($document, $lines) {
 
-            $new_document = Document::create([
-                'piece' => $document->piece,
-                'type' => $document->type,
-                'ref' => $document->ref,
-                'expedition' => $document->expedition,
-                'transfer_by' => $document->transfer_by,
-                'validated_by' => auth()->id(),
-                'controlled_by' => $document->controlled_by,
-                'status_id' => 11,
-                'client_id' => $document->client_id,
-            ]);
+            $new_document = Document::updateOrCreate(
+                [
+                    'piece' => $document->piece,
+                    'status_id' => 11,
+                ],
+                [
+                    'type' => $document->type,
+                    'ref' => $document->ref,
+                    'expedition' => $document->expedition,
+                    'transfer_by' => $document->transfer_by,
+                    'validated_by' => auth()->id(),
+                    'controlled_by' => $document->controlled_by,
+                    'client_id' => $document->client_id,
+                ]
+            );
 
             $palettes = [];
 

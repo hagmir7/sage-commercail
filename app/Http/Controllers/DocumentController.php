@@ -248,19 +248,20 @@ class DocumentController extends Controller
     }
 
 
-    // Controller & Validation List
+
     public function validationControllerList(Request $request)
     {
-        $query = Document::with([
-            'companies',
-            'docentete:cbMarq,DO_Date,DO_DateLivr,DO_Reliquat',
-        ])
-            ->whereHas('lines', function ($query) {
+        $query = Document::with(['companies', 'lines', 'docentete:DO_Piece,cbMarq,DO_DateLivr']);
+
+        if (auth()->user()->hasRole('commercial')) {
+            $query = $query->whereIn('status_id', [8, 9, 10, 11]);
+        } else {
+            $query->whereHas('lines', function ($query) {
                 $query->where('company_id', auth()->user()->company_id);
-            })
-            ->whereHas('companies', function ($query) {
+            })->whereHas('companies', function ($query) {
                 $query->whereIn('document_companies.status_id', [8, 9, 10, 11]);
             });
+        }
 
         if ($request->filled('search')) {
             $search = $request->search;
@@ -272,11 +273,8 @@ class DocumentController extends Controller
         }
 
         $documents = $query->orderBy('created_at', 'desc')->paginate(20);
-
         return response()->json($documents);
-    }
-
-
+}
 
     public function getDocumentsBL($piece)
     {
@@ -535,6 +533,7 @@ class DocumentController extends Controller
     public function print(Document $document){
         $document->companies()->updateExistingPivot(auth()->user()->company_id, [
             'printed' => true,
+            'updated' => false,
             'updated_at' => now(),
         ]);
         return response()->json(['message' => "Document imprimé avec succès"]);
