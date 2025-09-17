@@ -23,7 +23,8 @@ class Line extends Model
         'validated',
         'status_id',
         'first_company_id',
-        'quantity_prepare'
+        'quantity_prepare',
+        'company_code'
     ];
 
 

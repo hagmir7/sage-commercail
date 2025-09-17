@@ -426,8 +426,7 @@ class PaletteController extends Controller
 
                 Docligne::where('cbMarq', $line->docligne_id)->increment('DL_QteBL', floatval($request->quantity));
 
-
-                 // Document status update Allwasy must be in the bottm 
+                
                 if ($document->validation()) {
                     $document->update(['status_id' => 8]);
                 } elseif ($document->status_id != 7) {
@@ -491,8 +490,6 @@ class PaletteController extends Controller
 
         return response()->json($document);
     }
-
-
 
 
 
@@ -669,13 +666,12 @@ class PaletteController extends Controller
     }
 
 
-
-
     public function detach(Request $request)
     {
         $validator = Validator::make($request->all(), [
-            'line' => 'required|exists:lines,id',
-            'palette' => 'required|exists:palettes,code'
+            'pivot_id' => 'required|exists:line_palettes,id',
+            'line'     => 'required|exists:lines,id',
+            'palette'  => 'required|exists:palettes,code'
         ]);
 
         if ($validator->fails()) {
@@ -687,31 +683,32 @@ class PaletteController extends Controller
                 $line = Line::findOrFail($request->line);
                 $palette = Palette::where("code", $request->palette)->firstOrFail();
 
-                $pivot = $line->palettes()->where('palette_id', $palette->id)->first();
+                // Find pivot row
+                $pivot = DB::table('line_palettes')->where('id', $request->pivot_id)->first();
 
                 if ($pivot) {
-                    $quantity = $pivot->pivot->quantity;
-                    $line->docligne->update([
-                        'DL_QteBL' => floatval($line->docligne->DL_QteBL) - $quantity
-                    ]);
+                    // Decrement docligne quantity
+                    if ($line->docligne) {
+                        $line->docligne->update([
+                            'DL_QteBL' => floatval($line->docligne->DL_QteBL) - $pivot->quantity
+                        ]);
+                    }
+
+                    // Delete only this pivot row
+                    DB::table('line_palettes')->where('id', $request->pivot_id)->delete();
                 }
 
-                $line->palettes()->detach($palette->id);
+                $line->update(['status_id' => 7]);
 
-                // Update document status if preparation validated_by
-                $line->update([
-                    'status_id' => 7
-                ]);
+                if ($line->document && empty($line->document->status_id)) {
+                    $line->document->update(['status_id' => 7]);
+                }
 
-                if (!$line->document->status_id) {
-                    $line->document->update([
+                if ($palette->document) {
+                    $palette->document->companies()->updateExistingPivot(auth()->user()->company_id, [
                         'status_id' => 7,
                     ]);
                 }
-
-                $palette->document->companies()->updateExistingPivot(auth()->user()->company_id, [
-                    'status_id' => 7,
-                ]);
 
                 $palette->load(['lines.article_stock']);
                 return $palette;
@@ -725,6 +722,8 @@ class PaletteController extends Controller
             ], 500);
         }
     }
+
+
 
     
 

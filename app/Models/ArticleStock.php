@@ -29,7 +29,8 @@ class ArticleStock extends Model
         'gamme',
         'code_supplier',
         'code_supplier_2',
-        'category'
+        'category',
+        'company_code'
     ];
 
 

@@ -13,6 +13,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Carbon;
 use App\Http\Controllers\SellController;
+use App\Models\ArticleStock;
 use App\Models\Palette;
 use App\Models\RoleQuantityLine;
 
@@ -355,6 +356,7 @@ class DocenteteController extends Controller
                         'document_id' => $new_document->id,
                         'docligne_id' => $line->docligne_id,
                         'company_id' => $line->company_id,
+                        'company_code' => $line->company_code,
                         'role_id' => null,
                         'next_role_id' => null,
                         'palette_id' => $line->palette_id,
@@ -791,6 +793,16 @@ class DocenteteController extends Controller
                     throw new \Exception("Invalid line: {$lineId}");
                 }
 
+                $article = ArticleStock::where("code", $currentDocligne->AR_Ref)?->first();
+
+                if(!$article){
+                    \Log::alert("No article with this Ref ". $currentDocligne->AR_Ref);
+                }
+
+
+
+
+                \Log::alert($article->company_code);
 
                 if ($currentDocligne->AR_Ref != null) {
                     $line = Line::firstOrCreate([
@@ -806,6 +818,7 @@ class DocenteteController extends Controller
                         'company_id' => $request->company,
                         'first_company_id'  => $request->company,
                         'document_id' => $document->id,
+                        'company_code' => $article?->company_code ?? null
                     ]);
                 }
 

@@ -6,5 +6,5 @@ use Illuminate\Database\Eloquent\Relations\Pivot;
 
 class RoleQuantityLine extends Pivot
 {
-    protected $fillable = ['quantity', 'role_id', 'line_id'];
+    protected $fillable = ['quantity', 'role_id', 'line_id', 'next_role_id'];
 }
