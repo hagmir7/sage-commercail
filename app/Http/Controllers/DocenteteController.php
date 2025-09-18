@@ -702,13 +702,12 @@ class DocenteteController extends Controller
                 if (!empty($quantities) && isset($quantities[$line->id])) {
                     $updateData['transfer_quantity'] = $quantities[$line->id];
 
-                    if ((float) $quantities[$line->id] !== (float) ($line?->docligne?->DL_Qte)) {
-                        RoleQuantityLine::create([
-                            'line_id' => $line->id,
-                            'quantity' => $quantities[$line->id],
-                            'role_id' => $role->id,
-                        ]);
-                    }
+                    RoleQuantityLine::create([
+                        'line_id' => $line->id,
+                        'quantity' => $quantities[$line->id],
+                        'role_id' => $role->id,
+                        'next_role_id' => $next_role
+                    ]);
                 }
 
                 $line->update($updateData);
@@ -1014,5 +1013,11 @@ class DocenteteController extends Controller
         $results = $documents->paginate(20);
 
         return response()->json($results);
+    }
+
+
+    public function duplicate($piece){
+        $duplication = new DuplicationController();
+        $duplication->duplicat($piece);
     }
 }

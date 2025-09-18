@@ -19,3 +19,4 @@ Route::get('/test/{id}', [DocenteteController::class, 'show']);
 
 
 Route::post('login', [UserController::class, 'login'])->name("login");
+

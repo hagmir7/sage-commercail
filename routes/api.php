@@ -35,6 +35,8 @@ Route::get('/user', function (Request $request) {
 
 
 
+Route::get("duplicate/{piece}", [DocenteteController::class, 'duplicate']);
+
 Route::get("client/{client}", [ClientController::class, 'show']);
 Route::get("article/{article}", [ArticleController::class, 'show']);
 
@@ -141,8 +143,11 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get("shipping", 'shipping');
         Route::post('palettes/validate/{piece}', 'validate');
         Route::post('palettes/validate-partial/{piece}', 'validatePartial');
+        Route::get("duplicate/{piece}", 'duplicate');
         Route::get("{id}", 'show');
     });
+
+    
 
 
     Route::prefix('stock')->controller(StockMovementController::class)->group(function(){
