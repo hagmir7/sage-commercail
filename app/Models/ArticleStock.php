@@ -36,12 +36,26 @@ class ArticleStock extends Model
 
     public function palettes()
     {
-        return $this->belongsToMany(Palette::class)->withPivot('quantity')->withTimestamps();
+        return $this->belongsToMany(Palette::class, 'article_palette')->withPivot('quantity')->withTimestamps();
     }
 
     public function companies(){
         return $this->belongsToMany(Company::class, 'article_company');
     }
+
+    public function emplacements()
+    {
+        return $this->belongsToMany(
+            Emplacement::class,          // Related model
+            'article_emplacement',       // Pivot table
+            'article_stock_id',          // Foreign key on pivot for this model
+            'emplacement_id'             // Foreign key on pivot for the other model
+        )
+            ->withPivot('quantity')
+            ->withTimestamps();
+    }
+
+
 
     public function inventoryMovements(){
         return $this->hasMany(InventoryMovement::class, 'code_article', 'code');

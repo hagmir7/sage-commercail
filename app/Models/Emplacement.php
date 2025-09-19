@@ -8,12 +8,16 @@ class Emplacement extends Model
 {
     protected $fillable = ['depot_id', 'code', 'description', 'inventory_id'];
 
-
     public function articles()
     {
-        return $this->belongsToMany(ArticleStock::class, 'article_emplacement', 'emplacement_id', 'article_stock_id')
-            ->withPivot('quantity')
-            ->withTimestamps();
+        return $this->belongsToMany(
+            ArticleStock::class,         // Related model
+            'article_emplacement',       // Pivot table
+            'emplacement_id',            // Foreign key on pivot for this model
+            'article_stock_id'           // Foreign key on pivot for the other model
+        )
+        ->withPivot('quantity')
+        ->withTimestamps();
     }
 
 
