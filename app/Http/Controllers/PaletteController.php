@@ -4,11 +4,14 @@ namespace App\Http\Controllers;
 
 use App\Http\Controllers\Controller;
 use App\Models\ArticleStock;
+use App\Models\CompanyStock;
 use App\Models\Docligne;
 use App\Models\Document;
+use App\Models\Emplacement;
 use App\Models\InventoryStock;
 use App\Models\Line;
 use App\Models\Palette;
+use App\Models\StockMovement;
 use Illuminate\Http\Request;
 // use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\DB;
@@ -208,32 +211,32 @@ class PaletteController extends Controller
         $lineIdentifier = $request->line;
 
         try {
-        $line = Line::with([
+            $line = Line::with([
                 'docligne:cbMarq,DO_Piece,DO_Ref,CT_Num,Hauteur,Largeur,Poignée,Chant,Description,Rotation,Couleur,AR_Ref,Profondeur',
                 'docligne.article:AR_Ref,Nom,cbMarq,Hauteur,Largeur,Chant,Profonduer,Episseur,Description,AR_Design,Couleur',
                 'article_stock:code,name,height,width,depth,color,thickness,chant,description',
             ])
-            ->where('company_id', auth()->user()->company_id)
-            ->where("document_id", $document->id)
-            ->whereIn('status_id', [7, 8])
-            ->whereHas('docligne', function ($query) {
-                $query->whereColumn('DL_Qte', '>', 'DL_QteBL');
-            });
-
-        if (!$request->has('all') || $request->all !== 'true') {
-            $line->whereHas('article_stock', function ($query) use ($lineIdentifier) {
-                $query->where(function ($q) use ($lineIdentifier) {
-                    $q->where('code', (string)$lineIdentifier)
-                        ->orWhere('code_supplier', (string)$lineIdentifier)
-                        ->orWhere('code_supplier_2', (string)$lineIdentifier)
-                        ->orWhere('qr_code', (string)$lineIdentifier);
+                ->where('company_id', auth()->user()->company_id)
+                ->where("document_id", $document->id)
+                ->whereIn('status_id', [7, 8])
+                ->whereHas('docligne', function ($query) {
+                    $query->whereColumn('DL_Qte', '>', 'DL_QteBL');
                 });
-            });
-        }
 
-        $line = $line->get();
+            if (!$request->has('all') || $request->all !== 'true') {
+                $line->whereHas('article_stock', function ($query) use ($lineIdentifier) {
+                    $query->where(function ($q) use ($lineIdentifier) {
+                        $q->where('code', (string)$lineIdentifier)
+                            ->orWhere('code_supplier', (string)$lineIdentifier)
+                            ->orWhere('code_supplier_2', (string)$lineIdentifier)
+                            ->orWhere('qr_code', (string)$lineIdentifier);
+                    });
+                });
+            }
 
-                
+            $line = $line->get();
+
+
 
             return response()->json($line);
         } catch (\Exception $e) {
@@ -305,7 +308,7 @@ class PaletteController extends Controller
             }
 
             $palette = $document->palettes->where('code', $code)->first();
- 
+
 
             if (!$palette) {
                 return response()->json([
@@ -321,7 +324,7 @@ class PaletteController extends Controller
 
             $allPalettesDelivered = $document->palettes->every(fn($p) => !is_null($p->delivered_at));
 
-      
+
             if ($allPalettesDelivered) {
                 $document->update([
                     'status_id' => 14
@@ -330,7 +333,7 @@ class PaletteController extends Controller
 
 
             $palette->all_palettes_delivered = $allPalettesDelivered;
-    
+
             return response()->json($palette);
         } catch (\Exception $e) {
             return response()->json([
@@ -379,28 +382,29 @@ class PaletteController extends Controller
     public function confirm(Request $request)
     {
         $validator = Validator::make($request->all(), [
-            'quantity' => 'required|integer|max:1000|min:1',
-            'line' => 'required|exists:lines,id',
-            'palette' => 'required|exists:palettes,code',
+            'quantity'    => 'required|integer|max:1000|min:1',
+            'line'        => 'required|exists:lines,id',
+            'palette'     => 'required|exists:palettes,code',
             'emplacement' => 'nullable'
         ]);
 
         if ($validator->fails()) {
             return response()->json([
                 'message' => $validator->errors()->first(),
-                'errors' => $validator->errors()
+                'errors'  => $validator->errors()
             ], 422);
         }
 
-        $line = Line::find($request->line);
+        $line     = Line::find($request->line);
         $document = $line->document;
-        $palette = Palette::where("code", $request->palette)->first();
+        $palette  = Palette::where("code", $request->palette)->first();
 
         $line->load(['palettes', 'document']);
 
         try {
             DB::transaction(function () use ($document, $request, $line, $palette) {
 
+                // ✅ Check line qty validity
                 if (floatval($line?->docligne?->DL_Qte) < ($line?->docligne?->DL_QteBL + floatval($request->quantity))) {
                     throw new \Exception("La quantité n'est pas valide", 422);
                 }
@@ -409,24 +413,83 @@ class PaletteController extends Controller
                     throw new \Exception("Le document ne correspond pas", 404);
                 }
 
+                // ✅ Attach palette to line
                 $line->palettes()->attach($palette->id, ['quantity' => $request->quantity]);
                 $line->update(['status_id' => 8]);
 
                 $palette->load(['lines.article_stock']);
 
-
-
+                // ✅ Decrement stock if emplacement is specified
                 if ($request->filled('emplacement')) {
                     $article_stock = ArticleStock::where('code', $line->ref)->first();
-                    if ($article_stock) {
-                        $article_stock->quantity += floatval($request->quantity);
-                        $article_stock->save();
+                    $emplacement   = Emplacement::where("code", $request->emplacement)->first();
+
+                    $company_stock = CompanyStock::where('code_article', $line->ref)
+                        ->where('company_id', $emplacement->depot->company_id)
+                        ->lockForUpdate()
+                        ->first();
+
+                    // ✅ Check company stock
+                    if (!$company_stock || $company_stock->quantity < floatval($request->quantity)) {
+                        throw new \Exception("Stock insuffisant pour cet article.", 422);
+                    }
+
+                    // ✅ Create stock OUT movement
+                    StockMovement::create([
+                        'code_article'     => $line->ref,
+                        'designation'      => $article_stock->description ?? '',
+                        'emplacement_id'   => $emplacement?->id,
+                        'movement_type'    => "OUT",
+                        'article_stock_id' => $article_stock->id,
+                        'quantity'         => floatval($request->quantity),
+                        'moved_by'         => auth()->id(),
+                        'company_id'       => auth()->user()->company_id,
+                        'movement_date'    => now(),
+                    ]);
+
+                    // ✅ Decrement company stock safely
+                    $company_stock->decrement('quantity', floatval($request->quantity));
+
+                    // ✅ Update emplacement pivot
+                    $existing = $emplacement->articles()->find($article_stock->id);
+                    if ($existing) {
+                        $currentQty = $existing->pivot->quantity;
+                        if ($currentQty < floatval($request->quantity)) {
+                            throw new \Exception("Stock insuffisant dans l’emplacement.", 422);
+                        }
+                        $emplacement->articles()->updateExistingPivot($article_stock->id, [
+                            'quantity' => DB::raw('quantity - ' . floatval($request->quantity))
+                        ]);
+                    } else {
+                        throw new \Exception("Article non trouvé dans cet emplacement.", 404);
+                    }
+
+                    // ✅ Handle palettes (reduce instead of detach for history)
+                    $paletteRelation = $article_stock->palettes()
+                        ->where('emplacement_id', $emplacement->id)
+                        ->first();
+
+                    if ($paletteRelation) {
+                        $currentPaletteQty = $paletteRelation->pivot->quantity;
+                        if ($currentPaletteQty <= floatval($request->quantity)) {
+                            // Set to 0 instead of detach (to keep trace)
+                            $article_stock->palettes()->updateExistingPivot(
+                                $paletteRelation->id,
+                                ['quantity' => 0]
+                            );
+                        } else {
+                            $article_stock->palettes()->updateExistingPivot(
+                                $paletteRelation->id,
+                                ['quantity' => DB::raw('quantity - ' . floatval($request->quantity))]
+                            );
+                        }
                     }
                 }
 
+                // ✅ Update doc line
                 Docligne::where('cbMarq', $line->docligne_id)->increment('DL_QteBL', floatval($request->quantity));
 
-                
+                // ✅ Document status
                 if ($document->validation()) {
                     $document->update(['status_id' => 8]);
                 } elseif ($document->status_id != 7) {
@@ -435,20 +498,26 @@ class PaletteController extends Controller
 
                 $status = $this->validationCompany(auth()->user()->company_id, $document->id) ? 8 : 7;
 
-
                 $document->companies()->updateExistingPivot(auth()->user()->company_id, [
                     'status_id' => $status,
                     'updated_at' => now(),
                 ]);
             });
 
-            return response()->json($palette);
+            return response()->json([
+                'palette'   => $palette->fresh(),
+                'line'      => $line->fresh(['palettes', 'docligne']),
+                'document'  => $document->fresh(),
+            ]);
         } catch (\Exception $e) {
             return response()->json([
                 'message' => $e->getMessage()
             ], in_array($e->getCode(), [404, 422]) ? $e->getCode() : 500);
         }
     }
+
+
+
 
 
 
@@ -725,7 +794,7 @@ class PaletteController extends Controller
 
 
 
-    
+
 
     public function resetPalette($code)
     {
@@ -922,4 +991,6 @@ class PaletteController extends Controller
             ];
         }
     }
+
+
 }
