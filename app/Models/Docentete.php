@@ -37,6 +37,10 @@ class Docentete extends Model
         return $this->hasMany(Docligne::class, 'DO_Piece', 'DO_Piece');
     }
 
+     public function doclignes_inter(){
+        return $this->setConnection('sqlsrv_inter')->hasMany(Docligne::class, 'DO_Piece', 'DO_Piece');
+    }
+
 
     public function document(): HasOne
     {

@@ -17,6 +17,7 @@ use App\Http\Controllers\InventoryMovementController;
 use App\Http\Controllers\LineController;
 use App\Http\Controllers\PaletteController;
 use App\Http\Controllers\PermissionController;
+use App\Http\Controllers\ReceptionController;
 use App\Http\Controllers\RoleController;
 use App\Http\Controllers\SellController;
 use App\Http\Controllers\StockMovementController;
@@ -36,6 +37,7 @@ Route::get('/user', function (Request $request) {
 
 
 Route::get("duplicate/{piece}", [DocenteteController::class, 'duplicate']);
+Route::get("change/{piece}", [DocenteteController::class, 'change']);
 
 Route::get("client/{client}", [ClientController::class, 'show']);
 Route::get("article/{article}", [ArticleController::class, 'show']);
@@ -219,8 +221,15 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('{piece}/delivered-palettes', 'deliveredPalettes');
         Route::get('/{piece}', 'checkControlled');
     });
+
+
+    
 });
 
+
+Route::prefix('receptions')->controller(ReceptionController::class)->group(function () {
+    Route::get('', 'index');
+});
 
 Route::post('/login', [AuthController::class, 'login']);
 

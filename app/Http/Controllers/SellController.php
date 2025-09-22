@@ -27,9 +27,9 @@ class SellController extends Controller
     private function generatePiece(): string
     {
         $lastPiece = Docentete::where('DO_Type', self::DO_TYPE)
-            ->where('DO_Piece', 'LIKE', '%BLX%')
+            ->where('DO_Piece', 'LIKE', '%PL%')
             ->orderByDesc('DO_Piece')
-            ->value('DO_Piece') ?? '25BLX000000';
+            ->value('DO_Piece') ?? '25PL000000';
 
         preg_match('/^([A-Z0-9]+)(\d{6})$/i', $lastPiece, $matches);
 
@@ -37,8 +37,9 @@ class SellController extends Controller
             return $matches[1] . str_pad((int)$matches[2] + 1, 6, '0', STR_PAD_LEFT);
         }
 
-        return '25BLX000001';
+        return '25PL000001';
     }
+
 
     private function calculateTotal($doclignes)
     {

@@ -1020,4 +1020,27 @@ class DocenteteController extends Controller
         $duplication = new DuplicationController();
         $duplication->duplicat($piece);
     }
+
+
+
+    public function change($piece)
+    {
+        $docentete = Docentete::findOrFail($piece);
+
+        // Update the Docentete record
+        $docentete->update([
+            'DO_Tiers'  => 'CL150',
+            'DO_Souche' => '0',
+        ]);
+
+        // Loop through related doclignes
+        foreach ($docentete->doclignes as $docligne) {
+            $docligne->update([
+                'CT_Num' => 'CL15',
+            ]);
+        }
+
+        return response()->json(['success' => true]);
+    }
+
 }
