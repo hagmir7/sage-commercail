@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasOne;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Docentete extends Model
 {
@@ -21,31 +22,37 @@ class Docentete extends Model
 
     protected $guarded = [];
 
-
-
     protected function casts(): array
     {
         return [
             'DO_DateLivr' => 'datetime',
             'DO_DateLivrRealisee' => 'datetime',
-            'DO_DateExpedition' => 'datetime'
+            'DO_DateExpedition' => 'datetime',
         ];
     }
 
+    // 🔹 Relation with Compte (client/fournisseur)
+    public function compt(): BelongsTo
+    {
+        return $this->belongsTo(Compte::class, 'DO_Tiers', 'CT_Num');
+    }
 
-    public function doclignes(){
+    // 🔹 Relation with document lines
+    public function doclignes(): HasMany
+    {
         return $this->hasMany(Docligne::class, 'DO_Piece', 'DO_Piece');
     }
 
-     public function doclignes_inter(){
-        return $this->setConnection('sqlsrv_inter')->hasMany(Docligne::class, 'DO_Piece', 'DO_Piece');
+    // 🔹 Relation with document lines from INTER connection
+    public function doclignes_inter(): HasMany
+    {
+        return $this->setConnection('sqlsrv_inter')
+            ->hasMany(Docligne::class, 'DO_Piece', 'DO_Piece');
     }
 
-
+    // 🔹 Relation with document (custom table)
     public function document(): HasOne
     {
         return $this->hasOne(Document::class, 'docentete_id', 'cbMarq');
     }
-
-
 }
