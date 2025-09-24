@@ -15,8 +15,13 @@ class Docligne extends Model
 
     // protected $dateFormat = 'Y-d-m H:i:s.v';
 
-    const CREATED_AT = 'cbCreation';
-    const UPDATED_AT = 'cbModification';
+    // const CREATED_AT = 'cbCreation';
+    // const UPDATED_AT = 'cbModification';
+
+    public $timestamps = false;
+
+
+
 
     public function docentete()
     {

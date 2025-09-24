@@ -52,8 +52,8 @@ class RoleController extends Controller
     }
 
 
-    public function chargeRoles(){
-        return User::role('chargement')
+    public function roleUsers($role){
+        return User::role($role)
             ->where('company_id', auth()->user()->company_id)
             ->select('id AS value', 'full_name AS label')->get();
     }

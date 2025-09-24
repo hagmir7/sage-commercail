@@ -82,7 +82,7 @@ Route::middleware('auth:sanctum')->group(function () {
     // Get user Role and permissions
     Route::get('/user/{id}/permissions', [UserPermissionController::class, 'getUserRolesAndPermissions']);
     Route::get('/user/permissions', [UserPermissionController::class, 'getAuthUserRolesAndPermissions']);
-    Route::get('roles/chargement', [RoleController::class, 'chargeRoles']);
+    Route::get('roles/{role}', [RoleController::class, 'roleUsers']);
 
 
     Route::prefix('depots')->controller(DepotController::class)->group(function () {
@@ -222,14 +222,19 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/{piece}', 'checkControlled');
     });
 
+    Route::prefix('receptions')->controller(ReceptionController::class)->group(function () {
+        Route::get('', 'index');
+        Route::get('{piece}', 'show');
+        Route::post('transfer', 'transfer');
+        Route::get('reset/{piece}', 'reset');
+    });
+
 
     
 });
 
 
-Route::prefix('receptions')->controller(ReceptionController::class)->group(function () {
-    Route::get('', 'index');
-});
+
 
 Route::post('/login', [AuthController::class, 'login']);
 
