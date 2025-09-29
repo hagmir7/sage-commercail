@@ -251,5 +251,10 @@
                 </div>
             </main>
         </div>
+        <form action="{{ route('palettes.import') }}" method="POST" enctype="multipart/form-data">
+            @csrf
+            <input type="file" name="file" required>
+            <button type="submit">Importer</button>
+        </form>
     </body>
 </html>

@@ -24,6 +24,8 @@ class DocenteteController extends Controller
     {
         $user_roles = auth()->user()->roles()->pluck('name', 'id');
 
+        return $user_roles;
+
         if ($user_roles->isEmpty()) {
             return response()->json([]);
         }
@@ -52,7 +54,7 @@ class DocenteteController extends Controller
                 'DO_Expedit'
             ])
             ->whereIn("DO_Piece", $documents->pluck('piece'))
-            ->orderByDesc("DO_Date")
+            ->orderByDesc("cbCreation")
             ->where('DO_Domaine', 0)
             ->where('DO_Statut', 1);
 
@@ -162,7 +164,7 @@ class DocenteteController extends Controller
                 'DO_DateLivr',
                 'DO_Expedit'
             ])
-            ->orderByDesc("DO_Date")
+            ->orderByDesc("cbCreation")
             ->where('DO_Domaine', 0)
             ->where('DO_Statut', 1)
             ->where('DO_Type', $request->type ?? 2);

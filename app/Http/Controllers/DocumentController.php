@@ -63,7 +63,7 @@ class DocumentController extends Controller
     {
         $documents = Document::with(['status', 'lines.palettes'])
             ->withCount('lines')
-            ->orderByDesc('updated_at')
+            ->orderByDesc('id')
             ->get();
 
         $documents = $documents->map(function ($document) {
@@ -249,7 +249,7 @@ public function preparationList(Request $request)
             });
         }
 
-        $documents = $query->orderBy('created_at', 'desc')->paginate(20);
+        $documents = $query->orderByDesc('id')->paginate(20);
 
         return response()->json($documents);
     }
@@ -329,7 +329,7 @@ public function preparationList(Request $request)
             });
         }
 
-        $documents = $query->orderBy('created_at', 'desc')->paginate(20);
+        $documents = $query->orderBy('id', 'desc')->paginate(20);
         return response()->json($documents);
     }
 

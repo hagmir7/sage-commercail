@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Http\Controllers\Controller;
+use App\Imports\PalettesImport;
 use App\Models\ArticleStock;
 use App\Models\CompanyStock;
 use App\Models\Docligne;
@@ -17,6 +18,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Validator;
+use Maatwebsite\Excel\Facades\Excel;
 
 class PaletteController extends Controller
 {
@@ -420,9 +422,9 @@ class PaletteController extends Controller
                 $palette->load(['lines.article_stock']);
 
                 // ✅ Decrement stock if emplacement is specified
-                if ($request->filled('emplacement')) {
+                if ($request->emplacement) {
                     $article_stock = ArticleStock::where('code', $line->ref)->first();
-                    $emplacement   = Emplacement::where("code", $request->emplacement)->first();
+                     $emplacement = Emplacement::where("code", $request->emplacement)->first();
 
                     $company_stock = CompanyStock::where('code_article', $line->ref)
                         ->where('company_id', $emplacement->depot->company_id)
@@ -991,6 +993,22 @@ class PaletteController extends Controller
             ];
         }
     }
+
+
+
+      public function import(Request $request)
+        {
+            $request->validate([
+                'file' => 'required|mimes:xlsx,csv,xls',
+            ]);
+
+            Excel::import(new PalettesImport, $request->file('file'));
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Import terminé avec succès !'
+            ]);
+        }
 
 
 }

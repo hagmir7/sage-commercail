@@ -84,7 +84,7 @@ class InventoryController extends Controller
 
         return response()->json([
             'inventory' => $inventory,
-            'movements' => $movements->orderBy('created_at', 'desc')
+            'movements' => $movements->orderBy('id', 'desc')
                 ->paginate($request->input('per_page', 30)),
         ]);
     }

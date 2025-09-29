@@ -20,3 +20,7 @@ Route::get('/test/{id}', [DocenteteController::class, 'show']);
 
 Route::post('login', [UserController::class, 'login'])->name("login");
 
+
+use App\Http\Controllers\PaletteController;
+
+Route::post('/palettes/import', [PaletteController::class, 'import'])->name('palettes.import');

@@ -17,7 +17,8 @@ class Palette extends Model
         'delivered_at',
         'delivered_by',
         'inventory_id',
-        'first_company_id'
+        'first_company_id',
+        'weight'
     ];
 
     // public $timestamps = false;

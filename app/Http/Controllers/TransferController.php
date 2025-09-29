@@ -13,7 +13,7 @@ class TransferController extends Controller
     public function index()
     {
         $transferes = Transfer::with(['form_company', 'to_company', 'user', 'palette.document', 'transfer_by'])
-            ->orderByDesc('created_at')
+            ->orderByDesc('id')
             ->paginate(15);
         return response()->json($transferes);
     }
