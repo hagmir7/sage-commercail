@@ -8,6 +8,7 @@ use App\Models\Emplacement;
 use App\Models\Inventory;
 use Illuminate\Http\Request;
 use Maatwebsite\Excel\Facades\Excel;
+use Illuminate\Support\Facades\Validator;
 
 class EmplacementController extends Controller
 {
@@ -29,12 +30,26 @@ class EmplacementController extends Controller
 
     public function create(Request $request)
     {
+        $validator = Validator::make($request->all(), [
+            'depot_id' => 'required|exists:depots,id',
+            'code'     => 'required|string|max:255|unique:emplacements,code',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'errors' => $validator->errors(),
+                'message' => $validator->errors()->first()
+            ], 422);
+        }
+
         Emplacement::create([
             'depot_id' => $request->depot_id,
-            'code' => $request->code
+            'code'     => $request->code,
         ]);
-        return response()->json(['message' => "Addedd successfully"]);
+
+        return response()->json(['message' => "Added successfully"]);
     }
+
 
     public function delete(Emplacement $emplacement)
     {
