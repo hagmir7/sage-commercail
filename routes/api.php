@@ -103,7 +103,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('{emplacement:code}/inventory/{inventory}', 'showForInventory');
         Route::post('{depot}/import', 'import');
         Route::get('{emplacement:code}', 'show');
-
+        Route::delete('delete/{emplacement:code}', 'delete');
     });
 
     Route::prefix('transfer')->controller(TransferController::class)->group(function () {

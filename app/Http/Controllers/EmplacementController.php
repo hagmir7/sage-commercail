@@ -36,6 +36,15 @@ class EmplacementController extends Controller
         return response()->json(['message' => "Addedd successfully"]);
     }
 
+    public function delete(Emplacement $emplacement)
+    {
+        if (auth()->user()->hasRole(['admin', 'super_admin'])) {
+            $emplacement->delete();
+            return response()->json(["message" => "Emplacement deleted successfully"]);
+        }
+
+        return response()->json(["message" => "You are not authenticated ⚠️"], 401);
+    }
 
 
     public function showForInventory(Emplacement $emplacement, Inventory $inventory)
