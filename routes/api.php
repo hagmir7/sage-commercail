@@ -112,7 +112,6 @@ Route::middleware('auth:sanctum')->group(function () {
     });
 
 
-
     Route::prefix('palettes')->controller(PaletteController::class)->group(function () {
         Route::post('generate', 'generate');
         Route::post('scan', 'scanLine');
