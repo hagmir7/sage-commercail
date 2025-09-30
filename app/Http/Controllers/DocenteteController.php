@@ -31,7 +31,6 @@ class DocenteteController extends Controller
         }
         $documents = Document::whereHas('docentete')->whereHas("lines", function ($query) use ($user_roles) {
             $line = $query->where("company_id", auth()->user()->company_id)
-
                 ->whereIn('status_id', [1, 2, 3, 4, 5, 6, 7, 8, 9]);
 
             $common = array_intersect($user_roles->toArray(), ['fabrication', 'montage', 'preparation_cuisine', 'preparation_trailer', 'magasinier']);
