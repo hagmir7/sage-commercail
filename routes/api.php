@@ -228,13 +228,12 @@ Route::middleware('auth:sanctum')->group(function () {
 
     Route::prefix('receptions')->controller(ReceptionController::class)->group(function () {
         Route::get('', 'index');
+        Route::get('list', 'list');
         Route::get('{piece}', 'show');
         Route::post('transfer', 'transfer');
         Route::get('reset/{piece}', 'reset');
+        Route::post('movement/{piece}', 'movement');
     });
-
-
-    
 });
 
 

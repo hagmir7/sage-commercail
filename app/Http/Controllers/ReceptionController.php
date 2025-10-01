@@ -3,10 +3,14 @@
 namespace App\Http\Controllers;
 
 use App\Models\ArticleStock;
+use App\Models\CompanyStock;
 use App\Models\Docentete;
 use App\Models\Docligne;
 use App\Models\Document;
+use App\Models\Emplacement;
 use App\Models\Line;
+use App\Models\Palette;
+use App\Models\StockMovement;
 use App\Models\User;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
@@ -76,6 +80,22 @@ class ReceptionController extends Controller
         return response()->json($docentetes);
     }
 
+    public function generatePaletteCode()
+    {
+        $lastCode = DB::table('palettes')
+            ->where('code', 'like', 'PALS%')
+            ->orderBy('id', 'desc')
+            ->value('code');
+
+        if (!$lastCode) {
+            $nextNumber = 1;
+        } else {
+            $number = (int) substr($lastCode, 4);
+            $nextNumber = $number + 1;
+        }
+        return 'PALS' . str_pad($nextNumber, 8, '0', STR_PAD_LEFT);
+    }
+
 
 
     public function show($piece)
@@ -92,7 +112,7 @@ class ReceptionController extends Controller
                 'DO_Expedit',
                 'DO_TotalHT'
             )
-            ->with(['doclignes:DO_Piece,AR_Ref,DL_Design,DL_Qte,DL_QteBL,DL_Ligne,cbMarq', 'doclignes.line',])
+            ->with(['doclignes:DO_Piece,AR_Ref,DL_Design,DL_Qte,DL_QteBL,DL_Ligne,cbMarq', 'doclignes.line', 'doclignes.line.user_role', 'document'])
             ->find($piece);
     }
 
@@ -101,7 +121,8 @@ class ReceptionController extends Controller
 
         $validator = Validator::make($request->all(), [
             'document_piece' => 'required',
-            'user_id' => 'required|exists:users,id'
+            'user_id' => 'required|exists:users,id',
+            'lines' => 'required|array',
         ]);
 
         if ($validator->fails()) {
@@ -114,7 +135,6 @@ class ReceptionController extends Controller
 
         try {
             $user = User::find($request->user_id);
-
 
             $docentete = Docentete::on('sqlsrv_inter')->with('doclignes')->findOrFail($request->document_piece);
 
@@ -138,13 +158,15 @@ class ReceptionController extends Controller
 
 
             $lines = [];
-            foreach ($docentete->doclignes as $docligne) {
+            foreach ($request->lines as $lineId) {
+                $docligne = Docligne::where('cbMarq', $lineId)->first();
 
                 if ($docligne) {
                     $docligne->DL_QteBL = "0";
                     $docentete->cbModification = now()->format('Y-m-d H:i:s');
                     $docligne->save();
                 }
+
 
                 if ($docligne->AR_Ref != null) {
                     $line = Line::on('sqlsrv_inter')->firstOrCreate([
@@ -153,19 +175,20 @@ class ReceptionController extends Controller
                         'docligne_id' => $docligne->cbMarq,
                         'tiers' => $docligne->CT_Num,
                         'name' => $docligne?->Nom,
-                        'ref' => $docligne->AR_Ref,
+                        'ref' => $docligne?->AR_Ref,
                         'design' => $docligne->DL_Design,
                         'quantity' => $docligne->DL_Qte,
                         'dimensions' => $docligne->item,
                         'company_id' => $user->company_id,
                         'document_id' => $document->id,
-
+                        'role_id' => $user->id
                     ]);
                 }
 
 
                 $lines[] = $line;
             }
+
             return response()->json([
                 'status'  => 'success',
                 'message' => 'Document transferred successfully',
@@ -177,6 +200,69 @@ class ReceptionController extends Controller
             ], 500);
         }
     }
+
+
+    public function list(Request $request)
+    {
+
+        $companies = ['sqlsrv', 'sqlsrv_inter'];
+
+        $allDocentetes = collect();
+
+        foreach ($companies as $company) {
+            $query = Docentete::on($company)
+                ->whereHas('doclignes.line', function ($q) {
+                    $q->where('role_id', auth()->id());
+                })
+                ->with([
+                    'doclignes:DO_Piece,cbMarq',
+                    'doclignes.line:id,role_id,docligne_id',
+                    'compt:CT_Intitule,CT_Num,cbMarq,CT_Telephone'
+                ])
+                ->select([
+                    'DO_Reliquat',
+                    'DO_Piece',
+                    'DO_Ref',
+                    'DO_Tiers',
+                    'cbMarq',
+                    'DO_Date',
+                    'DO_DateLivr',
+                    'DO_Expedit',
+                    'DO_TotalHT',
+                    'cbCreation'
+                ])
+                ->orderByDesc('cbCreation')
+                ->get();
+
+            // Add company identifier if needed
+            $query->each(function ($doc) use ($company) {
+                $doc->company = $company;
+            });
+
+            $allDocentetes = $allDocentetes->merge($query);
+        }
+
+        // Optional: sort and paginate manually
+        $allDocentetes = $allDocentetes
+            ->sortByDesc('cbCreation')
+            ->values();
+
+        // If you want pagination across all databases
+        $perPage = 30;
+        $page = $request->get('page', 1);
+        $paginated = new \Illuminate\Pagination\LengthAwarePaginator(
+            $allDocentetes->forPage($page, $perPage),
+            $allDocentetes->count(),
+            $perPage,
+            $page,
+            ['path' => $request->url(), 'query' => $request->query()]
+        );
+
+        return response()->json($paginated);
+    }
+
+
+
 
     public function reset($piece)
     {
@@ -198,5 +284,175 @@ class ReceptionController extends Controller
         $document->delete();
 
         return response()->json(['message' => "Réinitialisé avec succès"], 200);
+    }
+
+
+    public function movement(Request $request, $piece)
+    {
+        try {
+            $validator = Validator::make($request->all(), [
+                'emplacement_code' => 'required|string|max:255|min:3|exists:emplacements,code',
+                'code_article'     => 'required|string',
+                'quantity'         => 'required|numeric|min:0',
+                'condition'        => 'nullable|numeric|min:1',
+                'type_colis'       => 'nullable|in:Piece,Palette,Carton',
+                'palettes'         => 'required_if:type_colis,Palette,Carton|numeric|min:1',
+                'company'          => 'required|numeric'
+            ]);
+
+            if ($validator->fails()) {
+                return response()->json([
+                    'message' => $validator->errors()->first(),
+                    'errors'  => $validator->errors()
+                ], 422);
+            }
+
+            $companyId   = intval($request->company ?? 1);
+            $article     = ArticleStock::where('code', $request->code_article)->first();
+            $emplacement = Emplacement::where("code", $request->emplacement_code)->first();
+
+            if (!$article) {
+                return response()->json([
+                    'errors' => ['article' => 'Article non trouvé']
+                ], 404);
+            }
+
+            if (!$emplacement) {
+                return response()->json([
+                    'errors' => ['emplacement' => 'Emplacement non trouvé']
+                ], 404);
+            }
+
+            $conditionMultiplier = $request->condition ? (float) $request->condition : 1.0;
+
+            $docentete = Docentete::on('sqlsrv_inter')->find($piece);
+
+
+            $docligne = $docentete->doclignes()->where("AR_Ref", $request->code_article)->first();
+
+            if (!$docligne || $docligne->DL_Qte < ($conditionMultiplier + $docligne->DL_QteBL)) {
+                return response()->json(['message' => "Quantité insuffisante"], 422);
+            }
+
+
+            DB::transaction(function () use ($article, $request, $conditionMultiplier, $emplacement, $companyId, $docligne, $docentete) {
+                StockMovement::create([
+                    'code_article'     => $request->code_article,
+                    'designation'      => $article->description,
+                    'emplacement_id'   => $emplacement->id,
+                    'movement_type'    => "IN",
+                    'article_stock_id' => $article->id,
+                    'quantity'         => $request->quantity,
+                    'moved_by'         => auth()->id(),
+                    'company_id'       => $companyId,
+                    'movement_date'    => now(),
+                ]);
+
+                $docligne->update([
+                    'DL_QteBL' => ($docligne->DL_QteBL + $conditionMultiplier)
+                ]);
+
+                if ($docentete->doclignes->sum('DL_QteBL') == $docentete->doclignes->sum('DL_Qte')) {
+                    $docentete->document()->update([
+                        'status_id' => 2
+                    ]);
+                }
+
+                if ($request->type_colis === "Palette" || $request->type_colis === "Carton") {
+                    $qte_value = $request->palettes * $conditionMultiplier;
+                } else {
+                    $qte_value = $request->quantity;
+                }
+
+                $company_stock = CompanyStock::where('code_article', $request->code_article)
+                    ->where('company_id', $companyId)
+                    ->first();
+
+                if ($company_stock) {
+                    $company_stock->quantity += $qte_value;
+                    $company_stock->save();
+                } else {
+                    CompanyStock::create([
+                        'code_article' => $request->code_article,
+                        'designation'  => $article->description,
+                        'company_id'   => $companyId,
+                        'quantity'     => $qte_value
+                    ]);
+                }
+
+                // ✅ Update emplacement pivot safely
+                $existing = $emplacement->articles()->find($article->id);
+
+                if ($existing) {
+                    $emplacement->articles()->updateExistingPivot($article->id, [
+                        'quantity' => DB::raw('quantity + ' . $qte_value)
+                    ]);
+                } else {
+                    $emplacement->articles()->attach($article->id, ['quantity' => $qte_value]);
+                }
+
+                // ✅ Handle palettes
+                if ($request->type_colis === "Palette") {
+                    for ($i = 1; $i <= intval($request->quantity); $i++) {
+                        $palette = Palette::create([
+                            "code"           => $this->generatePaletteCode(),
+                            "emplacement_id" => $emplacement->id,
+                            "company_id"     => $companyId,
+                            "user_id"        => auth()->id(),
+                            "type"           => "Stock",
+                        ]);
+                        $article->palettes()->attach($palette->id, ['quantity' => floatval($conditionMultiplier)]);
+                    }
+                } else {
+                    // One palette per emplacement
+                    $palette = Palette::firstOrCreate(
+                        ["emplacement_id" => $emplacement->id],
+                        [
+                            "code"       => $this->generatePaletteCode(),
+                            "company_id" => $companyId,
+                            "user_id"    => auth()->id(),
+                            "type"       => "Stock"
+                        ]
+                    );
+
+                    if ($article->palettes()->where('palette_id', $palette->id)->exists()) {
+                        $article->palettes()->updateExistingPivot(
+                            $palette->id,
+                            ['quantity' => DB::raw('quantity + ' . (int) $qte_value)]
+                        );
+                    } else {
+                        $article->palettes()->attach($palette->id, ['quantity' => $qte_value]);
+                    }
+                }
+            });
+
+            return response()->json(['message' => 'Stock successfully inserted or updated.']);
+        } catch (\Illuminate\Database\QueryException $e) {
+            \Log::error('Database error in insert function', [
+                'error'        => $e->getMessage(),
+                'sql'          => $e->getSql() ?? 'N/A',
+                'bindings'     => $e->getBindings() ?? [],
+                'trace'        => $e->getTraceAsString(),
+                'request_data' => $request->all(),
+            ]);
+
+            return response()->json([
+                'message' => 'Une erreur de base de données s\'est produite.',
+                'error'   => 'Database error'
+            ], 500);
+        } catch (\Exception $e) {
+            \Log::error('Unexpected error in insert function', [
+                'error'        => $e->getMessage(),
+                'trace'        => $e->getTraceAsString(),
+                'request_data' => $request->all(),
+                'line'         => $e->getLine(),
+                'file'         => $e->getFile()
+            ]);
+
+            return response()->json([
+                'message' => 'Une erreur inattendue s\'est produite.',
+                'error'   => 'Internal server error'
+            ], 500);
+        }
     }
 }

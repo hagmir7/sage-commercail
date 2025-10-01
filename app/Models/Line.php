@@ -68,6 +68,10 @@ class Line extends Model
         return $this->belongsTo(ArticleStock::class, 'ref', 'code');
     }
 
+    public function user_role(){
+        return $this->belongsTo(User::class, 'role_id', 'id');
+    }
+
 
     public function palettes(){
         return $this->belongsToMany(Palette::class, 'line_palettes')->withPivot(['quantity', 'controlled_at']);

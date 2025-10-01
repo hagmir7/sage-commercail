@@ -43,7 +43,7 @@ class ArticleStockController extends Controller
 
         // Map stock quantity for each article
         $articles->getCollection()->transform(function ($article) {
-            $article->stock_prepare = $this->calculateStockPrepare($article->code); 
+            $article->stock_prepare = $this->calculateStockPreparation($article->code); 
             $article->stock_prepartion = $this->calculateZoonPrepartion($article->code); 
             $article->stock = $this->calculateStock($article->code); 
 
@@ -58,14 +58,11 @@ class ArticleStockController extends Controller
 
     public function calculateStock($ref_article)
     {
-        // Find the article by its code
         $article = ArticleStock::where('code', $ref_article)->first();
 
         if (! $article) {
-            return 0; // if no article found
+            return 0;
         }
-
-        // Get all palettes with type = "Stock" and sum the pivot quantity
         $totalQuantity = $article->palettes()
             ->where("type", "Stock")
             ->sum("article_palette.quantity"); 
@@ -77,22 +74,21 @@ class ArticleStockController extends Controller
 
 
 
-    public function calculateStockPrepare($ref_article)
+    public function calculateStockPreparation($ref_article)
     {
+
         return Docligne::where('AR_Ref', $ref_article)
-            ->whereHas('line', function ($query) {
-                $query->whereIn('status_id', [8, 9, 10]);
-            })
+            ->whereIn('DO_Type', [2, 3])
+            ->whereColumn("DL_Qte", '>', 'DL_QteBL')
             ->sum('DL_Qte');
     }
 
-        public function calculateZoonPrepartion($ref_article)
+    public function calculateZoonPrepartion($ref_article)
     {
+
         return Docligne::where('AR_Ref', $ref_article)
-            ->whereHas('line', function ($query) {
-                $query->whereIn('status_id', [3, 4, 5, 6, 7]);
-            })
-            ->sum('DL_Qte');
+            ->whereIn('DO_Type', [2, 3])
+            ->sum('DL_QteBL');
     }
 
 
