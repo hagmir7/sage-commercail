@@ -136,12 +136,12 @@ class ReceptionController extends Controller
         try {
             $user = User::find($request->user_id);
 
-            $docentete = Docentete::on('sqlsrv_inter')->with('doclignes')->findOrFail($request->document_piece);
+            $docentete = Docentete::on($request->company)->with('doclignes')->findOrFail($request->document_piece);
 
             if (!$docentete) {
                 throw new \Exception("Le document avec la référence $request->document_piece n'existe pas");
             }
-            $document = Document::on('sqlsrv_inter')->firstOrCreate(
+            $document = Document::on($request->company)->firstOrCreate(
                 ['docentete_id' => $docentete->cbMarq],
                 [
 
@@ -162,14 +162,14 @@ class ReceptionController extends Controller
                 $docligne = Docligne::where('cbMarq', $lineId)->first();
 
                 if ($docligne) {
-                    $docligne->DL_QteBL = "0";
+                    $docligne->DL_QteBL = 0;
                     $docentete->cbModification = now()->format('Y-m-d H:i:s');
                     $docligne->save();
                 }
 
 
                 if ($docligne->AR_Ref != null) {
-                    $line = Line::on('sqlsrv_inter')->firstOrCreate([
+                    $line = Line::on($request->company)->firstOrCreate([
                         'docligne_id' => $docligne->cbMarq,
                     ], [
                         'docligne_id' => $docligne->cbMarq,
@@ -264,9 +264,9 @@ class ReceptionController extends Controller
 
 
 
-    public function reset($piece)
+    public function reset($piece, Request $request)
     {
-        $document = Document::on('sqlsrv_inter')->where("piece", $piece)->first();
+        $document = Document::on($request->company)->where("piece", $piece)->first();
 
         if (!$document) {
             return response()->json(['error' => "Document does not exist"], 404);
@@ -325,7 +325,7 @@ class ReceptionController extends Controller
 
             $conditionMultiplier = $request->condition ? (float) $request->condition : 1.0;
 
-            $docentete = Docentete::on('sqlsrv_inter')->find($piece);
+            $docentete = Docentete::on($request->company)->find($piece);
 
 
             $docligne = $docentete->doclignes()->where("AR_Ref", $request->code_article)->first();
