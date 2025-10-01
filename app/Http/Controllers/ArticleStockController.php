@@ -39,17 +39,40 @@ class ArticleStockController extends Controller
         }
 
         $articles = $query->paginate(100);
+        
 
         // Map stock quantity for each article
         $articles->getCollection()->transform(function ($article) {
             $article->stock_prepare = $this->calculateStockPrepare($article->code); 
             $article->stock_prepartion = $this->calculateZoonPrepartion($article->code); 
+            $article->stock = $this->calculateStock($article->code); 
 
             return $article;
         });
 
         return response()->json($articles);
     }
+
+
+
+
+    public function calculateStock($ref_article)
+    {
+        // Find the article by its code
+        $article = ArticleStock::where('code', $ref_article)->first();
+
+        if (! $article) {
+            return 0; // if no article found
+        }
+
+        // Get all palettes with type = "Stock" and sum the pivot quantity
+        $totalQuantity = $article->palettes()
+            ->where("type", "Stock")
+            ->sum("article_palette.quantity"); 
+
+        return $totalQuantity;
+    }
+
 
 
 
