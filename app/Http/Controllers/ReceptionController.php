@@ -98,9 +98,9 @@ class ReceptionController extends Controller
 
 
 
-    public function show($piece)
+    public function show(Request $request, $piece)
     {
-        return Docentete::on('sqlsrv_inter')
+        return Docentete::on($request->company)
             ->select(
                 'DO_Reliquat',
                 'DO_Piece',
