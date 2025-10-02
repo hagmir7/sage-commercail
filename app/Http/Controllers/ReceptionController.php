@@ -26,11 +26,15 @@ class ReceptionController extends Controller
 
 
         // Filter by type
-        if ($request->filled('status')) {
-            $query->whereHas('document', function ($document) use ($request) {
-                $document->where("status_id", $request->status);
-            });
-        }
+        $query->when($request->has('status') && $request->status !== '', function ($q) use ($request) {
+            if ((int) $request->status === 0) {
+                $q->whereDoesntHave('document');
+            } else {
+                $q->whereHas('document', fn($sub) => $sub->where('status_id', (int) $request->status));
+            }
+        });
+
+
 
         // Filter by domain (fixed)
         $query->where('DO_Domaine', 1)->where("DO_Type", 12)->where('DO_Statut', 2);
@@ -159,14 +163,12 @@ class ReceptionController extends Controller
 
             $lines = [];
             foreach ($request->lines as $lineId) {
-                $docligne = Docligne::where('cbMarq', $lineId)->first();
+                $docligne = Docligne::on($request->company)->where('cbMarq', $lineId)->first();
 
-                if ($docligne) {
-                    $docligne->DL_QteBL = 0;
-                    $docentete->cbModification = now()->format('Y-m-d H:i:s');
-                    $docligne->save();
-                }
-
+                $docligne->update([
+                    'DL_QteBL' => floatval(0),
+                    'cbModification' => now()->format('Y-m-d H:i:s')
+                ]);
 
                 if ($docligne->AR_Ref != null) {
                     $line = Line::on($request->company)->firstOrCreate([
@@ -217,7 +219,8 @@ class ReceptionController extends Controller
                 ->with([
                     'doclignes:DO_Piece,cbMarq',
                     'doclignes.line:id,role_id,docligne_id',
-                    'compt:CT_Intitule,CT_Num,cbMarq,CT_Telephone'
+                    'compt:CT_Intitule,CT_Num,cbMarq,CT_Telephone',
+                    'document:id,docentete_id,status_id'
                 ])
                 ->select([
                     'DO_Reliquat',
@@ -307,6 +310,7 @@ class ReceptionController extends Controller
                 ], 422);
             }
 
+
             $companyId   = intval($request->company ?? 1);
             $article     = ArticleStock::where('code', $request->code_article)->first();
             $emplacement = Emplacement::where("code", $request->emplacement_code)->first();
@@ -325,12 +329,12 @@ class ReceptionController extends Controller
 
             $conditionMultiplier = $request->condition ? (float) $request->condition : 1.0;
 
-            $docentete = Docentete::on($request->company)->find($piece);
+            $docentete = Docentete::on($request->company_db)->find($piece);
 
 
             $docligne = $docentete->doclignes()->where("AR_Ref", $request->code_article)->first();
 
-            if (!$docligne || $docligne->DL_Qte < ($conditionMultiplier + $docligne->DL_QteBL)) {
+            if (!$docligne || $docligne->DL_Qte < ($request->quantity + $docligne->DL_QteBL)) {
                 return response()->json(['message' => "Quantité insuffisante"], 422);
             }
 
@@ -349,7 +353,7 @@ class ReceptionController extends Controller
                 ]);
 
                 $docligne->update([
-                    'DL_QteBL' => ($docligne->DL_QteBL + $conditionMultiplier)
+                    'DL_QteBL' => ($docligne->DL_QteBL + floatval($request->quantity))
                 ]);
 
                 if ($docentete->doclignes->sum('DL_QteBL') == $docentete->doclignes->sum('DL_Qte')) {
