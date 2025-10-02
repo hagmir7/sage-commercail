@@ -207,7 +207,7 @@ class ReceptionController extends Controller
     public function list(Request $request)
     {
 
-        $companies = ['sqlsrv', 'sqlsrv_inter'];
+        $companies = ['sqlsrv', 'sqlsrv_inter', 'sqlsrv_serie', 'sqlsrv_asti'];
 
         $allDocentetes = collect();
 
