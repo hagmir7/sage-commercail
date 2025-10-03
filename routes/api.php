@@ -24,9 +24,13 @@ use App\Http\Controllers\StockMovementController;
 use App\Http\Controllers\TransferController;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\UserPermissionController;
+use App\Imports\MovementImport;
 use App\Models\User;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Route;
+use Maatwebsite\Excel\Facades\Excel;
+
 
 
 Route::get('/user', function (Request $request) {
@@ -35,6 +39,23 @@ Route::get('/user', function (Request $request) {
 
 
 
+Route::post('import-movements', function (Request $request) {
+    $request->validate([
+        'file' => 'required|mimes:xlsx,csv,xls'
+    ]);
+
+    Excel::import(new MovementImport, $request->file('file'));
+
+    return back()->with('success', 'Excel file imported successfully!');
+});
+
+
+
+Route::get('logi', function () {
+    return DB::connection('sqlsrv_logi')
+        ->table('T_User')
+        ->get();
+});
 
 Route::get("duplicate/{piece}", [DocenteteController::class, 'duplicate']);
 Route::get("change/{piece}", [DocenteteController::class, 'change']);

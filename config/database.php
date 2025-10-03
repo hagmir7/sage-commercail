@@ -202,6 +202,31 @@ return [
             'dateformat' => '%Y-%m-%d %H:%M:%S',
         ],
 
+
+        'sqlsrv_logi' => [ 
+            'driver' => 'sqlsrv',
+            'url' => env('LLDB_URL'),
+            'host' => env('LLDB_HOST', 'localhost'),
+            'port' => env('LLDB_PORT', '1433'),
+            'database' => env('LLDB_DATABASE', 'laravel'),
+            'username' => env('LLDB_USERNAME', 'root'),
+            'password' => env('LLDB_PASSWORD', ''),
+            'prefix' => '',
+            'prefix_indexes' => true,
+            'encrypt' => env('LLDB_ENCRYPT', 'yes'),
+            'trust_server_certificate' => env('LLDB_TRUST_SERVER_CERTIFICATE', 'true'),
+            'charset' => 'utf8',
+            'options' => [
+                PDO::ATTR_STRINGIFY_FETCHES => false,
+                PDO::SQLSRV_ATTR_ENCODING => PDO::SQLSRV_ENCODING_UTF8,
+                'Authentication' => 9,
+                PDO::ATTR_EMULATE_PREPARES => true,
+            ],
+            'date_format' => 'Y-d-m H:i:s.v',
+            'timezone' => 'UTC',
+            'dateformat' => '%Y-%m-%d %H:%M:%S',
+        ],
+
     ],
     /*
     |--------------------------------------------------------------------------
