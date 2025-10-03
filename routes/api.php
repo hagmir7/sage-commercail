@@ -198,6 +198,7 @@ Route::middleware('auth:sanctum')->group(function () {
 
         Route::get('update/{article:code}', 'update');
         Route::post('import', 'import');
+       
     });
 
 
@@ -234,6 +235,8 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('reset/{piece}', 'reset');
         Route::post('movement/{piece}', 'movement');
     });
+
+    Route::post('articles/update-ref', [ArticleController::class, 'updateRef']);
 });
 
 
@@ -246,3 +249,6 @@ Route::post('/register', [AuthController::class, 'register']);
 Route::get('/user/{id}', [AuthController::class, 'show']);
 
 Route::post('/user/update/{id}', [UserController::class, 'update']);
+
+
+

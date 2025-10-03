@@ -91,9 +91,6 @@ sp_change_users_login 'update_one', 'user_cbase', 'APPL_CBASE';
 
 
 
-
-
-
 ----- Remove sql server logs
 USE SAGE100GPAO;
 DBCC SHRINKFILE (N'Sage100GP_Log', 1024); -- Shrink to 1GB

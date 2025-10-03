@@ -38,12 +38,9 @@ class DuplicationController extends Controller
                 $doclignes = Docligne::with('line')->where('DO_Piece', $sourcePiece)->get();
             }
 
-            $DO_Piece = CurrentPiece::find('2')->DC_Piece;
+            $DO_Piece = '25FA0800'; // CurrentPiece::find('6')->DC_Piece;
 
             $duc = $this->createDocumentFromTemplate($sourcePiece, null,  $DO_Piece);
-
-
-
 
             foreach ($doclignes as $line) {
 
