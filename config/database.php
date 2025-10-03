@@ -115,10 +115,12 @@ return [
             'prefix_indexes' => true,
             'encrypt' => env('DB_ENCRYPT', 'yes'),
             'trust_server_certificate' => env('DB_TRUST_SERVER_CERTIFICATE', 'true'),
-            'charset'  => 'utf8',
+            'charset' => 'utf8',
+            'collation' => 'utf8_unicode_ci',
             'options' => [
                 PDO::ATTR_STRINGIFY_FETCHES => false,
                 PDO::SQLSRV_ATTR_ENCODING => PDO::SQLSRV_ENCODING_UTF8,
+                PDO::SQLSRV_ATTR_DIRECT_QUERY => true,
 
                 'Authentication' => 9,
                 PDO::ATTR_EMULATE_PREPARES => true,

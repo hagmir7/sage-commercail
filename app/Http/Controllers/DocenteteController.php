@@ -1020,6 +1020,7 @@ class DocenteteController extends Controller
     public function duplicate($piece){
         $duplication = new DuplicationController();
         $duplication->duplicat($piece);
+        
     }
 
 
