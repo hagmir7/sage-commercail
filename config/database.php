@@ -206,7 +206,7 @@ return [
         'sqlsrv_logi' => [ 
             'driver' => 'sqlsrv',
             'url' => env('LLDB_URL'),
-            'host' => env('LLDB_HOST', 'localhost'),
+            'host' =>  env('LLDB_HOST', 'localhost'),
             'port' => env('LLDB_PORT', '1433'),
             'database' => env('LLDB_DATABASE', 'laravel'),
             'username' => env('LLDB_USERNAME', 'root'),
@@ -219,7 +219,7 @@ return [
             'options' => [
                 PDO::ATTR_STRINGIFY_FETCHES => false,
                 PDO::SQLSRV_ATTR_ENCODING => PDO::SQLSRV_ENCODING_UTF8,
-                'Authentication' => 9,
+                // 'Authentication' => 9,
                 PDO::ATTR_EMULATE_PREPARES => true,
             ],
             'date_format' => 'Y-d-m H:i:s.v',
