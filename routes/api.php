@@ -50,10 +50,11 @@ Route::post('import-movements', function (Request $request) {
 });
 
 
-
 Route::get('logi', function () {
     return DB::connection('sqlsrv_logi')
-        ->table('T_User')
+        ->table('T_MouvementEntresSorties')
+        ->orderByDesc('Date')
+        ->limit(20)
         ->get();
 });
 
