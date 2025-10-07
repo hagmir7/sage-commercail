@@ -128,4 +128,10 @@ class UserController extends Controller
 
         return response()->json(['message' => 'Mot de passe mis à jour avec succès']);
     }
+
+
+
+    public function usersActions(){
+        return User::withCount(['movements', ]);
+    }
 }

@@ -30,6 +30,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Route;
 use Maatwebsite\Excel\Facades\Excel;
+use Carbon\Carbon;
 
 
 
@@ -69,9 +70,31 @@ Route::get("article/{article}", [ArticleController::class, 'show']);
 Route::get("preparation/{piece}/{companyId}", [PaletteController::class, 'validationCompany']);
 
 
-Route::get('/users', function (Request $request) {
-   return User::all();
 
+
+Route::get('/users', function (Request $request) {
+    $month = $request->get('month', now()->format('Y-m'));
+    // Parse month start & end
+    $startOfMonth = Carbon::parse($month . '-01')->startOfMonth();
+    $endOfMonth = Carbon::parse($month . '-01')->endOfMonth();
+
+    return User::withCount([
+        'preparations as preparations_count' => function ($query) use ($startOfMonth, $endOfMonth) {
+            $query->whereBetween('created_at', [$startOfMonth, $endOfMonth]);
+        },
+        'movements as movements_count' => function ($query) use ($startOfMonth, $endOfMonth) {
+            $query->whereBetween('created_at', [$startOfMonth, $endOfMonth]);
+        },
+        'controlles as controlles_count' => function ($query) use ($startOfMonth, $endOfMonth) {
+            $query->whereBetween('created_at', [$startOfMonth, $endOfMonth]);
+        },
+        'validations as validations_count' => function ($query) use ($startOfMonth, $endOfMonth) {
+            $query->whereBetween('created_at', [$startOfMonth, $endOfMonth]);
+        },
+        'chargements as chargements_count' => function ($query) use ($startOfMonth, $endOfMonth) {
+            $query->whereBetween('created_at', [$startOfMonth, $endOfMonth]);
+        },
+    ])->get();
 });
 
 Route::get('inventory/{inventory}/movements/export', [InventoryExportController::class, 'movements']);

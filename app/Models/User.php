@@ -55,4 +55,25 @@ class User extends Authenticatable
             'password' => 'hashed',
         ];
     }
+
+
+    public function movements(){
+        return $this->hasMany(StockMovement::class, 'moved_by');
+    }
+
+    public function controlles(){
+        return $this->hasMany(Palette::class, 'controlled_by');
+    }
+
+    public function validations(){
+        return $this->hasMany(Document::class, 'validated_by');
+    }
+
+    public function chargements(){
+        return $this->hasMany(Palette::class, 'delivered_by');
+    }
+
+     public function preparations(){
+        return $this->hasMany(Palette::class, 'user_id');
+    }
 }
