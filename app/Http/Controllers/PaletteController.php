@@ -519,10 +519,6 @@ class PaletteController extends Controller
     }
 
 
-
-
-
-
     public function documentPalettes($piece)
     {
 

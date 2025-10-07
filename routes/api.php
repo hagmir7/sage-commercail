@@ -216,6 +216,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::prefix('articles')->controller(ArticleStockController::class)->group(function () {
         Route::get('{article_stock:code}', 'show');
         Route::get('', 'index');
+        Route::post('store', 'store');
         Route::put('update/{article_stock:code}', 'update');
 
         Route::get('update/{article:code}', 'update');
@@ -230,24 +231,28 @@ Route::middleware('auth:sanctum')->group(function () {
 
 
     Route::prefix('documents')->controller(DocumentController::class)->group(function () {
-
+        Route::get('archive', 'archive');
         Route::get('/', 'list');
         Route::get('preparation-list', 'preparationList');
 
-        Route::get('/ready', 'ready');
-        Route::get('/progress/{piece}', 'progress');
+        Route::get('ready', 'ready');
+        Route::get('progress/{piece}', 'progress');
         Route::post('chargement/{document}', 'addChargement');
         Route::get('validation-controller', 'validationControllerList');
 
         Route::get('livraison', 'livraison');
         Route::get('print/{document}', 'print');
         Route::get('reset-print/{document}', 'resetPrint');
-        // All documents routes up to this route !
-        Route::get('{document:piece}', 'show');
-        Route::get('/{piece}/palettes', 'documentPalettes');
+
+        // More specific routes first
+        Route::get('{piece}/palettes', 'documentPalettes');
         Route::get('{piece}/delivered-palettes', 'deliveredPalettes');
-        Route::get('/{piece}', 'checkControlled');
+
+        // Then generic show/check routes
+        Route::get('{document:piece}', 'show'); // If using route model binding
+        Route::get('{piece}', 'checkControlled');
     });
+
 
     Route::prefix('receptions')->controller(ReceptionController::class)->group(function () {
         Route::get('', 'index');
@@ -256,6 +261,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('transfer', 'transfer');
         Route::get('reset/{piece}', 'reset');
         Route::post('movement/{piece}', 'movement');
+        Route::get('validation/{piece}', 'validation');
     });
 
     Route::post('articles/update-ref', [ArticleController::class, 'updateRef']);

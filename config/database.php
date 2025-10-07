@@ -103,7 +103,6 @@ return [
 
 
         'sqlsrv' => [
-
             'driver' => 'sqlsrv',
             'url' => env('DB_URL'),
             'host' => env('DB_HOST', 'localhost'),
@@ -146,6 +145,7 @@ return [
             'options' => [
                 PDO::ATTR_STRINGIFY_FETCHES => false,
                 PDO::SQLSRV_ATTR_ENCODING => PDO::SQLSRV_ENCODING_UTF8,
+                 PDO::SQLSRV_ATTR_DIRECT_QUERY => true,
                 'Authentication' => 9,
                 PDO::ATTR_EMULATE_PREPARES => true,
             ],

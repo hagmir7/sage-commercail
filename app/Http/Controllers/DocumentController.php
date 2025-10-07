@@ -212,7 +212,7 @@ class DocumentController extends Controller
         return strval($docligne->docentete->cbMarq);
     }
 
-public function preparationList(Request $request)
+    public function preparationList(Request $request)
     {
         $user_roles = auth()->user()->roles()->pluck('name', 'id');
 
@@ -220,21 +220,21 @@ public function preparationList(Request $request)
             'companies',
             'docentete:cbMarq,DO_Date,DO_DateLivr,DO_Reliquat'
         ])
-        ->whereHas('lines', function ($q) use ($user_roles) {
-            $q->where('company_id', auth()->user()->company_id);
+            ->whereHas('lines', function ($q) use ($user_roles) {
+                $q->where('company_id', auth()->user()->company_id);
 
-            $common = array_intersect(
-                $user_roles->toArray(),
-                ['fabrication', 'montage', 'preparation_cuisine', 'preparation_trailer', 'magasinier']
-            );
+                $common = array_intersect(
+                    $user_roles->toArray(),
+                    ['fabrication', 'montage', 'preparation_cuisine', 'preparation_trailer', 'magasinier']
+                );
 
-            if (!empty($common)) {
-                $q->whereIn("role_id", $user_roles->keys());
-            }
-        })
-        ->whereHas('companies', function ($q) {
-            $q->whereIn('document_companies.status_id', [1, 2, 3, 4, 5, 6, 7]);
-        });
+                if (!empty($common)) {
+                    $q->whereIn("role_id", $user_roles->keys());
+                }
+            })
+            ->whereHas('companies', function ($q) {
+                $q->whereIn('document_companies.status_id', [1, 2, 3, 4, 5, 6, 7]);
+            });
 
         // 🔍 Search
         if ($request->filled('search')) {
@@ -242,11 +242,11 @@ public function preparationList(Request $request)
 
             $query->where(function ($q) use ($search) {
                 $q->where('ref', 'like', "%{$search}%")
-                  ->orWhere('piece', 'like', "%{$search}%");
+                    ->orWhere('piece', 'like', "%{$search}%");
             })
-            ->orWhereHas('companies', function ($q) use ($search) {
-                $q->where('client_id', 'like', "%{$search}%");
-            });
+                ->orWhereHas('companies', function ($q) use ($search) {
+                    $q->where('client_id', 'like', "%{$search}%");
+                });
         }
 
         $documents = $query->orderByDesc('id')->paginate(20);
@@ -272,9 +272,9 @@ public function preparationList(Request $request)
 
         $document->load([
             'lines' => fn($q) =>
-                $q->join('F_DOCLIGNE', 'lines.docligne_id', '=', 'F_DOCLIGNE.cbMarq')
-                  ->orderBy('F_DOCLIGNE.DL_Ligne')
-                  ->select('lines.*'),
+            $q->join('F_DOCLIGNE', 'lines.docligne_id', '=', 'F_DOCLIGNE.cbMarq')
+                ->orderBy('F_DOCLIGNE.DL_Ligne')
+                ->select('lines.*'),
 
             'lines.status',
             'lines.role',
@@ -455,10 +455,6 @@ public function preparationList(Request $request)
 
 
 
-  
-
-
-
     public function addChargement(Document $document, Request $request)
     {
         $validator = Validator::make($request->all(), [
@@ -481,13 +477,6 @@ public function preparationList(Request $request)
             $document->companies()->updateExistingPivot(auth()->user()->company_id, [
                 'status_id' => 13,
             ]);
-
-
-
-            // DB::table('document_companies')
-            //     ->where('document_id', $document->id)
-            //     ->where('company_id', auth()->id())
-            //     ->update(['status_id' => 13]);
 
             $document->update(['status_id' => 13]);
         });
@@ -558,5 +547,44 @@ public function preparationList(Request $request)
         ]);
 
         return response()->json(['message' => "Réinitialisation d'impression avec succès"]);
+    }
+
+
+    public function archive(Request $request)
+    {
+        $query = Document::with('docentete:DO_Domaine,DO_Type,DO_Piece,DO_Date,DO_Ref,DO_Tiers,DO_Statut,cbMarq,cbCreation,DO_DateLivr,DO_Expedit') // load the related docentete
+            ->when($request->filled('type'), function ($q) use ($request) {
+                if ($request->type == 1) {
+                    $q->where('piece', 'like', '%PL%');
+                } elseif ($request->type == 2) {
+                    $q->where(function ($q2) {
+                        $q2->where('piece_bl', 'like', '%BL%')
+                            ->orWhere('piece', 'like', '%BL%');
+                    });
+                }
+            });
+
+        if ($request->has('search') && $request->search !== '') {
+            $search = $request->search;
+            $query->where(function ($q) use ($search) {
+                $q->where('piece_fa', 'like', "%$search%")
+                    ->orWhere('piece', 'like', "%$search%")
+                    ->orWhere('ref', 'like', "%$search%")
+                    ->orWhere('client_id', 'like', "%$search%")
+                    ->orWhere('piece_bl', 'like', "%$search%");
+            });
+        }
+
+        if ($request->filled('date')) {
+            $dates = explode(',', $request->date, 2);
+            $start = Carbon::parse(urldecode($dates[0]))->startOfDay();
+            $end = Carbon::parse(urldecode($dates[1] ?? $dates[0]))->endOfDay();
+
+            $query->whereBetween('created_at', [$start, $end]);
+        }
+
+        $documents = $query->select('documents.*')->paginate(30);
+
+        return response()->json($documents, 200, [], JSON_UNESCAPED_UNICODE);
     }
 }

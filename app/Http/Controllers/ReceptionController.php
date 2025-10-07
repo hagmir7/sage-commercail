@@ -206,51 +206,62 @@ class ReceptionController extends Controller
 
     public function list(Request $request)
     {
-
         $companies = ['sqlsrv', 'sqlsrv_inter', 'sqlsrv_serie', 'sqlsrv_asti'];
-
         $allDocentetes = collect();
 
         foreach ($companies as $company) {
-            $query = Docentete::on($company)
-                ->whereHas('doclignes.line', function ($q) {
-                    $q->where('role_id', auth()->id());
-                })
-                ->with([
-                    'doclignes:DO_Piece,cbMarq',
-                    'doclignes.line:id,role_id,docligne_id',
-                    'compt:CT_Intitule,CT_Num,cbMarq,CT_Telephone',
-                    'document:id,docentete_id,status_id'
-                ])
-                ->select([
-                    'DO_Reliquat',
-                    'DO_Piece',
-                    'DO_Ref',
-                    'DO_Tiers',
-                    'cbMarq',
-                    'DO_Date',
-                    'DO_DateLivr',
-                    'DO_Expedit',
-                    'DO_TotalHT',
-                    'cbCreation'
-                ])
-                ->orderByDesc('cbCreation')
-                ->get();
+            try {
+                // Fetch data from each connection
+                $query = Docentete::on($company)
+                    ->whereHas('doclignes.line', function ($q) {
+                        $q->where('role_id', auth()->id());
+                    })
+                    ->with([
+                        'doclignes' => function ($q) {
+                            $q->select(['DO_Piece', 'cbMarq']);
+                        },
+                        'doclignes.line' => function ($q) {
+                            $q->select(['id', 'role_id', 'docligne_id']);
+                        },
+                        'compt' => function ($q) {
+                            $q->select(['CT_Intitule', 'CT_Num', 'cbMarq', 'CT_Telephone']);
+                        },
+                        'document' => function ($q) {
+                            $q->select(['id', 'docentete_id', 'status_id']);
+                        },
+                    ])
+                    ->select([
+                        'DO_Reliquat',
+                        'DO_Piece',
+                        'DO_Ref',
+                        'DO_Tiers',
+                        'cbMarq',
+                        'DO_Date',
+                        'DO_DateLivr',
+                        'DO_Expedit',
+                        'DO_TotalHT',
+                        'cbCreation'
+                    ])
+                    ->orderByDesc('cbCreation')
+                    ->get();
 
-            // Add company identifier if needed
-            $query->each(function ($doc) use ($company) {
-                $doc->company = $company;
-            });
+                // Add company origin to each record
+                $query->each(function ($doc) use ($company) {
+                    $doc->company = $company;
+                });
 
-            $allDocentetes = $allDocentetes->merge($query);
+                // Merge results
+                $allDocentetes = $allDocentetes->merge($query);
+            } catch (\Throwable $e) {
+                \Log::error("❌ Failed fetching data from {$company}: " . $e->getMessage());
+                continue; // Skip failed connection
+            }
         }
 
-        // Optional: sort and paginate manually
-        $allDocentetes = $allDocentetes
-            ->sortByDesc('cbCreation')
-            ->values();
+        // Sort all merged results by cbCreation (descending)
+        $allDocentetes = $allDocentetes->sortByDesc('cbCreation')->values();
 
-        // If you want pagination across all databases
+        // --- Manual Pagination Helper ---
         $perPage = 30;
         $page = $request->get('page', 1);
         $paginated = new \Illuminate\Pagination\LengthAwarePaginator(
@@ -258,12 +269,14 @@ class ReceptionController extends Controller
             $allDocentetes->count(),
             $perPage,
             $page,
-            ['path' => $request->url(), 'query' => $request->query()]
+            [
+                'path' => $request->url(),
+                'query' => $request->query(),
+            ]
         );
 
         return response()->json($paginated);
     }
-
 
 
 
@@ -275,16 +288,42 @@ class ReceptionController extends Controller
             return response()->json(['error' => "Document does not exist"], 404);
         }
 
-        foreach ($document->lines as $line) {
-            $line->delete();
-        }
-
+       
 
         if (!auth()->user()->hasRole("commercial")) {
             return response()->json(['error' => "Unauthorized"], 403);
         }
 
+         foreach ($document->lines as $line) {
+            $line->delete();
+        }
+
+
         $document->delete();
+
+        return response()->json(['message' => "Réinitialisé avec succès"], 200);
+    }
+
+
+    public function validation(Request $request, $piece)
+    {
+        // $document = Document::on($request->company_db)->where("piece", $piece)->first();
+        $document = \App\Models\Document::on($request->company_db)->where('piece', $piece)->first();
+        \Log::alert($piece);
+         \Log::alert($request->company_db);
+
+        if (!$document) {
+            return response()->json(['message' => "Le document n'existe pas $piece"], 404);
+        }
+
+
+
+        if (!auth()->user()->hasRole("admin")) {
+            return response()->json(['message' => "Unauthorized"], 403);
+        }
+
+        $document->status_id = 3;
+        $document->save();
 
         return response()->json(['message' => "Réinitialisé avec succès"], 200);
     }

@@ -41,7 +41,7 @@ class DocenteteController extends Controller
         });
 
         $query = Docentete::with(['document.status', 'document.companies'])
-    
+
             ->select([
                 'DO_Reliquat',
                 'DO_Piece',
@@ -272,7 +272,7 @@ class DocenteteController extends Controller
         }
 
         $lines = Line::whereIn('id', $lineIds)->get();
-        
+
 
 
         $invalidLine = $lines->first(function ($line) {
@@ -289,7 +289,6 @@ class DocenteteController extends Controller
 
         $invalidQte = $lines->first(function ($line) {
             $qte = (float) ($line->docligne->DL_QteBL ?? 0);
-            \Log::alert("Line {$line->id} | Ref {$line->ref} | DL_QteBL = {$qte}");
             return $qte <= 0;
         });
 
@@ -348,7 +347,7 @@ class DocenteteController extends Controller
                     $line->update([
                         'status_id' => 8
                     ]);
-                    
+
                     Line::create([
                         'ref' => $line->ref,
                         'quantity' => $line->quantity,
@@ -441,7 +440,7 @@ class DocenteteController extends Controller
                 $this->updateDocStatus($document?->docentete);
             }
 
-            
+
 
             $document->companies()->updateExistingPivot(auth()->user()->company_id, [
                 'status_id' => 11,
@@ -735,8 +734,12 @@ class DocenteteController extends Controller
 
 
     // Transfer to Company controller (Adill)
+
+
     public function transferCompany($request)
     {
+        DB::beginTransaction();
+
         try {
             $docligne = Docligne::where('cbMarq', $request->lines[0])->first();
 
@@ -767,69 +770,61 @@ class DocenteteController extends Controller
                 $document->companies()->attach($request->company, [
                     'status_id' => 1,
                     'updated_at' => now(),
-                    'printed' => false 
+                    'printed' => false
                 ]);
             }
 
             $lines = [];
 
-
             foreach ($request->lines as $lineId) {
+                $currentDocligne = Docligne::where('cbMarq', $lineId)->first();
 
-        
-            $currentDocligne = Docligne::where('cbMarq', $lineId)->first();
+                if (!$currentDocligne) {
+                    throw new \Exception("Invalid line: {$lineId}");
+                }
 
-            if ($currentDocligne) {
+                // Reset quantity
                 $currentDocligne->DL_QteBL = 0;
                 $currentDocligne->save();
-            }
 
+                $article = ArticleStock::where('code', $currentDocligne->AR_Ref)->first();
 
-                if (!$currentDocligne) {
-                    throw new \Exception("Invalid line: {$lineId}");
+                if (!$article) {
+                    \Log::alert("No article with this Ref " . $currentDocligne->AR_Ref);
                 }
-
-                if (!$currentDocligne) {
-                    throw new \Exception("Invalid line: {$lineId}");
-                }
-
-                $article = ArticleStock::where("code", $currentDocligne->AR_Ref)?->first();
-
-                if(!$article){
-                    \Log::alert("No article with this Ref ". $currentDocligne->AR_Ref);
-                }
-
-
-
-
-                \Log::alert($article->company_code);
 
                 if ($currentDocligne->AR_Ref != null) {
-                    $line = Line::firstOrCreate([
-                        'docligne_id' => $currentDocligne->cbMarq,
-                    ], [
-                        'docligne_id' => $currentDocligne->cbMarq,
-                        'tiers' => $currentDocligne->CT_Num,
-                        'name' => $currentDocligne?->Nom,
-                        'ref' => $currentDocligne->AR_Ref,
-                        'design' => $currentDocligne->DL_Design,
-                        'quantity' => $currentDocligne->DL_Qte,
-                        'dimensions' => $currentDocligne->item,
-                        'company_id' => $request->company,
-                        'first_company_id'  => $request->company,
-                        'document_id' => $document->id,
-                        'company_code' => $article?->company_code ?? null
-                    ]);
+                    $line = Line::firstOrCreate(
+                        ['docligne_id' => $currentDocligne->cbMarq],
+                        [
+                            'docligne_id' => $currentDocligne->cbMarq,
+                            'tiers' => $currentDocligne->CT_Num,
+                            'name' => $currentDocligne->Nom ?? null,
+                            'ref' => $currentDocligne->AR_Ref,
+                            'design' => $currentDocligne->DL_Design,
+                            'quantity' => $currentDocligne->DL_Qte,
+                            'dimensions' => $currentDocligne->item ?? null,
+                            'company_id' => $request->company,
+                            'first_company_id'  => $request->company,
+                            'document_id' => $document->id,
+                            'company_code' => $article?->company_code ?? null
+                        ]
+                    );
+
+                    $lines[] = $line;
                 }
-
-
-                $lines[] = $line;
             }
+
+            DB::commit();
+
             return response()->json([
                 'status'  => 'success',
                 'message' => 'Document transferred successfully',
             ], 200);
         } catch (\Exception $e) {
+            DB::rollBack();
+            // \Log::error('❌ TransferCompany failed: ' . $e->getMessage(), ['trace' => $e->getTraceAsString()]);
+
             return response()->json([
                 'status' => 'error',
                 'message' => $e->getMessage(),
@@ -1017,10 +1012,10 @@ class DocenteteController extends Controller
     }
 
 
-    public function duplicate($piece){
+    public function duplicate($piece)
+    {
         $duplication = new DuplicationController();
         $duplication->duplicat($piece);
-        
     }
 
 
@@ -1044,5 +1039,4 @@ class DocenteteController extends Controller
 
         return response()->json(['success' => true]);
     }
-
 }

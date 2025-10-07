@@ -205,8 +205,6 @@ class StockMovementController extends Controller
                 ], 422);
             }
 
-            \Log::alert("Qte " . $request->quantity);
-
             $companyId   = intval($request->company ?? 1);
             $article     = ArticleStock::where('code', $request->code_article)->first();
             $emplacement = Emplacement::where("code", $request->emplacement_code)->first();

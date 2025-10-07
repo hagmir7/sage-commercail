@@ -39,13 +39,13 @@ class ArticleStockController extends Controller
         }
 
         $articles = $query->paginate(100);
-        
+
 
         // Map stock quantity for each article
         $articles->getCollection()->transform(function ($article) {
-            $article->stock_prepare = $this->calculateStockPreparation($article->code); 
-            $article->stock_prepartion = $this->calculateZoonPrepartion($article->code); 
-            $article->stock = $this->calculateStock($article->code); 
+            $article->stock_prepare = $this->calculateStockPreparation($article->code);
+            $article->stock_prepartion = $this->calculateZoonPrepartion($article->code);
+            $article->stock = $this->calculateStock($article->code);
 
             return $article;
         });
@@ -65,7 +65,7 @@ class ArticleStockController extends Controller
         }
         $totalQuantity = $article->palettes()
             ->where("type", "Stock")
-            ->sum("article_palette.quantity"); 
+            ->sum("article_palette.quantity");
 
         return $totalQuantity;
     }
@@ -93,7 +93,7 @@ class ArticleStockController extends Controller
 
 
 
- 
+
 
 
 
@@ -137,26 +137,63 @@ class ArticleStockController extends Controller
     public function store(Request $request)
     {
         $validator = Validator::make($request->all(), [
-            'code' => 'required|string|max:255|unique:articles',
-            'description' => 'required|string',
-            'name' => 'nullable|string|max:255',
-            'color' => 'nullable|string|max:255',
-            'qte_inter' => 'integer|min:0',
-            'qte_serie' => 'integer|min:0',
-            'palette_id' => 'nullable|exists:palettes,id',
+            'code' => 'required|string|max:100',
+            'description' => 'nullable|string|max:255',
+            'name' => 'string|max:150',
+            'color' => 'nullable|string|max:50',
+            'quantity' => 'nullable|numeric',
+            'stock_min' => 'nullable|numeric',
+            'price' => 'nullable|numeric',
             'thickness' => 'nullable|numeric',
-            'hieght' => 'nullable|numeric',
+            'height' => 'nullable|numeric',
             'width' => 'nullable|numeric',
             'depth' => 'nullable|numeric',
-            'chant' => 'nullable|string|max:255',
+            'chant' => 'nullable|string|max:100',
+            'condition' => 'nullable|string|max:100',
+            'code_supplier' => 'nullable|string|max:100',
+            'qr_code' => 'nullable|string|max:255',
+            'palette_condition' => 'nullable|string|max:100',
+            'unit' => 'nullable|string|max:20',
+            'gamme' => 'nullable|string|max:100',
+            'category' => 'nullable|string|max:100',
         ]);
 
         if ($validator->fails()) {
-            return response()->json(['errors' => $validator->errors()], 422);
+            return response()->json([
+                'message' => $validator->errors()->first(),
+                'errors' => $validator->errors(),
+            ], 422);
         }
 
-        $article = ArticleStock::create($request->all());
-        return response()->json(['data' => $article, 'message' => 'Article created successfully'], 201);
+        // Update article fields
+        $article_stock = ArticleStock::create($request->only([
+            'code',
+            'description',
+            'name',
+            'color',
+            'qte_inter',
+            'qte_serie',
+            'quantity',
+            'stock_min',
+            'price',
+            'thickness',
+            'height',
+            'width',
+            'depth',
+            'chant',
+            'condition',
+            'code_supplier',
+            'qr_code',
+            'palette_condition',
+            'unit',
+            'gamme',
+            'category'
+        ]));
+
+        return response()->json([
+            'message' => 'Article créé avec succès.',
+            'id' => $article_stock->code
+        ], 200);
     }
 
     /**
@@ -220,9 +257,27 @@ class ArticleStockController extends Controller
 
         // Update article fields
         $article_stock->update($request->only([
-            'code', 'description', 'name', 'color', 'qte_inter', 'qte_serie', 'quantity', 'stock_min',
-            'price', 'thickness', 'height', 'width', 'depth', 'chant',
-            'condition', 'code_supplier', 'qr_code', 'palette_condition', 'unit', 'gamme', 'category'
+            'code',
+            'description',
+            'name',
+            'color',
+            'qte_inter',
+            'qte_serie',
+            'quantity',
+            'stock_min',
+            'price',
+            'thickness',
+            'height',
+            'width',
+            'depth',
+            'chant',
+            'condition',
+            'code_supplier',
+            'qr_code',
+            'palette_condition',
+            'unit',
+            'gamme',
+            'category'
         ]));
 
         return response()->json([
@@ -245,8 +300,4 @@ class ArticleStockController extends Controller
 
         return response()->json(['message' => 'Article deleted successfully']);
     }
-
-
- 
-    
 }
