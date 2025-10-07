@@ -354,13 +354,11 @@ class DocumentController extends Controller
         $doc = $docs->first()->docentete;
 
         if ($docs->count() > 1) {
-            $doc = Docentete::whereIn("DO_Piece", $docs->pluck('DO_Piece'))->whereDoesntHave('document')->first();;
+            $doc = Docentete::whereIn("DO_Piece", $docs->pluck('DO_Piece'))->whereDoesntHave('document')->first();
         }
 
-
-
         $document->update([
-            'docentete_id' => $doc->cbMarq,
+            'docentete_id' => $doc?->cbMarq,
             'status_id'    => str_contains($doc->DO_Piece, 'BL') ? 12 : $document->status_id,
             'piece_bl'     => str_contains($doc->DO_Piece, 'BL') ? $doc->DO_Piece : $document->piece_bl,
             'piece_fa'     => str_contains($doc->DO_Piece, 'FA') ? $doc->DO_Piece : $document->piece_fa,
@@ -375,7 +373,7 @@ class DocumentController extends Controller
 
             if ($docligne) {
                 $line->update([
-                    'docligne_id' => $docligne->cbMarq, // or correct PK
+                    'docligne_id' => $docligne?->cbMarq, // or correct PK
                 ]);
             }
         }
@@ -389,7 +387,8 @@ class DocumentController extends Controller
     {
 
         if (!$request->filled('search')) {
-            $documents = Document::whereDoesntHave('docentete')->whereNull('piece_bl')->get();
+            $documents = Document::whereDoesntHave('docentete')->whereNull('piece_bl')->orWhereNull('piece_fa')->get();
+            // $documents = Document::whereDoesntHave('docentete')->whereNull('piece_fa')->orWhereNull('piece_fa')->get();
 
             if ($documents->isNotEmpty()) {
                 $documents->each(fn($document) => $this->convertDocument($document));
