@@ -14,6 +14,7 @@ return new class extends Migration
     {
         Schema::table('palettes', function (Blueprint $table) {
             $table->foreignIdFor(User::class, 'controlled_by')->nullable();
+            $table->date('controlled_at')->nullable();
         });
     }
 
@@ -24,6 +25,7 @@ return new class extends Migration
     {
         Schema::table('palettes', function (Blueprint $table) {
             $table->dropColumn('controlled_by');
+            $table->dropColumn('controlled_at');
         });
     }
 };

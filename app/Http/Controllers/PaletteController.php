@@ -599,7 +599,7 @@ class PaletteController extends Controller
         $allConfirmed = !$palette->lines()->wherePivotNull('controlled_at')->exists();
 
         if ($allConfirmed) {
-            $palette->update(['controlled' => true, 'controlled_by' => auth()->id()]);
+            $palette->update(['controlled' => true, 'controlled_by' => auth()->id(), 'controlled_at' => now()]);
         }
 
         return response()->json($palette);
@@ -618,7 +618,7 @@ class PaletteController extends Controller
 
             $document = Line::find($lineId)->document;
             if ($allConfirmed) {
-                $palette->update(['controlled' => true, 'controlled_by' => auth()->id()]);
+                $palette->update(['controlled' => true, 'controlled_by' => auth()->id(), 'controlled_at' => now()]);
 
                 $document->update([
                     'status_id' => 10

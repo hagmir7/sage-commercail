@@ -27,9 +27,9 @@ class SellController extends Controller
     private function generatePiece(): string
     {
         $lastPiece = Docentete::where('DO_Type', self::DO_TYPE)
-            ->where('DO_Piece', 'LIKE', '%PL%')
+            ->where('DO_Piece', 'LIKE', '%BLX%')
             ->orderByDesc('DO_Piece')
-            ->value('DO_Piece') ?? '25PL000000';
+            ->value('DO_Piece') ?? '25BLX000000';
 
         preg_match('/^([A-Z0-9]+)(\d{6})$/i', $lastPiece, $matches);
 
@@ -37,7 +37,7 @@ class SellController extends Controller
             return $matches[1] . str_pad((int)$matches[2] + 1, 6, '0', STR_PAD_LEFT);
         }
 
-        return '25PL000001';
+        return '25BLX000001';
     }
 
 
@@ -69,6 +69,8 @@ class SellController extends Controller
 
     public function calculator($sourcePiece, $lines = [])
     {
+        DB::beginTransaction();
+
         try {
             if (!empty($lines) && (is_array($lines) || $lines instanceof \Illuminate\Support\Collection)) {
                 $doclignes = Docligne::with('line')->whereIn('cbMarq', $lines)->get();
@@ -76,8 +78,9 @@ class SellController extends Controller
                 $doclignes = Docligne::with('line')->where('DO_Piece', $sourcePiece)->get();
             }
 
-            $grouped = $doclignes->groupBy(fn($doc) => $doc->line->company_code);
-
+            $grouped = $doclignes->groupBy(function ($doc) {
+                return $doc->line?->article_stock?->company_code ?? 'FR001';
+            });
 
             foreach ($grouped as $companyCode => $companyLines) {
 
@@ -118,14 +121,17 @@ class SellController extends Controller
                 }
             }
 
+            // ✅ Commit all if everything succeeded
+            DB::commit();
+
             return response()->json(['success' => true]);
 
         } catch (Exception $e) {
+            DB::rollBack();
             Log::error('Calculator operation failed: ' . $e->getMessage());
             return response()->json(['error' => $e->getMessage()], 500);
         }
     }
-
 
     public function createDocumentFromTemplate(string $sourcePiece, string $DO_Piece, $total, $companyCode): string
     {
@@ -133,7 +139,7 @@ class SellController extends Controller
             $DO_Domaine = 1;
             $DO_Type    = 13;
             $DO_Date    = now()->format('Y-m-d H:i:s');
-            $DO_Statut  = 0;
+            $DO_Statut  = 2;
 
             // Step 1: Get the source row
             $source = DB::connection('sqlsrv')

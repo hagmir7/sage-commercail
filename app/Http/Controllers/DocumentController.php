@@ -329,6 +329,8 @@ class DocumentController extends Controller
             });
         }
 
+        $query->whereNull('piece_fa')->whereNull('piece_bl');
+
         $documents = $query->orderBy('id', 'desc')->paginate(20);
         return response()->json($documents);
     }
@@ -343,44 +345,48 @@ class DocumentController extends Controller
 
     public function convertDocument(Document $document)
     {
-        $docs = $this->getDocumentsBL($document->piece);
+        return DB::transaction(function () use ($document) {
+            $docs = $this->getDocumentsBL($document->piece);
 
-        if ($docs->isEmpty()) {
-            // No BL/FA linked → nothing to update
-            return $document;
-        }
-
-
-        $doc = $docs->first()->docentete;
-
-        if ($docs->count() > 1) {
-            $doc = Docentete::whereIn("DO_Piece", $docs->pluck('DO_Piece'))->whereDoesntHave('document')->first();
-        }
-
-        $document->update([
-            'docentete_id' => $doc?->cbMarq,
-            'status_id'    => str_contains($doc->DO_Piece, 'BL') ? 12 : $document->status_id,
-            'piece_bl'     => str_contains($doc->DO_Piece, 'BL') ? $doc->DO_Piece : $document->piece_bl,
-            'piece_fa'     => str_contains($doc->DO_Piece, 'FA') ? $doc->DO_Piece : $document->piece_fa,
-        ]);
-
-        $lines = Line::where('document_id', $document->id)->get();
-
-        foreach ($lines as $line) {
-            $docligne = $doc->doclignes
-                ->where('AR_Ref', $line->ref)
-                ->first();
-
-            if ($docligne) {
-                $line->update([
-                    'docligne_id' => $docligne?->cbMarq, // or correct PK
-                ]);
+            if ($docs->isEmpty()) {
+                return $document;
             }
-        }
 
+            $doc = $docs->first()->docentete;
 
+            if ($docs->count() > 1) {
+                $doc = Docentete::whereIn("DO_Piece", $docs->pluck('DO_Piece'))
+                    ->whereDoesntHave('document')
+                    ->first();
+            }
 
-        return $document->fresh();
+            if (!$doc) {
+                return 0;
+            }
+
+            // Update the main document
+            $document->update([
+                'docentete_id' => $doc->cbMarq,
+                'status_id'    => str_contains($doc->DO_Piece, 'BL') ? 12 : $document->status_id,
+                'piece_bl'     => str_contains($doc->DO_Piece, 'BL') ? $doc->DO_Piece : ($docs->first()->DL_PieceBL ?? $document->piece_bl),
+                'piece_fa'     => str_contains($doc->DO_Piece, 'FA') ? $doc->DO_Piece : $document->piece_fa,
+            ]);
+
+            // Update related lines
+            $lines = Line::where('document_id', $document->id)->get();
+
+            foreach ($lines as $line) {
+                $docligne = optional($doc->doclignes)
+                    ->where('AR_Ref', $line->ref)
+                    ->first();
+
+                if ($docligne) {
+                    $line->update(['docligne_id' => $docligne->cbMarq]);
+                }
+            }
+
+            return $document->fresh();
+        });
     }
 
     public function livraison(Request $request)
@@ -388,7 +394,6 @@ class DocumentController extends Controller
 
         if (!$request->filled('search')) {
             $documents = Document::whereDoesntHave('docentete')->whereNull('piece_bl')->orWhereNull('piece_fa')->get();
-            // $documents = Document::whereDoesntHave('docentete')->whereNull('piece_fa')->orWhereNull('piece_fa')->get();
 
             if ($documents->isNotEmpty()) {
                 $documents->each(fn($document) => $this->convertDocument($document));
@@ -551,7 +556,7 @@ class DocumentController extends Controller
 
     public function archive(Request $request)
     {
-        $query = Document::with('docentete:DO_Domaine,DO_Type,DO_Piece,DO_Date,DO_Ref,DO_Tiers,DO_Statut,cbMarq,cbCreation,DO_DateLivr,DO_Expedit') // load the related docentete
+        $query = Document::with(['docentete:DO_Domaine,DO_Type,DO_Piece,DO_Date,DO_Ref,DO_Tiers,DO_Statut,cbMarq,cbCreation,DO_DateLivr,DO_Expedit', 'status'])
             ->when($request->filled('type'), function ($q) use ($request) {
                 if ($request->type == 1) {
                     $q->where('piece', 'like', '%PL%');
@@ -582,7 +587,7 @@ class DocumentController extends Controller
             $query->whereBetween('created_at', [$start, $end]);
         }
 
-        $documents = $query->select('documents.*')->paginate(30);
+        $documents = $query->select('documents.*')->orderByDesc('id')->paginate(30);
 
         return response()->json($documents, 200, [], JSON_UNESCAPED_UNICODE);
     }

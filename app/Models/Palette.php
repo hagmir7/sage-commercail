@@ -18,6 +18,7 @@ class Palette extends Model
         'delivered_by',
         'inventory_id',
         'first_company_id',
+        'controlled_at',
         'controlled_by',
         'weight'
     ];
