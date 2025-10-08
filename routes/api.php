@@ -86,7 +86,7 @@ Route::get('/users', function (Request $request) {
             $query->whereBetween('created_at', [$startOfMonth, $endOfMonth]);
         },
         'controlles as controlles_count' => function ($query) use ($startOfMonth, $endOfMonth) {
-            $query->whereBetween('created_at', [$startOfMonth, $endOfMonth]);
+            $query->whereBetween('controlled_at', [$startOfMonth, $endOfMonth]);
         },
         'validations as validations_count' => function ($query) use ($startOfMonth, $endOfMonth) {
             $query->whereBetween('created_at', [$startOfMonth, $endOfMonth]);
@@ -204,6 +204,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::prefix('stock')->controller(StockMovementController::class)->group(function(){
         Route::post('in', 'in');
         Route::post('out', 'out');
+        Route::post('return', 'in');
         Route::get('movements', 'listGeneral');
         Route::get('movements/{company}', 'list');
         Route::put('movements/update/{stock_movement}', 'update');

@@ -229,7 +229,7 @@ class StockMovementController extends Controller
                     'code_article'     => $request->code_article,
                     'designation'      => $article->description,
                     'emplacement_id'   => $emplacement->id,
-                    'movement_type'    => "IN",
+                    'movement_type'    => request()->is('*return*') ? "RETURN" : "IN",
                     'article_stock_id' => $article->id,
                     'quantity'         => $request->quantity,
                     'moved_by'         => auth()->id(),
