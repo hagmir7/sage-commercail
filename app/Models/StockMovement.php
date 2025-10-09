@@ -23,7 +23,8 @@ class StockMovement extends Model
         'moved_by',
         'note',
         'code_article',
-        'company_id'
+        'company_id',
+        'to_company_id'
     ];
 
     public function article()
@@ -36,7 +37,7 @@ class StockMovement extends Model
         return $this->belongsTo(Emplacement::class, 'emplacement_id');
     }
 
-    public function toEmplacement()
+    public function to_emplacement()
     {
         return $this->belongsTo(Emplacement::class, 'to_emplacement_id');
     }
@@ -44,6 +45,11 @@ class StockMovement extends Model
     public function movedBy()
     {
         return $this->belongsTo(User::class, 'moved_by');
+    }
+
+    public function to_company()
+    {
+        return $this->belongsTo(Company::class, 'to_company_id');
     }
 
     public function scopeFilterByCategory($query, $category)

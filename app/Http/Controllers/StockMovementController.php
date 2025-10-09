@@ -27,6 +27,8 @@ class StockMovementController extends Controller
             'types' => 'nullable|string',
         ]);
 
+        return;
+
         $types = $request->filled('types') ? explode(',', $request->types) : null;
 
         if ($types && array_diff($types, ['IN', 'OUT', 'TRANSFER', 'RETURN'])) {
@@ -34,7 +36,7 @@ class StockMovementController extends Controller
         }
 
         $movements = $company->movements()
-            ->with(['movedBy:id,full_name', 'emplacement:id,code'])
+            ->with(['movedBy:id,full_name', 'emplacement:id,code', 'to_emplacement'])
             ->when($types, fn($q) => $q->whereIn('movement_type', $types));
 
         if (!auth()->user()->hasRole('admin') && !auth()->user()->hasRole('supper_admin')) {
@@ -90,7 +92,7 @@ class StockMovementController extends Controller
             return response()->json(['error' => 'Invalid types provided'], 422);
         }
 
-        $movements = StockMovement::with(['movedBy:id,full_name', 'emplacement:id,code'])
+        $movements = StockMovement::with(['movedBy:id,full_name', 'emplacement:id,code','to_emplacement:id,code', 'to_company'])
             ->when($types, fn($q) => $q->whereIn('movement_type', $types));
 
         if (!auth()->user()->hasRole('admin') && !auth()->user()->hasRole('supper_admin')) {
@@ -450,13 +452,14 @@ class StockMovementController extends Controller
             $conditionMultiplier = $request->condition ? (float) $request->condition : 1.0;
 
 
-            DB::transaction(function () use ($article, $request, $conditionMultiplier, $emplacement) {
+            DB::transaction(function () use ($article, $request, $conditionMultiplier, $emplacement, $companyId) {
                 $qte_value = ($request->type_colis === "Palette" || $request->type_colis === "Carton")
                     ? $request->palettes * $conditionMultiplier
                     : $request->quantity;
 
 
                 $second_emplacement = Emplacement::where('code', $request->second_emplacement_code)->first();
+
 
 
                 StockMovement::create([
@@ -469,6 +472,7 @@ class StockMovementController extends Controller
                     'moved_by'         => auth()->id(),
                     'company_id'       => auth()?->user()?->compnay_id || 1,
                     'movement_date'    => now(),
+                    'to_company_id'    => $companyId,
                     'to_emplacement_id' => !empty($request->second_emplacement_code) ? $second_emplacement->id : null
                 ]);
 

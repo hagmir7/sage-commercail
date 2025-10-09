@@ -85,8 +85,7 @@ Route::get('/users', function (Request $request) {
         'movements as movements_count' => function ($query) use ($startOfMonth, $endOfMonth) {
             $query->whereBetween('created_at', [$startOfMonth, $endOfMonth]);
         },
-        'controlles as 
-        controlles_count' => function ($query) use ($startOfMonth, $endOfMonth) {
+        'controlles as controlles_count' => function ($query) use ($startOfMonth, $endOfMonth) {
             $query->whereBetween('controlled_at', [$startOfMonth, $endOfMonth]);
         },
         'validations as validations_count' => function ($query) use ($startOfMonth, $endOfMonth) {
