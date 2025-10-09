@@ -25,6 +25,7 @@ use App\Http\Controllers\TransferController;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\UserPermissionController;
 use App\Imports\MovementImport;
+use App\Models\ArticleStock;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -37,6 +38,7 @@ use Carbon\Carbon;
 Route::get('/user', function (Request $request) {
     return $request->user();
 })->middleware('auth:sanctum');
+
 
 
 
@@ -240,6 +242,7 @@ Route::middleware('auth:sanctum')->group(function () {
 
     Route::prefix('articles')->controller(ArticleStockController::class)->group(function () {
         Route::get('{article_stock:code}', 'show');
+        Route::get('emplacements/{piece}', 'emplacements');
         Route::get('', 'index');
         Route::post('store', 'store');
         Route::put('update/{article_stock:code}', 'update');
