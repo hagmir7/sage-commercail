@@ -19,9 +19,6 @@ use Illuminate\Support\Facades\Validator;
 class StockMovementController extends Controller
 {
 
-
-
-
     public function list(Request $request, Company $company)
     {
         $request->validate([
@@ -32,7 +29,7 @@ class StockMovementController extends Controller
 
         $types = $request->filled('types') ? explode(',', $request->types) : null;
 
-        if ($types && array_diff($types, ['IN', 'OUT', 'TRANSFER'])) {
+        if ($types && array_diff($types, ['IN', 'OUT', 'TRANSFER', 'RETURN'])) {
             return response()->json(['error' => 'Invalid types provided'], 422);
         }
 
@@ -89,7 +86,7 @@ class StockMovementController extends Controller
 
         $types = $request->filled('types') ? explode(',', $request->types) : null;
 
-        if ($types && array_diff($types, ['IN', 'OUT', 'TRANSFER'])) {
+        if ($types && array_diff($types, ['IN', 'OUT', 'TRANSFER', 'RETURN'])) {
             return response()->json(['error' => 'Invalid types provided'], 422);
         }
 
@@ -370,10 +367,6 @@ class StockMovementController extends Controller
                 return response()->json(['errors' => ['article' => 'Article non trouvé']], 404);
             }
 
-            if (!$emplacement) {
-                return response()->json(['errors' => ['emplacement' => 'Emplacement non trouvé']], 404);
-            }
-
             $conditionMultiplier = $request->condition ? (float) $request->condition : 1.0;
 
             DB::transaction(function () use ($article, $request, $conditionMultiplier, $emplacement, $companyId) {
@@ -382,14 +375,7 @@ class StockMovementController extends Controller
                     ? $request->palettes * $conditionMultiplier
                     : $request->quantity;
 
-                // ✅ Check company stock availability
-                $company_stock = CompanyStock::where('code_article', $request->code_article)
-                    ->where('company_id', $companyId)
-                    ->first();
-
-                if (!$company_stock || $company_stock->quantity < $qte_value) {
-                    throw new \Exception("Stock insuffisant pour cet article.");
-                }
+               
 
                 // ✅ Log stock movement
                 StockMovement::create([
@@ -403,41 +389,95 @@ class StockMovementController extends Controller
                     'company_id'       => $companyId,
                     'movement_date'    => now(),
                 ]);
+                $this->stockOut($emplacement, $article, $qte_value);
+            });
 
-                // ✅ Update company stock
-                $company_stock->quantity -= $qte_value;
-                $company_stock->save();
+            return response()->json(['message' => 'Stock successfully removed.']);
+        } catch (\Illuminate\Database\QueryException $e) {
+            Log::error('Database error in out function', [
+                'error'        => $e->getMessage(),
+                'sql'          => $e->getSql() ?? 'N/A',
+                'bindings'     => $e->getBindings() ?? [],
+                'trace'        => $e->getTraceAsString(),
+                'request_data' => $request->all(),
+            ]);
 
-                // ✅ Update emplacement pivot
-                $existing = $emplacement->articles()->find($article->id);
-                if ($existing) {
-                    $currentQty = $existing->pivot->quantity;
-                    if ($currentQty < $qte_value) {
-                        throw new \Exception("Stock insuffisant dans l’emplacement.");
-                    }
-                    $emplacement->articles()->updateExistingPivot($article->id, [
-                        'quantity' => DB::raw('quantity - ' . $qte_value)
-                    ]);
-                } else {
-                    throw new \Exception("Article non trouvé dans cet emplacement.");
-                }
+            return response()->json(['message' => 'Erreur base de données.', 'error' => 'Database error'], 500);
+        } catch (\Exception $e) {
+            Log::error('Unexpected error in out function', [
+                'error'        => $e->getMessage(),
+                'trace'        => $e->getTraceAsString(),
+                'request_data' => $request->all(),
+                'line'         => $e->getLine(),
+                'file'         => $e->getFile()
+            ]);
 
-                // ✅ Handle palettes (reduce instead of add)
-                $palette = $article->palettes()
-                    ->where('emplacement_id', $emplacement->id)
-                    ->first();
+            return response()->json(['message' => $e->getMessage(), 'error' => 'Internal server error'], 500);
+        }
+    }
 
-                if ($palette) {
-                    $currentPaletteQty = $palette->pivot->quantity;
-                    if ($currentPaletteQty <= $qte_value) {
-                        // Remove pivot if quantity exhausted
-                        $article->palettes()->detach($palette->id);
-                    } else {
-                        $article->palettes()->updateExistingPivot(
-                            $palette->id,
-                            ['quantity' => DB::raw('quantity - ' . (int) $qte_value)]
-                        );
-                    }
+
+    public function transfer(Request $request)
+    {
+        try {
+            $validator = Validator::make($request->all(), [
+                'emplacement_code' => 'required|string|max:255|min:3|exists:emplacements,code',
+                'second_emplacement_code' => 'nullable|string|max:255|min:3|exists:emplacements,code',
+                'code_article'     => 'required|string',
+                'quantity'         => 'required|numeric|min:1',
+                'condition'        => 'nullable|numeric|min:1',
+                'type_colis'       => 'nullable|in:Piece,Palette,Carton',
+                'palettes'         => 'required_if:type_colis,Palette,Carton|numeric|min:1',
+                'company'          => 'nullable|numeric'
+            ]);
+
+            if ($validator->fails()) {
+                return response()->json([
+                    'message' => $validator->errors()->first(),
+                    'errors'  => $validator->errors()
+                ], 422);
+            }
+
+            $companyId   = intval($request->company ?? 1);
+
+            $article     = ArticleStock::where('code', $request->code_article)->first();
+            $emplacement = Emplacement::where("code", $request->emplacement_code)->first();
+
+            if (!$article) {
+                return response()->json(['errors' => ['article' => 'Article non trouvé']], 404);
+            }
+
+            $conditionMultiplier = $request->condition ? (float) $request->condition : 1.0;
+
+
+            DB::transaction(function () use ($article, $request, $conditionMultiplier, $emplacement) {
+                $qte_value = ($request->type_colis === "Palette" || $request->type_colis === "Carton")
+                    ? $request->palettes * $conditionMultiplier
+                    : $request->quantity;
+
+
+                $second_emplacement = Emplacement::where('code', $request->second_emplacement_code)->first();
+
+
+                StockMovement::create([
+                    'code_article'     => $request->code_article,
+                    'designation'      => $article->description,
+                    'emplacement_id'   => $emplacement->id,
+                    'movement_type'    => "TRANSFER",
+                    'article_stock_id' => $article->id,
+                    'quantity'         => $qte_value,
+                    'moved_by'         => auth()->id(),
+                    'company_id'       => auth()?->user()?->compnay_id || 1,
+                    'movement_date'    => now(),
+                    'to_emplacement_id' => !empty($request->second_emplacement_code) ? $second_emplacement->id : null
+                ]);
+
+                $this->stockOut($emplacement, $article, $qte_value);
+
+
+                if(!empty($request->second_emplacement_code)){
+                    $second_emplacement = Emplacement::where('code', $request->second_emplacement_code)->first();
+                    $this->stockInsert($second_emplacement, $article, $qte_value, $conditionMultiplier, $request->type_colise, $request->quantity);
                 }
             });
 
@@ -462,6 +502,107 @@ class StockMovementController extends Controller
             ]);
 
             return response()->json(['message' => $e->getMessage(), 'error' => 'Internal server error'], 500);
+        }
+    }
+
+
+    public function stockInsert($emplacement, $article, $qte_value, $conditionMultiplier, $type_colis, $quantity)
+    {
+        DB::transaction(function () use ($emplacement, $article, $qte_value, $conditionMultiplier, $type_colis, $quantity) {
+
+            // 🔹 1️⃣ If type is "Palette" — create one per quantity
+            if ($type_colis === "Palette") {
+                for ($i = 1; $i <= intval($quantity); $i++) {
+                    $palette = Palette::create([
+                        "code"           => $this->generatePaletteCode(),
+                        "emplacement_id" => $emplacement->id,
+                        "company_id"     => $emplacement->depot->company_id ?? null,
+                        "user_id"        => auth()->id(),
+                        "type"           => "Stock",
+                    ]);
+
+                    $article->palettes()->attach($palette->id, [
+                        'quantity' => floatval($conditionMultiplier),
+                    ]);
+                }
+
+                return; // ✅ done for "Palette" type
+            }
+
+            // 🔹 2️⃣ For non-palette (grouped stock)
+            // Find or create a palette for this emplacement
+            $palette = Palette::firstOrCreate(
+                ['emplacement_id' => $emplacement->id, 'type' => 'Stock'],
+                [
+                    "code"       => $this->generatePaletteCode(),
+                    "company_id" => $emplacement->depot->company_id ?? null,
+                    "user_id"    => auth()->id(),
+                    "type"       => "Stock"
+                ]
+            );
+
+            // 🔹 3️⃣ Check if article already exists in that palette
+            $existingPivot = $article->palettes()
+                ->where('palette_id', $palette->id)
+                ->first();
+
+            if ($existingPivot) {
+                // Update quantity
+                $article->palettes()->updateExistingPivot(
+                    $palette->id,
+                    ['quantity' => DB::raw('quantity + ' . (float) $qte_value)]
+                );
+            } else {
+                // Attach new article
+                $article->palettes()->attach($palette->id, ['quantity' => $qte_value]);
+            }
+        });
+    }
+
+
+    public function stockOut($emplacement, $article, $qte_value)
+    {
+        // 1️⃣ Get all palettes in this emplacement that have this article
+        $palettes = Palette::where('emplacement_id', $emplacement->id)
+            ->whereHas('articles', function ($q) use ($article) {
+                $q->where('article_stocks.id', $article->id);
+            })
+            ->with(['articles' => function ($q) use ($article) {
+                $q->where('article_stocks.id', $article->id);
+            }])
+            ->lockForUpdate()
+            ->get();
+
+        if ($palettes->isEmpty()) {
+            throw new \Exception("Article non trouvé dans cet emplacement.");
+        }
+
+        // 2️⃣ Calculate total available quantity
+        $totalQty = $palettes->sum(fn($p) => $p->articles->first()?->pivot->quantity ?? 0);
+
+        if ($totalQty < $qte_value) {
+            throw new \Exception("Stock insuffisant dans l’emplacement.");
+        }
+
+        // 3️⃣ Deduct from palettes one by one
+        $remaining = $qte_value;
+
+        foreach ($palettes as $palette) {
+            $pivot = $palette->articles->first()->pivot;
+            $available = $pivot->quantity;
+
+            if ($available >= $remaining) {
+                $palette->articles()->updateExistingPivot($article->id, [
+                    'quantity' => DB::raw('quantity - ' . $remaining)
+                ]);
+                break;
+            } else {
+                // empty this palette and move to next
+                $palette->articles()->updateExistingPivot($article->id, [
+                    'quantity' => 0
+                ]);
+                $remaining -= $available;
+            }
         }
     }
 }

@@ -64,5 +64,10 @@ class Palette extends Model
         return $this->belongsTo(User::class);
     }
 
+    public function emplacement()
+    {
+        return $this->belongsTo(Emplacement::class);
+    }
+
     
 }
