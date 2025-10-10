@@ -177,6 +177,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('{code}/line/{lineId}', 'controller');
         Route::get('document/{piece}', 'documentPalettes');
         Route::delete('{palette:code}', 'destroy');
+        Route::post('import', 'import');
     });
 
 

@@ -514,7 +514,7 @@ class StockMovementController extends Controller
     {
         DB::transaction(function () use ($emplacement, $article, $qte_value, $conditionMultiplier, $type_colis, $quantity) {
 
-            // 🔹 1️⃣ If type is "Palette" — create one per quantity
+            //  If type is "Palette" — create one per quantity
             if ($type_colis === "Palette") {
                 for ($i = 1; $i <= intval($quantity); $i++) {
                     $palette = Palette::create([
@@ -530,10 +530,10 @@ class StockMovementController extends Controller
                     ]);
                 }
 
-                return; // ✅ done for "Palette" type
+                return;
             }
 
-            // 🔹 2️⃣ For non-palette (grouped stock)
+            // For non-palette (grouped stock)
             // Find or create a palette for this emplacement
             $palette = Palette::firstOrCreate(
                 ['emplacement_id' => $emplacement->id, 'type' => 'Stock'],
@@ -545,7 +545,7 @@ class StockMovementController extends Controller
                 ]
             );
 
-            // 🔹 3️⃣ Check if article already exists in that palette
+            // Check if article already exists in that palette
             $existingPivot = $article->palettes()
                 ->where('palette_id', $palette->id)
                 ->first();

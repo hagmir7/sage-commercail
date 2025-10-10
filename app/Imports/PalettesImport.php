@@ -45,14 +45,16 @@ class PalettesImport implements ToCollection, WithHeadingRow
                 }
 
                 // Extract data from row - try multiple possible column names
-                $articleCode     = $row['article_code'] ?? $row['article code'] ?? null;
+                $articleCode     = $row['article_code'] ?? null;
                 $qte             = $row['qte'] ?? $row['quantity'] ?? null;
-                $emplacementCode = $row['emplacement_code'] ?? $row['emplacement code'] ?? $row['emplacement'] ?? null;
+                $emplacementCode = $row['emplacement_code'] ?? $row['emplacement'] ?? null;
+                $conditionPalette = $row['condition_palette'] ?? null;
 
                 // Trim whitespace from all values
                 $articleCode     = $articleCode ? trim($articleCode) : null;
                 $qte             = $qte ? trim($qte) : null;
                 $emplacementCode = $emplacementCode ? trim($emplacementCode) : null;
+                $conditionPalette = $conditionPalette ? trim($conditionPalette) : null;
 
                 // Validate required fields
                 if (!$articleCode || !$qte || !$emplacementCode) {
@@ -88,17 +90,44 @@ class PalettesImport implements ToCollection, WithHeadingRow
                     continue;
                 }
 
-                // Create new palette with generated code
-                $palette = Palette::create([
-                    'code'           => $this->generatePaletteCode(),
-                    'company_id'     => $emplacement->depot->company_id,
-                    'emplacement_id' => $emplacement->id,
-                    'type'           => 'Stock',
-                    'user_id'        => 1,
-                ]);
 
-                // Attach article to palette with quantity
-                $palette->articles()->attach($article->id, ['quantity' => $qte]);
+                if ($conditionPalette) {
+                    $palette = Palette::create([
+                        'code'           => $this->generatePaletteCode(),
+                        'company_id'     => $emplacement->depot->company_id,
+                        'emplacement_id' => $emplacement->id,
+                        'type'           => 'Stock',
+                        'user_id'        => 1,
+                    ]);
+                    $palette->articles()->attach($article->id, ['quantity' => $qte]);
+                } else {
+                    $firstPalette = Palette::where('emplacement_id', $emplacement->id)->first();
+
+                    if ($firstPalette) {
+                        $qte = (int) $qte;
+                        if ($firstPalette->articles()->whereKey($article->id)->exists()) {
+                            $firstPalette->articles()->updateExistingPivot($article->id, [
+                                'quantity' => DB::raw('quantity + ' . $qte),
+                            ]);
+                        } else {
+                            $firstPalette->articles()->attach($article->id, ['quantity' => $qte]);
+                        }
+                    } else {
+                        $newPalette = Palette::create([
+                            'code'           => $this->generatePaletteCode(),
+                            'company_id'     => $emplacement->depot->company_id,
+                            'emplacement_id' => $emplacement->id,
+                            'type'           => 'Stock',
+                            'user_id'        => 1,
+                        ]);
+
+                        $newPalette->articles()->attach($article->id, ['quantity' => $qte]);
+                    }
+                }
+
+
+
+                
             }
 
             DB::commit();
