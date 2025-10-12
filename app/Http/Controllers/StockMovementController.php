@@ -377,7 +377,7 @@ class StockMovementController extends Controller
                     ? $request->palettes * $conditionMultiplier
                     : $request->quantity;
 
-               
+
 
                 // ✅ Log stock movement
                 StockMovement::create([

@@ -14,7 +14,6 @@ use App\Models\Line;
 use App\Models\Palette;
 use App\Models\StockMovement;
 use Illuminate\Http\Request;
-// use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Validator;
@@ -221,6 +220,7 @@ class PaletteController extends Controller
                 ->where('company_id', auth()->user()->company_id)
                 ->where("document_id", $document->id)
                 ->whereIn('status_id', [7, 8])
+                ->whereIn('role_id', auth()->user()->roles()->pluck('id')->toArray())
                 ->whereHas('docligne', function ($query) {
                     $query->whereColumn('DL_Qte', '>', 'DL_QteBL');
                 });
@@ -426,16 +426,6 @@ class PaletteController extends Controller
                     $article_stock = ArticleStock::where('code', $line->ref)->first();
                      $emplacement = Emplacement::where("code", $request->emplacement)->first();
 
-                    $company_stock = CompanyStock::where('code_article', $line->ref)
-                        ->where('company_id', $emplacement->depot->company_id)
-                        ->lockForUpdate()
-                        ->first();
-
-                    // ✅ Check company stock
-                    if (!$company_stock || $company_stock->quantity < floatval($request->quantity)) {
-                        throw new \Exception("Stock insuffisant pour cet article.", 422);
-                    }
-
                     // ✅ Create stock OUT movement
                     StockMovement::create([
                         'code_article'     => $line->ref,
@@ -449,43 +439,9 @@ class PaletteController extends Controller
                         'movement_date'    => now(),
                     ]);
 
-                    // ✅ Decrement company stock safely
-                    $company_stock->decrement('quantity', floatval($request->quantity));
 
-                    // ✅ Update emplacement pivot
-                    $existing = $emplacement->articles()->find($article_stock->id);
-                    if ($existing) {
-                        $currentQty = $existing->pivot->quantity;
-                        if ($currentQty < floatval($request->quantity)) {
-                            throw new \Exception("Stock insuffisant dans l’emplacement.", 422);
-                        }
-                        $emplacement->articles()->updateExistingPivot($article_stock->id, [
-                            'quantity' => DB::raw('quantity - ' . floatval($request->quantity))
-                        ]);
-                    } else {
-                        throw new \Exception("Article non trouvé dans cet emplacement.", 404);
-                    }
-
-                    // ✅ Handle palettes (reduce instead of detach for history)
-                    $paletteRelation = $article_stock->palettes()
-                        ->where('emplacement_id', $emplacement->id)
-                        ->first();
-
-                    if ($paletteRelation) {
-                        $currentPaletteQty = $paletteRelation->pivot->quantity;
-                        if ($currentPaletteQty <= floatval($request->quantity)) {
-                            // Set to 0 instead of detach (to keep trace)
-                            $article_stock->palettes()->updateExistingPivot(
-                                $paletteRelation->id,
-                                ['quantity' => 0]
-                            );
-                        } else {
-                            $article_stock->palettes()->updateExistingPivot(
-                                $paletteRelation->id,
-                                ['quantity' => DB::raw('quantity - ' . floatval($request->quantity))]
-                            );
-                        }
-                    }
+                    $stock_movement = new StockMovementController();
+                    $stock_movement->stockOut($emplacement, $article_stock, $request->quantity);
                 }
 
                 // ✅ Update doc line

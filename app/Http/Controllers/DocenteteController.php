@@ -35,6 +35,7 @@ class DocenteteController extends Controller
 
             $common = array_intersect($user_roles->toArray(), ['fabrication', 'montage', 'preparation_cuisine', 'preparation_trailer', 'magasinier']);
             if (!empty($common)) {
+
                 $line = $query->whereIn("role_id", $user_roles->keys());
             }
             return $line;
@@ -450,7 +451,7 @@ class DocenteteController extends Controller
 
             // Achate d'article
             $sellController = new SellController();
-            $sellController->calculator($document?->docentete->DO_Piece);
+            $sellController->calculator($document?->docentete->DO_Piece, $document->lines->where('company_id', auth()->user()?->company_id)->pluck('docligne_id'));
 
             return response()->json(["message" => "Le document est validé avec succès"]);
         });

@@ -228,6 +228,8 @@ class DocumentController extends Controller
                     ['fabrication', 'montage', 'preparation_cuisine', 'preparation_trailer', 'magasinier']
                 );
 
+
+
                 if (!empty($common)) {
                     $q->whereIn("role_id", $user_roles->keys());
                 }
