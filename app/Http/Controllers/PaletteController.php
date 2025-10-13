@@ -324,7 +324,9 @@ class PaletteController extends Controller
             $palette->save();
 
 
-            $allPalettesDelivered = $document->palettes->every(fn($p) => !is_null($p->delivered_at));
+            $allPalettesDelivered = $document->palettes && $document->palettes->count() > 0
+            ? $document->palettes->every(fn($p) => !is_null($p->delivered_at))
+            : false;
 
 
             if ($allPalettesDelivered) {
@@ -333,8 +335,6 @@ class PaletteController extends Controller
                 ]);
             }
 
-
-            $palette->all_palettes_delivered = $allPalettesDelivered;
 
             return response()->json($palette);
         } catch (\Exception $e) {

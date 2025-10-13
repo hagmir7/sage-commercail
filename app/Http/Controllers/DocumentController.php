@@ -394,13 +394,13 @@ class DocumentController extends Controller
     public function livraison(Request $request)
     {
 
-        if (!$request->filled('search')) {
-            $documents = Document::whereDoesntHave('docentete')->whereNull('piece_bl')->orWhereNull('piece_fa')->get();
+        // if (!$request->filled('search')) {
+        //     $documents = Document::whereDoesntHave('docentete')->whereNull('piece_bl')->orWhereNull('piece_fa')->get();
 
-            if ($documents->isNotEmpty()) {
-                $documents->each(fn($document) => $this->convertDocument($document));
-            }
-        }
+        //     if ($documents->isNotEmpty()) {
+        //         $documents->each(fn($document) => $this->convertDocument($document));
+        //     }
+        // }
 
         // 🔹 Main query for BLs
         $query = Docentete::with([
@@ -469,7 +469,8 @@ class DocumentController extends Controller
 
         if ($validator->fails()) {
             return response()->json([
-                'errors' => $validator->errors()
+                'errors' => $validator->errors(),
+                'message' => $validator->errors()->first()
             ], 422);
         }
 
