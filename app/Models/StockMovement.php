@@ -10,10 +10,9 @@ use Exception;
 class StockMovement extends Model
 {
     protected $fillable = [
-        'article_id',
         'designation',
-        'to_emplacement_id',
         'emplacement_id',
+        'to_emplacement_id',
         'article_stock_id',
         'quantity',
         'movement_type',
