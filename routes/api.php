@@ -25,7 +25,6 @@ use App\Http\Controllers\TransferController;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\UserPermissionController;
 use App\Imports\MovementImport;
-use App\Models\ArticleStock;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -210,8 +209,10 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('return', 'in');
         Route::post('transfer', 'transfer');
         Route::get('movements', 'listGeneral');
+        Route::get('movements/export', 'exportMovements');
         Route::get('movements/{company}', 'list');
         Route::put('movements/update/{stock_movement}', 'update');
+       
     });
 
 

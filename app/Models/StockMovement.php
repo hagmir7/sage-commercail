@@ -24,11 +24,10 @@ class StockMovement extends Model
         'to_company_id'
     ];
 
-    public function article()
+    public function articleStock()
     {
-        return $this->belongsTo(ArticleStock::class);
+        return $this->belongsTo(ArticleStock::class, 'article_stock_id');
     }
-
     public function emplacement()
     {
         return $this->belongsTo(Emplacement::class, 'emplacement_id');
@@ -51,9 +50,8 @@ class StockMovement extends Model
 
     public function scopeFilterByCategory($query, $category)
     {
-        return $query->whereHas('article', fn($q) => $q->where('category', 'like', $category));
+        return $query->whereHas('articleStock', fn($q) => $q->where('category', 'like', $category));
     }
-
     public function scopeFilterByDepots($query, $depots)
     {
         return $query->whereHas('emplacement.depot', fn($q) => $q->whereIn('id', $depots));
@@ -88,6 +86,18 @@ class StockMovement extends Model
 
         return $query;
     }
+
+
+        public function scopeFilterByTypes($query, $types)
+        {
+            if (empty($types)) {
+                return $query;
+            }
+
+            return $query->whereIn('movement_type', $types);
+        }
+
+
 
     public function scopeFilterByDates(Builder $query, $dateRange)
     {

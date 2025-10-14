@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Exports\StockMovementsExport;
 use App\Models\ArticleStock;
 use App\Models\Company;
 use App\Models\CompanyStock;
@@ -12,6 +13,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Validator;
+use Maatwebsite\Excel\Facades\Excel;
 
 // use App\Models\Palette;
 
@@ -63,6 +65,7 @@ class StockMovementController extends Controller
         }
 
         if ($request->filled('category') && $request->category !== '') {
+
             $movements->filterByCategory($request->category);
         }
 
@@ -608,5 +611,22 @@ class StockMovementController extends Controller
                 $remaining -= $available;
             }
         }
+    }
+
+
+    public function exportMovements(Request $request)
+    {
+        // $filters = $request->all();
+        $filters = [
+            'dateRange' => $request->input('dateRange'),
+            'users' => $request->input('users', []),
+            'category' => $request->input('category'),
+            'depots' => $request->input('depots', []),
+            'search' => $request->input('search'),
+            'types' => $request->input('types', []),
+            'dates' => $request->input('dates', []),
+        ];
+        $fileName = 'stock_movements_' . now()->format('Y_m_d_His') . '.xlsx';
+        return Excel::download(new StockMovementsExport($filters), $fileName);
     }
 }

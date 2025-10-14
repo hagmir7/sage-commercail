@@ -300,9 +300,13 @@ class ArticleStockController extends Controller
 
     public function emplacements($code)
     {
-        $article = ArticleStock::where('code', $code)->first();
+        $article = ArticleStock::with('companies')->where('code', $code)
+            ->orWhere('code_supplier', $code)
+            ->orWhere('code_supplier_2', $code)
+            ->orWhere('qr_code', $code)
+            ->first();
 
-        if (! $article) {
+        if (!$article) {
             return response()->json(['message' => 'Article not found'], 404);
         }
 
