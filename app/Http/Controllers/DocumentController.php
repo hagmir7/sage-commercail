@@ -565,6 +565,7 @@ class DocumentController extends Controller
     public function archive(Request $request)
     {
         $query = Document::with(['docentete:DO_Domaine,DO_Type,DO_Piece,DO_Date,DO_Ref,DO_Tiers,DO_Statut,cbMarq,cbCreation,DO_DateLivr,DO_Expedit', 'status'])
+            ->whereHas('docentete')
             ->when($request->filled('type'), function ($q) use ($request) {
                 if ($request->type == 1) {
                     $q->where('piece', 'like', '%PL%');

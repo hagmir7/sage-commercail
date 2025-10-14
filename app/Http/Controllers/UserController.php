@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Document;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -134,4 +135,12 @@ class UserController extends Controller
     public function usersActions(){
         return User::withCount(['movements', ]);
     }
+
+
+    public function documents() {
+        return Document::with('docentete:DO_Reliquat,DO_Piece,DO_Ref,DO_Tiers,cbMarq,DO_Date,DO_DateLivr,DO_Expedit')
+            ->whereIn('id', auth()->user()->lines->pluck('document_id'))
+            ->paginate(35);
+    }
+
 }

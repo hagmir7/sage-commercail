@@ -104,6 +104,10 @@ class DocenteteController extends Controller
                 'status_id' => $line->next_role_id ? 7 : ($user->hasRole("fabrication") ? 4 : 6)
             ]);
 
+            auth()->user()->lines()->syncWithoutDetaching([
+                $line->id => ['action_name' => $user->hasRole("fabrication") ? "Fabrication" : 'Montage']
+            ]);
+
             $line->update([
                 'next_role_id' => null,
             ]);
@@ -664,14 +668,12 @@ class DocenteteController extends Controller
             $quantities = [];
 
             if (is_array($lineData) && !empty($lineData)) {
-                // New format (objects with line_id + quantity)
                 if (is_array($lineData[0]) && isset($lineData[0]['line_id'])) {
                     foreach ($lineData as $item) {
                         $lineIds[] = $item['line_id'];
                         $quantities[$item['line_id']] = $item['quantity'];
                     }
                 } else {
-                    // Old format (just IDs)
                     $lineIds = $lineData;
                 }
             }
@@ -699,18 +701,6 @@ class DocenteteController extends Controller
                     'status_id' => $status,
                     'next_role_id' => $next_role,
                 ];
-
-                if (!empty($quantities) && isset($quantities[$line->id])) {
-                    $updateData['transfer_quantity'] = $quantities[$line->id];
-
-                    RoleQuantityLine::create([
-                        'line_id' => $line->id,
-                        'quantity' => $quantities[$line->id],
-                        'role_id' => $role->id,
-                        'next_role_id' => $next_role
-                    ]);
-                }
-
                 $line->update($updateData);
             }
 

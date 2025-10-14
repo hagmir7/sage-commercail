@@ -143,6 +143,10 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('/create', 'create');
     });
 
+    Route::prefix('users')->controller(UserController::class)->group(function(){
+        Route::get('documents', 'documents');
+    });
+
 
     Route::prefix('emplacement')->controller(EmplacementController::class)->group(function () {
         Route::post('create', 'create');

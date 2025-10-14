@@ -76,4 +76,11 @@ class User extends Authenticatable
      public function preparations(){
         return $this->hasMany(Palette::class, 'user_id');
     }
+
+    public function lines()
+    {
+        return $this->belongsToMany(Line::class, 'user_line')
+            ->withPivot('action_name')
+            ->withTimestamps();
+    }
 }

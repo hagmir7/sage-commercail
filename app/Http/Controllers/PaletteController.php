@@ -13,6 +13,7 @@ use App\Models\InventoryStock;
 use App\Models\Line;
 use App\Models\Palette;
 use App\Models\StockMovement;
+use App\Models\UserLine;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -460,6 +461,10 @@ class PaletteController extends Controller
                     'status_id' => $status,
                     'updated_at' => now(),
                 ]);
+
+                auth()->user()->lines()->syncWithoutDetaching([
+                    $line->id => ['action_name' => 'Preparation']
+                ]);
             });
 
             return response()->json([
@@ -467,6 +472,7 @@ class PaletteController extends Controller
                 'line'      => $line->fresh(['palettes', 'docligne']),
                 'document'  => $document->fresh(),
             ]);
+
         } catch (\Exception $e) {
             return response()->json([
                 'message' => $e->getMessage()
@@ -589,6 +595,10 @@ class PaletteController extends Controller
 
 
             $user_company = auth()->user()->company_id;
+
+            auth()->user()->lines()->syncWithoutDetaching([
+                $lineId => ['action_name' => 'Contrôle']
+            ]);
 
 
 
