@@ -220,6 +220,7 @@ class DocumentController extends Controller
             'companies',
             'docentete:cbMarq,DO_Date,DO_DateLivr,DO_Reliquat'
         ])
+            ->whereHas('docentete')
             ->whereHas('lines', function ($q) use ($user_roles) {
                 $q->where('company_id', auth()->user()->company_id);
 
@@ -394,13 +395,13 @@ class DocumentController extends Controller
     public function livraison(Request $request)
     {
 
-        // if (!$request->filled('search')) {
-        //     $documents = Document::whereDoesntHave('docentete')->whereNull('piece_bl')->orWhereNull('piece_fa')->get();
+        if (!$request->filled('search')) {
+            $documents = Document::whereDoesntHave('docentete')->whereNull('piece_bl')->orWhereNull('piece_fa')->get();
 
-        //     if ($documents->isNotEmpty()) {
-        //         $documents->each(fn($document) => $this->convertDocument($document));
-        //     }
-        // }
+            if ($documents->isNotEmpty()) {
+                $documents->each(fn($document) => $this->convertDocument($document));
+            }
+        }
 
         // 🔹 Main query for BLs
         $query = Docentete::with([
