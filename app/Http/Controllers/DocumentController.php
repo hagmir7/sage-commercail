@@ -220,7 +220,11 @@ class DocumentController extends Controller
             'companies',
             'docentete:cbMarq,DO_Date,DO_DateLivr,DO_Reliquat'
         ])
-            ->whereHas('docentete')
+            ->whereHas('docentete', function($query){
+                $query->where('DO_Domaine', 0)
+                ->where('DO_Statut', 1)
+               ->where('DO_Type', 2);
+            })
             ->whereHas('lines', function ($q) use ($user_roles) {
                 $q->where('company_id', auth()->user()->company_id);
 
