@@ -19,6 +19,7 @@ class UserController extends Controller
             'full_name' => 'required|string|max:255',
             'phone' => 'nullable|string|max:255',
             'email' => 'required|string|email|max:255|unique:users,email,' . $id,
+            'company_id' => 'nullable|numeric|exists:companies,id'
         ]);
 
         if ($validator->fails()) {
@@ -28,10 +29,8 @@ class UserController extends Controller
             ], 422);
         }
 
-
-
         $user = User::find($id);
-        $roles = $user->getRoleNames(); // Get all role names the user has
+        $roles = $user->getRoleNames();
         foreach ($roles as $role) {
             $user->removeRole($role);
         }
@@ -47,6 +46,7 @@ class UserController extends Controller
             'full_name' => $request->full_name,
             'email' => $request->email,
             'phone' => $request->phone ?? null,
+            'company_id' => $request->company_id ?? null
         ]);
 
         $token = $user->createToken('auth_token')->plainTextToken;
@@ -143,5 +143,19 @@ class UserController extends Controller
             ->orWhere("transfer_by", auth()->id())
             ->paginate(35);
     }
+
+
+    public function showDocument($piece){
+        return Document::with(['lines' => function($lines){
+            if(auth()->user()->hasRole(['preparation_cuisine', 'preparation_trailer', 'fabrication', 'montage', 'magasinier','chargement'])){
+                return $lines->whereIn("id", auth()->user()->lines->pluck('id'));
+            }elseif(auth()->user()->hasRole(['preparation', 'controleur'])){
+                return $lines->where("company_id", auth()->user()->company_id);
+            }
+            
+        }])->where('piece', $piece)->first();
+    }
+
+
 
 }

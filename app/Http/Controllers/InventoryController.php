@@ -297,13 +297,6 @@ public function insert(Request $request, Inventory $inventory)
             }
         });
 
-        Log::info('Stock successfully inserted or updated', [
-            'article_code' => $request->article_code,
-            'inventory_id' => $inventory->id,
-            'quantity' => $request->quantity,
-            'user_id' => auth()->id()
-        ]);
-
         return response()->json(['message' => 'Stock successfully inserted or updated.']);
         
     } catch (\Illuminate\Database\QueryException $e) {

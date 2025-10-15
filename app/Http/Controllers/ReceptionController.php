@@ -309,9 +309,6 @@ class ReceptionController extends Controller
     {
         // $document = Document::on($request->company_db)->where("piece", $piece)->first();
         $document = \App\Models\Document::on($request->company_db)->where('piece', $piece)->first();
-        \Log::alert($piece);
-         \Log::alert($request->company_db);
-
         if (!$document) {
             return response()->json(['message' => "Le document n'existe pas $piece"], 404);
         }

@@ -2,6 +2,9 @@
 
 namespace App\Models;
 
+use DateTime;
+use Exception;
+use Illuminate\Contracts\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 
 class InventoryMovement extends Model

@@ -145,6 +145,7 @@ Route::middleware('auth:sanctum')->group(function () {
 
     Route::prefix('users')->controller(UserController::class)->group(function(){
         Route::get('documents', 'documents');
+        Route::get('documents/{piece}', 'showDocument');
     });
 
 

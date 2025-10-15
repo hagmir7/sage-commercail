@@ -29,21 +29,12 @@ class InventoryMovementController extends Controller
 
         $article = ArticleStock::where('code', $request->code_article)->first();
         $emplacement = Emplacement::where('code', $request->emplacement)->first();
-
-        $olde_quantity = $inventory_movement->quantity;
         $inventory_movement->update([
             'quantity' => $request->quantity,
             'emplacement_id' => $emplacement->id,
             'emplacement_code' => $request->emplacement,
             'code_article' => $request->code_article ? $request->code_article : $inventory_movement->code_article,
             'designation' => $request->code_article ? $article->description : $inventory_movement->designation
-        ]);
-
-        \Log::info("Quantité mise à jour", [
-            'movement_id' => $inventory_movement->id,
-            'ancien' =>  $olde_quantity,
-            'nouveau' => $request->quantity,
-            'user_id' => auth()->id() ?? null
         ]);
         return response()->json(['message' => "Quantité modifiée avec succès"]);
     }

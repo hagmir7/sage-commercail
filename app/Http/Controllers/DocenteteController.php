@@ -814,7 +814,7 @@ class DocenteteController extends Controller
             ], 200);
         } catch (\Exception $e) {
             DB::rollBack();
-            // \Log::error('❌ TransferCompany failed: ' . $e->getMessage(), ['trace' => $e->getTraceAsString()]);
+            \Log::error('❌Error: TransferCompany failed: ' . $e->getMessage());
 
             return response()->json([
                 'status' => 'error',
