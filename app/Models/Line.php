@@ -9,6 +9,7 @@ class Line extends Model
     protected $fillable = [
         'ref',
         'quantity',
+        'name',
         'design',
         'dimensions',
         'document_id',

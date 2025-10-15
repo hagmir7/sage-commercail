@@ -723,10 +723,43 @@ class DocenteteController extends Controller
     }
 
 
+    public function generateLineDimensions($docligne)
+    {
+        $getValue = function ($key) use ($docligne) {
+            $value = $docligne->$key ?? 0;
+            if ($value > 0) return $value;
+
+            $articleValue = $docligne->article->$key ?? 0;
+            return $articleValue > 0 ? $articleValue : 0;
+        };
+
+        $width = $getValue('Largeur');
+        $height = $getValue('Hauteur');
+        $depth = $getValue('Epaisseur');
+        $thickness = $getValue('Profondeur');
+
+        // If all values are zero, return empty string
+        if ($width + $height + $depth + $thickness == 0) {
+            return '';
+        }
+
+        // Format cleanly (remove trailing zeros)
+        $format = fn($v) => rtrim(rtrim(number_format($v, 2, '.', ''), '0'), '.');
+
+        $width = $format($width);
+        $height = $format($height);
+        $depth = $format($depth);
+        $thickness = $format($thickness);
+
+        return "{$width} x {$height} x {$depth} x {$thickness} mm";
+    }
+
+
+
+
+
 
     // Transfer to Company controller (Adill)
-
-
     public function transferCompany($request)
     {
         DB::beginTransaction();
@@ -790,11 +823,11 @@ class DocenteteController extends Controller
                         [
                             'docligne_id' => $currentDocligne->cbMarq,
                             'tiers' => $currentDocligne->CT_Num,
-                            'name' => $currentDocligne->Nom ?? null,
+                            'name' => $currentDocligne->Nom ?: ($currentDocligne?->article?->Nom ?? null) .' '. $currentDocligne?->article?->Couleur  .' '. $currentDocligne?->Description,
                             'ref' => $currentDocligne->AR_Ref,
                             'design' => $currentDocligne->DL_Design,
                             'quantity' => $currentDocligne->DL_Qte,
-                            'dimensions' => $currentDocligne->item ?? null,
+                            'dimensions' => $this->generateLineDimensions($currentDocligne),
                             'company_id' => $request->company,
                             'first_company_id'  => $request->company,
                             'document_id' => $document->id,

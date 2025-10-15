@@ -141,6 +141,7 @@ class UserController extends Controller
         return Document::with('docentete:DO_Reliquat,DO_Piece,DO_Ref,DO_Tiers,cbMarq,DO_Date,DO_DateLivr,DO_Expedit')
             ->whereIn('id', auth()->user()->lines->pluck('document_id'))
             ->orWhere("transfer_by", auth()->id())
+            ->orderByDesc('id')
             ->paginate(35);
     }
 
