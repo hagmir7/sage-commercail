@@ -19,33 +19,36 @@ class DuplicationController extends Controller
     private function generateHeure(): string
     {
         $now = new DateTime();
-        $timeString = $now->format('His'); // HHmmss
+        $timeString = $now->format('His');
         $timeString = str_pad($timeString, 9, '0', STR_PAD_LEFT);
         return $timeString;
     }
 
-    private function generatePiece(): string
-    {
-        // Example last piece from DB: 25FA0786
-        $lastPiece = Docentete::where('DO_Type', self::DO_TYPE)
-            ->where('DO_Piece', 'LIKE', '25FA%')
-            ->orderByDesc('DO_Piece')
-            ->value('DO_Piece') ?? '25FA0000';
+        private function generatePiece(): string
+        {
+            return DB::transaction(function () {
+                // Fetch last piece
+                $result = DB::selectOne('SELECT TOP 1 * FROM F_DOCCURRENTPIECE WHERE cbMarq = 7 ORDER BY DC_Piece DESC');
 
-        // Match prefix + number (any digit length at the end)
-        if (preg_match('/^([A-Z0-9]+?)(\d+)$/i', $lastPiece, $matches)) {
-            $prefix = $matches[1];   // "25FA"
-            $number = $matches[2];   // "0786"
+                $lastPiece = $result?->DC_Piece ?? '25FA000000'; // default if none found
 
-            // Keep same digit length (here 4 digits)
-            $nextNumber = str_pad((string)((int)$number + 1), strlen($number), '0', STR_PAD_LEFT);
+                // Extract prefix and numeric part
+                if (preg_match('/^([A-Z0-9]+?)(\d+)$/', $lastPiece, $matches)) {
+                    $prefix = $matches[1];
+                    $number = (int) $matches[2];
+                    $nextNumber = $number + 1;
 
-            return $prefix . $nextNumber;
+                    // Preserve leading zeros
+                    $newPiece = $prefix . str_pad($nextNumber, strlen($matches[2]), '0', STR_PAD_LEFT);
+                } else {
+                    // Fallback if format unexpected
+                    $newPiece = '25FA000001';
+                }
+
+                return $newPiece;
+            });
         }
 
-        // Fallback if no match
-        return '25FA0001';
-    }
 
 
 
@@ -117,6 +120,7 @@ class DuplicationController extends Controller
             unset($source['cbCT_NumCentrale']);
             unset($source['cbDO_FactureFrs']);
             unset($source['cbDO_PieceOrig']);
+            unset($source['cbHash']);
             
             
             // Override specific columns

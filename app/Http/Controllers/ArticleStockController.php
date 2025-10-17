@@ -7,10 +7,8 @@ use App\Imports\ArticleStockImport;
 use App\Models\ArticleStock;
 use App\Models\Docligne;
 use App\Models\Emplacement;
-use App\Models\Line;
-use App\Models\User;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
+
 use Illuminate\Support\Facades\Validator;
 use Maatwebsite\Excel\Facades\Excel;
 
@@ -54,8 +52,6 @@ class ArticleStockController extends Controller
 
         return response()->json($articles);
     }
-
-
 
 
     public function calculateStock($ref_article)
@@ -310,12 +306,12 @@ class ArticleStockController extends Controller
             return response()->json(['message' => 'Article not found'], 404);
         }
 
-        // 🔹 Fetch emplacements containing palettes with this article
+       
         $emplacements = Emplacement::whereHas('palettes.articles', function ($query) use ($article) {
             $query->where('article_stocks.id', $article->id);
         })
             ->with([
-                'depot.company', // ✅ Load depot and its company
+                'depot.company',
                 'palettes' => function ($q) use ($article) {
                     $q->whereHas('articles', fn($a) => $a->where('article_stocks.id', $article->id))
                         ->with([
@@ -327,4 +323,5 @@ class ArticleStockController extends Controller
 
         return response()->json($emplacements);
     }
+    
 }
