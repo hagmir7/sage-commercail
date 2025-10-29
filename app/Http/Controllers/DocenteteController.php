@@ -823,7 +823,7 @@ class DocenteteController extends Controller
                         [
                             'docligne_id' => $currentDocligne->cbMarq,
                             'tiers' => $currentDocligne->CT_Num,
-                            'name' => $currentDocligne->Nom ?: ($currentDocligne?->article?->Nom ?? null) .' '. $currentDocligne?->article?->Couleur  .' '. $currentDocligne?->Description,
+                            'name' => $currentDocligne->Nom ?: ($currentDocligne?->article?->Nom ?? null) . ' ' . $currentDocligne?->article?->Couleur  . ' ' . $currentDocligne?->Description,
                             'ref' => $currentDocligne->AR_Ref,
                             'design' => $currentDocligne->DL_Design,
                             'quantity' => $currentDocligne->DL_Qte,
@@ -1036,11 +1036,30 @@ class DocenteteController extends Controller
     }
 
 
-    public function duplicate($piece)
+    public function duplicate($piece, Request $request)
     {
         $duplication = new DuplicationController();
-        $duplication->duplicat($piece);
+
+        $client = $request->client ?? null;
+        $souche = $request->souche ?? null;
+
+
+        if ($souche === 'Souche A') {
+            $souche = 0;
+        } elseif ($souche === 'Souche B') {
+            $souche = 1;
+        } else {
+            $souche = null;
+        }
+
+        $result = $duplication->duplicat($piece, [], $client, $souche);
+
+        return response()->json([
+            'message' => 'Duplication executed',
+            'data' => $result
+        ]);
     }
+
 
 
 
@@ -1057,10 +1076,44 @@ class DocenteteController extends Controller
         // Loop through related doclignes
         foreach ($docentete->doclignes as $docligne) {
             $docligne->update([
-                'CT_Num' => 'CL15',
+                'CT_Num' => 'CL150',
             ]);
         }
 
         return response()->json(['success' => true]);
     }
+
+
+public function delete($piece = '25FA002095', $type = 6)
+{
+    try {
+        // Execute the stored procedure
+        DB::statement("EXEC sp_DeleteDocument @DO_Piece = ?, @DO_Type = ?", [$piece, $type]);
+
+        return response()->json([
+            'success' => true,
+            'message' => "Suppression terminée pour le document $piece."
+        ]);
+
+    } catch (\Illuminate\Database\QueryException $e) {
+        // Check if the error is 82176 (trigger warning)
+        if (str_contains($e->getMessage(), '82176')) {
+            // Ignore it, log for reference
+            \Log::info("Trigger warning 82176 ignored during deletion of $piece");
+            return response()->json([
+                'success' => true,
+                'message' => "Suppression terminée (trigger warning 82176 ignoré) pour le document $piece."
+            ]);
+        }
+
+        // Rethrow other errors
+        \Log::error('Erreur suppression document: ' . $e->getMessage());
+
+        return response()->json([
+            'success' => false,
+            'message' => "Erreur lors de la suppression du document $piece.",
+            'error' => $e->getMessage()
+        ], 500);
+    }
+}
 }

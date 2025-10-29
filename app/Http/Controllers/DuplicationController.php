@@ -9,6 +9,8 @@ use App\Models\Docligne;
 use DateTime;
 use Exception;
 
+use function PHPUnit\Framework\isNull;
+
 class DuplicationController extends Controller
 {
     private const DO_TYPE = 0;
@@ -24,35 +26,39 @@ class DuplicationController extends Controller
         return $timeString;
     }
 
-        private function generatePiece(): string
-        {
-            return DB::transaction(function () {
-                // Fetch last piece
-                $result = DB::selectOne('SELECT TOP 1 * FROM F_DOCCURRENTPIECE WHERE cbMarq = 7 ORDER BY DC_Piece DESC');
+    private function generatePiece(): string
+    {
+        return DB::transaction(function () {
+            // 1️⃣ Get current piece
+            $result = DB::selectOne('SELECT TOP 1 * FROM F_DOCCURRENTPIECE WHERE cbMarq = 7');
+            $currentPiece = $result?->DC_Piece ?? '25FA000000';
 
-                $lastPiece = $result?->DC_Piece ?? '25FA000000'; // default if none found
+            // 2️⃣ Extract prefix + number
+            if (preg_match('/^([A-Z0-9]+?)(\d+)$/', $currentPiece, $matches)) {
+                $prefix = $matches[1];
+                $number = (int) $matches[2];
+                $nextNumber = $number + 1;
 
-                // Extract prefix and numeric part
-                if (preg_match('/^([A-Z0-9]+?)(\d+)$/', $lastPiece, $matches)) {
-                    $prefix = $matches[1];
-                    $number = (int) $matches[2];
-                    $nextNumber = $number + 1;
+                // Preserve leading zeros
+                $newPiece = $prefix . str_pad($nextNumber, strlen($matches[2]), '0', STR_PAD_LEFT);
+            } else {
+                // Fallback if format unexpected
+                $newPiece = '25FA000001';
+            }
 
-                    // Preserve leading zeros
-                    $newPiece = $prefix . str_pad($nextNumber, strlen($matches[2]), '0', STR_PAD_LEFT);
-                } else {
-                    // Fallback if format unexpected
-                    $newPiece = '25FA000001';
-                }
+            // 3️⃣ Update table with new piece
+            DB::update('UPDATE F_DOCCURRENTPIECE SET DC_Piece = ? WHERE cbMarq = 7', [$newPiece]);
 
-                return $newPiece;
-            });
-        }
+            // 4️⃣ Return new piece
+            return $newPiece;
+        });
+    }
 
 
 
 
-    public function duplicat($sourcePiece, $lines = [])
+
+    public function duplicat($sourcePiece, $lines = [], $clinet=null, $souche=null)
     {
         try {
             if (!empty($lines) && (is_array($lines) || $lines instanceof \Illuminate\Support\Collection)) {
@@ -63,7 +69,7 @@ class DuplicationController extends Controller
 
             $DO_Piece = $this->generatePiece();
 
-            $duc = $this->createDocumentFromTemplate($sourcePiece, null,  $DO_Piece);
+            $duc = $this->createDocumentFromTemplate($sourcePiece, $DO_Piece, $clinet, $souche);
 
 
             foreach ($doclignes as $line) {
@@ -85,6 +91,8 @@ class DuplicationController extends Controller
                 ]);
             }
 
+            $docentetController = new DocenteteController();
+            $docentetController->delete($sourcePiece);
             return response()->json(['success' => true]);
         } catch (Exception $e) {
             Log::error('duplicat operation failed: ' . $e->getMessage());
@@ -93,8 +101,9 @@ class DuplicationController extends Controller
     }
 
 
-    public function createDocumentFromTemplate(string $sourcePiece, $clinet, $DO_Piece)
+    public function createDocumentFromTemplate(string $sourcePiece, $DO_Piece, $clinet=null, $souche=null)
     {
+    
         try {
             $DO_Date = now()->format('Y-m-d H:i:s');
             
@@ -128,6 +137,7 @@ class DuplicationController extends Controller
             $source['DO_Date']    = $DO_Date;
             $source['DO_Heure']   = $this->generateHeure();
             $source['DO_Tiers']   = $clinet ?: $source['DO_Tiers'];
+            $source['DO_Souche']   = $souche;
 
             // Replace all date columns with now()
             foreach ($source as $col => $val) {

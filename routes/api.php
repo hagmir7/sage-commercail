@@ -60,7 +60,7 @@ Route::get('logi', function () {
         ->get();
 });
 
-Route::get("duplicate/{piece}", [DocenteteController::class, 'duplicate']);
+Route::post("duplicate/{piece}", [DocenteteController::class, 'duplicate']);
 Route::get("change/{piece}", [DocenteteController::class, 'change']);
 
 Route::get("client/{client}", [ClientController::class, 'show']);
