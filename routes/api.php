@@ -17,6 +17,10 @@ use App\Http\Controllers\InventoryMovementController;
 use App\Http\Controllers\LineController;
 use App\Http\Controllers\PaletteController;
 use App\Http\Controllers\PermissionController;
+use App\Http\Controllers\PurchaseDocumentController;
+use App\Http\Controllers\PurchaseDocumentHistoryController;
+use App\Http\Controllers\PurchaseLineController;
+use App\Http\Controllers\PurchaseLineFileController;
 use App\Http\Controllers\ReceptionController;
 use App\Http\Controllers\RoleController;
 use App\Http\Controllers\SellController;
@@ -300,6 +304,18 @@ Route::middleware('auth:sanctum')->group(function () {
     });
 
     Route::post('articles/update-ref', [ArticleController::class, 'updateRef']);
+
+
+    Route::apiResource('purchase-documents', PurchaseDocumentController::class);
+
+    // Lignes
+    Route::apiResource('purchase-lines', PurchaseLineController::class);
+
+    // Fichiers
+    Route::apiResource('purchase-line-files', PurchaseLineFileController::class);
+
+    // Historiques
+    Route::apiResource('purchase-document-histories', PurchaseDocumentHistoryController::class);
 });
 
 
