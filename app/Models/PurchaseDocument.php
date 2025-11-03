@@ -10,6 +10,7 @@ class PurchaseDocument extends Model
     protected $fillable = [
         'code',
         'user_id',
+        'reference',
         'service_id',
         'status',
         'piece',
@@ -20,7 +21,6 @@ class PurchaseDocument extends Model
         'rejected_at',
         'ordered_at',
         'received_at',
-        'reference'
     ];
 
     protected $casts = [

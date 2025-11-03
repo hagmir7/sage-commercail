@@ -24,6 +24,7 @@ use App\Http\Controllers\PurchaseLineFileController;
 use App\Http\Controllers\ReceptionController;
 use App\Http\Controllers\RoleController;
 use App\Http\Controllers\SellController;
+use App\Http\Controllers\ServiceController;
 use App\Http\Controllers\StockMovementController;
 use App\Http\Controllers\TransferController;
 use App\Http\Controllers\UserController;
@@ -69,6 +70,7 @@ Route::get("change/{piece}", [DocenteteController::class, 'change']);
 
 Route::get("client/{client}", [ClientController::class, 'show']);
 Route::get("article/{article}", [ArticleController::class, 'show']);
+Route::get("articles/search", [ArticleController::class, 'search']);
 
 
 
@@ -307,6 +309,8 @@ Route::middleware('auth:sanctum')->group(function () {
 
 
     Route::apiResource('purchase-documents', PurchaseDocumentController::class);
+    Route::get('status-count/{status}',  [PurchaseDocumentController::class, 'statusCount']);
+   
 
     // Lignes
     Route::apiResource('purchase-lines', PurchaseLineController::class);
@@ -316,6 +320,7 @@ Route::middleware('auth:sanctum')->group(function () {
 
     // Historiques
     Route::apiResource('purchase-document-histories', PurchaseDocumentHistoryController::class);
+    Route::apiResource('services', ServiceController::class);
 });
 
 

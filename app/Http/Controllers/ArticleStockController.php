@@ -244,7 +244,7 @@ class ArticleStockController extends Controller
 
 
         if (!$article_stock) {
-            return response()->json(['message' => 'Article not found.'], 404);
+            return response()->json(['message' => 'Article introuvable.'], 404);
         }
 
         // Update article fields
@@ -303,7 +303,7 @@ class ArticleStockController extends Controller
             ->first();
 
         if (!$article) {
-            return response()->json(['message' => 'Article not found'], 404);
+            return response()->json(['message' => 'Article introuvable.'], 404);
         }
 
        

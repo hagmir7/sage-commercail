@@ -136,7 +136,7 @@ class InventoryController extends Controller
             ->first();
 
         if (!$article) {
-            return response()->json(['error' => "Article not found"], 404);
+            return response()->json(['error' => "Article introuvable."], 404);
         }
 
         return $article;

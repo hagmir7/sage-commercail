@@ -9,6 +9,22 @@ use Illuminate\Support\Facades\Validator;
 
 class ArticleController extends Controller
 {
+
+    public function search(Request $request)
+    {
+        $query = $request->input('q');
+
+        $articles = Article::select('AR_Ref', 'AR_Design')
+            ->when($query, function ($q) use ($query) {
+                $q->where('AR_Ref', 'like', '%' . $query . '%')
+                    ->orWhere('AR_Design', 'like', '%' . $query . '%');
+            })
+            ->paginate(100);
+
+        return response()->json($articles);
+    }
+
+
     public function show(Article $article)
     {
 
