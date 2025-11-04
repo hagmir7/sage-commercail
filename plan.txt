@@ -14,7 +14,7 @@ User
 
 Document
  - id
- - cpMarq
+ - cbMarq
  - DO_Piece
  - DO_Type
  - DO_Ref
@@ -28,7 +28,7 @@ Document
 Line
  - id
  - document_id
- - cpMarq
+ - cbMarq
  - DO_Piece
  - AR_Ref
  - DL_Design
@@ -281,8 +281,8 @@ SELECT TOP (1000) * FROM [STILEMOBILI].[dbo].F_DOCLIGNE WHERE cbDL_PieceBC = '25
 SELECT * FROM F_COMPTET WHERE CT_Num = 'FR001';
 
 
-  -- cpMarq, DO_Domaine, DO_Piece, DO_Type, DO_Ref, DO_Tiers, DO_Expedition, DO_DateLivr, DO_TotalTTC, cbCreation, Type
-  -- cpMarq, DO_Piece, AR_Ref, DL_Design, DL_Qte, DL_PrixUnitaire, DL_MontantTTC, DL_Remise01REM_Valeur,
+  -- cbMarq, DO_Domaine, DO_Piece, DO_Type, DO_Ref, DO_Tiers, DO_Expedition, DO_DateLivr, DO_TotalTTC, cbCreation, Type
+  -- cbMarq, DO_Piece, AR_Ref, DL_Design, DL_Qte, DL_PrixUnitaire, DL_MontantTTC, DL_Remise01REM_Valeur,
   -- DL_PieceBC, DL_PieceBL, DL_PiecePL, DL_PieceDE
   -- (Nom, Hauteur, Largeur, Profondeur, Langeur, Couleur, Chant, Episseur, TRANSMIS, Poignée, Description, Rotation)
 

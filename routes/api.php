@@ -67,8 +67,10 @@ Route::get('logi', function () {
 
 Route::post("duplicate/{piece}", [DocenteteController::class, 'duplicate']);
 Route::get("change/{piece}", [DocenteteController::class, 'change']);
-
+Route::get("client/suppliers", [ClientController::class, 'suppliers']);
 Route::get("client/{client}", [ClientController::class, 'show']);
+
+
 Route::get("article/{article}", [ArticleController::class, 'show']);
 Route::get("articles/search", [ArticleController::class, 'search']);
 
@@ -310,6 +312,7 @@ Route::middleware('auth:sanctum')->group(function () {
 
     Route::apiResource('purchase-documents', PurchaseDocumentController::class);
     Route::get('status-count/{status}',  [PurchaseDocumentController::class, 'statusCount']);
+    Route::post('purchase-documents/transfer',  [PurchaseDocumentController::class, 'transfer']);
    
 
     // Lignes

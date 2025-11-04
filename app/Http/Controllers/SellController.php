@@ -203,13 +203,6 @@ class SellController extends Controller
                 'Montant_S_DT' => $total['TotalTTC']
 
 
-
-
-
-
-
-
-
             ]);
 
             return $DO_Date;

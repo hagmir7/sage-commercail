@@ -2,14 +2,18 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\CurrentPiece;
 use App\Models\PurchaseDocument;
 use App\Models\PurchaseLine;
 use App\Models\PurchaseLineFile;
 use Carbon\Carbon;
+use DateTime;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Validator;
+use Exception;
+use phpDocumentor\Reflection\Types\Null_;
 
 class PurchaseDocumentController extends Controller
 {
@@ -123,6 +127,8 @@ class PurchaseDocumentController extends Controller
         $purchaseDocument->load(['user', 'service', 'lines.files']);
         return response()->json($purchaseDocument);
     }
+
+
 
     public function update(Request $request, $id)
     {
@@ -302,7 +308,355 @@ class PurchaseDocumentController extends Controller
     }
 
 
-    public function statusCount($status){
+    public function statusCount($status)
+    {
         return PurchaseDocument::where('status', $status)->count();
+    }
+
+
+    public function generatePiece($DO_Souche): string
+    {
+        $prefix = $DO_Souche == 2 ? 'BDA' : 'DA';
+        $year   = date('y');
+        $souche = $DO_Souche == 0 ? 19 : 36;
+
+        $lastPiece = CurrentPiece::on('sqlsrv_inter')->where('cbMarq', $souche)->first()->DC_Piece;
+
+        $nextNumber = 1;
+
+        if ($lastPiece) {
+            $pattern = '/^' . preg_quote($year . $prefix, '/') . '(\d{6})$/i';
+
+            if (preg_match($pattern, $lastPiece, $matches)) {
+                $nextNumber = (int)$matches[1];
+            }
+        }
+        CurrentPiece::on('sqlsrv_inter')->where('cbMarq', $souche)
+            ->first()
+            ->update(['DC_Piece' => sprintf('%s%s%06d', $year, $prefix, $nextNumber + 1)]);
+        return sprintf('%s%s%06d', $year, $prefix, $nextNumber);
+    }
+
+    public function transfer(Request $request)
+    {
+        // Validate incoming request
+        $validator = Validator::make($request->all(), [
+            'souche' => 'required|integer|in:0,1,2',
+            'reference' => 'required|string|max:50',
+            'supplier' => 'required|string|max:10',
+            'company_db' => 'required|string|max:30'
+        ]);
+
+        // Return validation errors with HTTP 422 status
+        if ($validator->fails()) {
+            return response()->json([
+                'message' => $validator->errors()->first(),
+                'errors' => $validator->errors()
+            ], 422);
+        }
+
+        try {
+            // Generate piece and create document
+            $piece = $this->generatePiece($request->souche);
+            $DO_Date = $this->createDocentent(
+                $piece,
+                $request->supplier,
+                $request->reference,
+                $request->souche,
+                $request->company_db
+            );
+
+            $lastDRNo = DB::connection($request->company_db)
+                ->table('F_DOCREGL')
+                ->max('DR_No');
+
+            $newDRNo = ($lastDRNo ?? 0) + 1;
+
+            DB::connection($request->company_db)->table('F_DOCREGL')->insert([
+                'DR_No' => $newDRNo,
+                'DO_Domaine' => 1,
+                'DO_Type' => 10,
+                'DO_Piece' => $piece,
+                'DR_TypeRegl' => 2,
+                'DR_Date' => $DO_Date,
+                'DR_Pourcent' => 0.0,
+                'DR_Montant' => 0.0,
+                'DR_MontantDev' => 0.0,
+                'DR_Equil' => 1,
+                'EC_No' => 0,
+                'DR_Regle' => 0,
+                'N_Reglement' => 1,
+                'CA_No' => 0,
+                'DO_DocType' => 10,
+                'cbProt' => 0,
+                'cbCreateur' => 'ERP1',
+                'cbModification' => $DO_Date,
+                'cbReplication' => 0,
+                'cbFlag' => 0,
+                'cbCreation' => $DO_Date,
+                'cbHashVersion' => 1,
+                'cbHashDate' => null,
+                'cbHashOrder' => null,
+                'DR_Libelle' => '',
+                'DR_AdressePaiement' => '',
+                'cbCreationUser' => "77384016-921F-472F-B56D-1D563B7DDF3C"
+            ]);
+
+            // Log successful transfer
+            \Log::info("Transfer completed", [
+                'souche' => $request->souche,
+                'reference' => $request->reference,
+                'supplier' => $request->supplier,
+                'company_db' => $request->company_db,
+                'piece' => $piece
+            ]);
+
+            // Return successful JSON response
+            return response()->json([
+                'message' => 'Transfer successful',
+                'piece' => $piece
+            ], 200);
+        } catch (\Exception $e) {
+            // Log any exceptions
+            \Log::error("Transfer failed: " . $e->getMessage(), [
+                'souche' => $request->souche,
+                'reference' => $request->reference,
+                'supplier' => $request->supplier,
+                'company_db' => $request->company_db
+            ]);
+
+            // Return error response
+            return response()->json([
+                'message' => 'Transfer failed',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+
+    public function createDocentent(string $DO_Piece, string $DO_Tiers, string $DO_Ref, $DO_Souche, $company_db): string
+    {
+        try {
+            $DO_Domaine = 1;
+            $DO_Type    = 10;
+            $DO_Date    = now()->format('Y-m-d H:i:s');
+            $DO_Statut  = 0;
+
+
+            DB::connection($company_db)->table('F_DOCENTETE')->insert([
+                'DO_Domaine'       => $DO_Domaine,
+                'DO_Type'          => $DO_Type,
+                'DO_Piece'         => $DO_Piece,
+                'DO_Date'          => $DO_Date,
+                'DO_Ref'           => $DO_Ref,
+                'DO_Tiers'         => $DO_Tiers,
+                'CO_No'            => 0,
+                'cbCreationUser'   => '69C8CD64-D06F-4097-9CAC-E488AC2610F9',
+                'cbModification'   => DB::raw('GETDATE()'),
+                'cbCreation'       => DB::raw('GETDATE()'),
+                'DO_Statut'        => $DO_Statut,
+                'CT_NumPayeur'     => $DO_Tiers,
+                'DO_Period'        => 1,
+                'DO_Devise'        => 1,
+                'DO_Cours'       => floatval(1),
+                'LI_No'         => 0,
+                'DO_Expedit' => 1,
+                'DO_NbFacture' => 1,
+                'DO_BLFact' => 0,
+                'DO_TxEscompte' => floatval(0),
+                'DO_Reliquat' => 0,
+                'DO_Imprim' => 0,
+                'DO_Souche' => $DO_Souche,
+                'DO_DateLivr' => null,
+                "DO_Condition"    => 1,
+                'DO_Tarif' => 1,
+                "DO_Colisage" => 1,
+                'DO_TypeColis' => 1,
+                'DO_Transaction' => 11,
+                'DE_No' => 1,
+                'DO_Langue' => 0,
+                'CA_Num' => '',
+                'DO_Ecart' => floatval(0),
+                'DO_Regime' => 11,
+                'N_CatCompta' => 5,
+                'DO_Ventile' => 0,
+                'AB_No' => 0,
+                'CG_Num' => 44110000,
+                'DO_Heure' => $this->generateHeure(),
+                'CA_No' => 0,
+                'CO_NoCaissier' => 0,
+                'DO_Transfere' => 0,
+                'DO_Cloture' => 0,
+                'DO_Attente' => 0,
+                'DO_Provenance' => 0,
+                'DO_DebutAbo' => '1753-01-01 00:00:00.000',
+                'DO_FinAbo' => '1753-01-01 00:00:00.000',
+                'DO_DebutPeriod' => '1753-01-01 00:00:00.000',
+                'DO_FinPeriod' => '1753-01-01 00:00:00.000',
+                'MR_No' => 0,
+                'DO_TypeFrais' => 0,
+                'DO_ValFrais' => 0,
+                'DO_TypeLigneFrais' => 0,
+                'DO_TypeFranco' => 0,
+                'DO_ValFranco' => 0,
+                'DO_TypeLigneFranco' => 0,
+                'DO_Taxe1' => 0,
+                'DO_TypeTaux1' => 0,
+                'DO_TypeTaxe1' => 0,
+                'DO_Taxe2' => 0,
+                'DO_TypeTaux2' => 0,
+                'DO_TypeTaxe2' => 0,
+                'DO_Taxe3' => 0,
+                'DO_TypeTaux3' => 0,
+                'DO_TypeTaxe3' => 0,
+                'DO_MajCpta' => 0,
+                'DO_TotalHTNet' => 0,
+                'DO_TotalTTC' => 0,
+                'DO_NetAPayer' => 0,
+                'DO_MontantRegle' => 0,
+                'DO_StatutBAP' => 0,
+                'DO_Escompte' => 0,
+                'DO_DocType' => 10,
+                'DO_TypeCalcul' => 0,
+                'DO_TotalHT' => 0,
+                'DO_Valide' => 0,
+                'DO_Coffre' => 0,
+                'DO_PieceOrig' => '',
+                'DO_EStatut' => '',
+                'DO_DemandeRegul' => '',
+                'ET_No' => '',
+
+                'DO_Contact' => '',
+                'DO_FactureElec' => 0,
+                'DO_TypeTransac' => 0,
+                'DO_DateLivrRealisee' => '1753-01-01 00:00:00.000',
+                'DO_DateExpedition' => '1753-01-01 00:00:00.000',
+                'DO_FactureFrs' => '',
+                'DO_Motif' => '',
+                'CA_NumIFRS' => '',
+                'DO_NoWeb' => '',
+                'DO_DateLivr' => '1753-01-01 00:00:00.000',
+                'DO_Coord01' => '',
+                'DO_Coord02' => '',
+                'DO_Coord03' => '',
+                'DO_Coord04' => '',
+                'DO_AdressePaiement' => '',
+                'DO_PaiementLigne' => 0,
+                'DO_MotifDevis' => 0,
+                'DO_Conversion' => 0,
+
+                // 'DO_TotalHTNet' => $total['TotalHT'],
+                // 'DO_TotalTTC' => $total['TotalTTC'], 
+                // 'DO_NetAPayer' => $total['TotalTTC'],
+                // 'Montant_S_DT' => $total['TotalTTC']
+
+            ]);
+
+            return $DO_Date;
+        } catch (Exception $e) {
+            \Log::error('Docentete creation failed: ' . $e->getMessage());
+            throw $e;
+        }
+    }
+
+
+
+    public function createDocligne($DO_Piece, $DO_Ref, $CT_Num, $DO_Date, $DO_Domaine, $DO_Type, $AR_Ref, $DL_Design, $DL_Qte, $EU_Enumere)
+    {
+        DB::connection('sqlsrv_inter')->table('F_DOCLIGNE')->insert([
+            'DO_Domaine' => $DO_Domaine, // e.g. 1
+            'DO_Type' => $DO_Type, // e.g. 10
+            'CT_Num' => $CT_Num, // e.g. 'FR001'
+            'DO_Piece' => $DO_Piece, // e.g. '23DA000002'
+            'DO_Date' => $DO_Date,
+            'DL_DateBC' => '1753-01-01 00:00:00',
+            'DL_DateBL' => '1753-01-01 00:00:00',
+            'DL_Ligne' => 1000,
+            'DO_Ref' => $DO_Ref, // e.g. 'First Achat test'
+            'DL_TNomencl' => 0,
+            'DL_TRemPied' => 0,
+            'DL_TRemExep' => 0,
+            'AR_Ref' => $AR_Ref, // e.g. 'CAB009301'
+            'DL_Design' => $DL_Design, // e.g. 'caisson bas four blanc 800x600'
+            'DL_Qte' => $DL_Qte, // e.g. 1
+            'DL_QteBC' => $DL_Qte,
+            'DL_QteBL' => 0.000000,
+            'DL_PoidsNet' => 0.000000,
+            'DL_PoidsBrut' => 0.000000,
+            'DL_Remise01REM_Valeur' => 0.000000,
+            'DL_Remise01REM_Type' => 0,
+            'DL_Remise02REM_Valeur' => 0.000000,
+            'DL_Remise02REM_Type' => 0,
+            'DL_Remise03REM_Valeur' => 0.000000,
+            'DL_Remise03REM_Type' => 0,
+            'DL_PrixUnitaire' => 0.000000,
+            'DL_PUBC' => 0.000000,
+            'DL_Taxe1' => 0,
+            'DL_TypeTaux1' => 0,
+            'DL_TypeTaxe1' => 0,
+            'DL_Taxe2' => 0,
+            'DL_TypeTaux2' => 0,
+            'DL_TypeTaxe2' => 0,
+            'cbCO_No' => 0,
+            'AG_No1' => 0,
+            'AG_No2' => 0,
+            'DL_PrixRU' => 0.000000,
+            'DL_CMUP' => 0.000000,
+            'DL_MvtStock' => 0,
+            'DT_No' => 0,
+            'cbDT_No' => 0,
+            'cbAF_RefFourniss' => '',
+            'EU_Enumere' => $EU_Enumere, // e.g. 'Kit'
+            'EU_Qte' => $DL_Qte,
+            'DL_TTC' => 0,
+            'DE_No' => 1,
+            'cbDE_No' => 1,
+            'DL_NoRef' => 0,
+            'DL_TypePL' => 0,
+            'DL_PUDevise' => 0.000000,
+            'DL_PUTTC' => 0,
+            'DL_No' => 249758,
+            'DO_DateLivr' => '1753-01-01 00:00:00',
+            'DL_Taxe3' => 0.000000,
+            'DL_TypeTaux3' => 0,
+            'DL_TypeTaxe3' => 0,
+            'DL_Frais' => 0.000000,
+            'DL_Valorise' => 1,
+            'DL_NonLivre' => 0,
+            'AC_RefClient' => '',
+            'DL_MontantHT' => 0.000000,
+            'DL_MontantTTC' => 0.000000,
+            'DL_FactPoids' => 0,
+            'DL_Escompte' => 0,
+            'DL_DatePL' => '1753-01-01 00:00:00',
+            'DL_QtePL' => 0.000000,
+            'DL_NoColis' => 0,
+            'DL_QteRessource' => 0.000000,
+            'DL_DateAvancement' => '1753-01-01 00:00:00',
+            'DL_PieceOFProd' => 0,
+            'DL_DateDE' => $DO_Date,
+            'DL_QteDE' => $DL_Qte,
+            'DL_Operation' => 0,
+            'DL_NoSousTotal' => 0,
+            'CA_No' => 0,
+            'DO_DocType' => 10,
+            'cbProt' => 0,
+            'cbCreateur' => 'ERP1',
+            'cbModification' => $DO_Date,
+            'cbReplication' => $DO_Date,
+            'cbFlag' => 0,
+            'cbCreation' => $DO_Date,
+            'cbCreationUser' => "77384016-921F-472F-B56D-1D563B7DDF3C",
+            'cbHash' => 1,
+        ]);
+    }
+
+
+    private function generateHeure(): string
+    {
+        $now = new DateTime();
+        $timeString = $now->format('His'); // HHmmss
+        $timeString = str_pad($timeString, 9, '0', STR_PAD_LEFT);
+        return $timeString;
     }
 }

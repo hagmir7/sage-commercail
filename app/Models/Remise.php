@@ -7,7 +7,7 @@ use Illuminate\Database\Eloquent\Model;
 class Remise extends Model
 {
     protected $table = "F_FAMCLIENT";
-    protected $primaryKey = "cpMarq";
+    protected $primaryKey = "cbMarq";
     protected $keyType = "integer";
     public $incrementing = true;
 

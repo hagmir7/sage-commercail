@@ -139,6 +139,17 @@ SELECT TOP (1000) [DO_Domaine]
   FROM [STILEMOBILI].[dbo].[F_DOCLIGNE] WHERE DO_Type = 6 ORDER BY cbCreation desc;
 
 
+  --------------  Sage L100 : élément en cours d'utilisation - Infraworld
+  dbcc cbsqlxp(free)
+go
+delete from cbnotification
+go
+delete from cbregmessage
+go
+delete from cbusersession
+go
+
+
 
 
 
