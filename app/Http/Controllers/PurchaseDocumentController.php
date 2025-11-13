@@ -450,22 +450,17 @@ class PurchaseDocumentController extends Controller
         }
     }
 
-    public function createDocentete(string $DO_Piece, string $DO_Tiers, string $DO_Ref, $DO_Souche, $company_db): string
-    {
-        try {
+public function createDocentete(string $DO_Piece, string $DO_Tiers, string $DO_Ref, $DO_Souche, $company_db): string
+{
+    try {
+        $currentDateTime = date('Y-d-m H:i:s.000');
+        $DO_Date  = date('Y-d-m') . ' 00:00:00.000';
+        // 2022-01-18 00:00:00.000
 
-            $currentDateTime = DB::connection($company_db)
-                ->selectOne('SELECT GETDATE() as [current_date]')
-                ->current_date;
-
-
-
-             $DO_Date = DB::connection($company_db)
-                ->selectOne('SELECT CAST(CAST(GETDATE() AS DATE) AS DATETIME) as [current_date]')
-                ->current_date;
+        $DO_Heure = $this->generateHeure();
 
 
-            DB::connection($company_db)->table('F_DOCENTETE')->insert([
+        DB::connection($company_db)->table('F_DOCENTETE')->insert([
             'DO_Domaine'            => 1,
             'DO_Type'               => 10,
             'DO_Piece'              => $DO_Piece,
@@ -473,11 +468,14 @@ class PurchaseDocumentController extends Controller
             'DO_Ref'                => $DO_Ref,
             'DO_Tiers'              => $DO_Tiers,
             'CO_No'                 => 0,
+            'cbCO_No'               => null,  // MISSING COLUMN
             'DO_Period'             => 1,
             'DO_Devise'             => 1,
             'DO_Cours'              => 1.000000,
             'DE_No'                 => 1,
+            'cbDE_No'               => 1,     // MISSING COLUMN
             'LI_No'                 => 0,
+            'cbLI_No'               => null,  // MISSING COLUMN
             'CT_NumPayeur'          => $DO_Tiers,
             'DO_Expedit'            => 1,
             'DO_NbFacture'          => 1,
@@ -509,7 +507,7 @@ class PurchaseDocumentController extends Controller
             'DO_FinPeriod'          => '1753-01-01 00:00:00.000',
             'CG_Num'                => '44110000',
             'DO_Statut'             => 0,
-            'DO_Heure'              => $this->generateHeure(),
+            'DO_Heure'              => $DO_Heure,
             'CA_No'                 => 0,
             'CO_NoCaissier'         => 0,
             'DO_Transfere'          => 0,
@@ -536,7 +534,6 @@ class PurchaseDocumentController extends Controller
             'DO_TypeTaxe3'          => 0,
             'DO_MajCpta'            => 0,
             'DO_Motif'              => '',
-            'CT_NumCentrale'        => null,
             'DO_Contact'            => '',
             'DO_FactureElec'        => 0,
             'DO_TypeTransac'        => 0,
@@ -544,15 +541,11 @@ class PurchaseDocumentController extends Controller
             'DO_DateExpedition'     => '1753-01-01 00:00:00.000',
             'DO_FactureFrs'         => '',
             'DO_PieceOrig'          => '',
-            'DO_GUID'               => null,
             'DO_EStatut'            => 0,
             'DO_DemandeRegul'       => 0,
             'ET_No'                 => 0,
             'DO_Valide'             => 0,
             'DO_Coffre'             => 0,
-            'DO_CodeTaxe1'          => null,
-            'DO_CodeTaxe2'          => null,
-            'DO_CodeTaxe3'          => null,
             'DO_TotalHT'            => 0.000000,
             'DO_StatutBAP'          => 0,
             'DO_Escompte'           => 0,
@@ -579,26 +572,15 @@ class PurchaseDocumentController extends Controller
             'cbHashVersion'         => 1,
             'cbHashDate'            => null,
             'cbHashOrder'           => null,
-            // 'N° d\'expédition'      => null,
-            'Port'                  => null,
-            'Messagerie'            => null,
-            'Livraison'             => null,
-            'Nature de Marchandises' => null,
-            'Nbre Colis'            => null,
-            'Nbre de Palettes'      => null,
-            // 'D.TIMBRE'              => 0.000000,
-            'Montant_S_DT'          => 0.000000,
-            'Transfert'             => null,
-            'Type'                  => null,
-            'Fournisseur'           => null
+
         ]);
 
-            return $DO_Date;
-        } catch (Exception $e) {
-            \Log::error('Docentete creation failed: ' . $e->getMessage());
-            throw $e;
-        }
+        return $DO_Date;
+    } catch (Exception $e) {
+        \Log::error('Docentete creation failed: ' . $e->getMessage());
+        throw $e;
     }
+}
 
     private function generateHeure(): string
     {
