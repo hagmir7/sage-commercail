@@ -220,10 +220,10 @@ class DocumentController extends Controller
             'companies',
             'docentete:cbMarq,DO_Date,DO_DateLivr,DO_Reliquat'
         ])
-            ->whereHas('docentete', function($query){
+            ->whereHas('docentete', function ($query) {
                 $query->where('DO_Domaine', 0)
-                ->where('DO_Statut', 1)
-               ->where('DO_Type', 2);
+                    ->where('DO_Statut', 1)
+                    ->where('DO_Type', 2);
             })
             ->whereHas('lines', function ($q) use ($user_roles) {
                 $q->where('company_id', auth()->user()->company_id);
@@ -233,12 +233,17 @@ class DocumentController extends Controller
                     ['fabrication', 'montage', 'preparation_cuisine', 'preparation_trailer', 'magasinier']
                 );
 
-
-
                 if (!empty($common)) {
                     $q->whereIn("role_id", $user_roles->keys());
                 }
             })
+            ->addSelect([
+                'documents.*',
+                'has_user_printer' => \DB::table('user_document_printer')
+                    ->selectRaw('CASE WHEN COUNT(*) > 0 THEN 1 ELSE 0 END')
+                    ->whereColumn('user_document_printer.document_id', 'documents.id')
+                    ->where('user_document_printer.user_id', auth()->id())
+            ])
             ->whereHas('companies', function ($q) {
                 $q->whereIn('document_companies.status_id', [1, 2, 3, 4, 5, 6, 7]);
             });
@@ -545,6 +550,7 @@ class DocumentController extends Controller
             'updated' => false,
             'updated_at' => now(),
         ]);
+        $document->printers()->syncWithoutDetaching(auth()->id());
         return response()->json(['message' => "Document imprimé avec succès"]);
     }
 

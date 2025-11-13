@@ -64,6 +64,15 @@ class Document extends Model
     }
 
 
+    // In Document.php
+    public function printers()
+    {
+        return $this->belongsToMany(User::class, 'user_document_printer', 'document_id', 'user_id')
+            ->withTimestamps();
+    }
+
+
+
 
     public function validation(): bool
     {

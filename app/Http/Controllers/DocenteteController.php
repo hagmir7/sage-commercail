@@ -15,7 +15,6 @@ use Illuminate\Support\Carbon;
 use App\Http\Controllers\SellController;
 use App\Models\ArticleStock;
 use App\Models\Palette;
-use App\Models\RoleQuantityLine;
 
 class DocenteteController extends Controller
 {
