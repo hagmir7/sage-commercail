@@ -27,6 +27,7 @@ use App\Http\Controllers\SellController;
 use App\Http\Controllers\ServiceController;
 use App\Http\Controllers\StockMovementController;
 use App\Http\Controllers\TransferController;
+use App\Http\Controllers\UnitController;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\UserPermissionController;
 use App\Imports\MovementImport;
@@ -325,6 +326,8 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::apiResource('purchase-document-histories', PurchaseDocumentHistoryController::class);
     Route::apiResource('services', ServiceController::class);
 });
+
+Route::apiResource('units', UnitController::class);
 
 
 

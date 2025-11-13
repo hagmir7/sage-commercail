@@ -313,6 +313,30 @@ class PurchaseDocumentController extends Controller
         return PurchaseDocument::where('status', $status)->count();
     }
 
+    public function checkArticles($company_db, $document_id){
+        $purchaseDocument = PurchaseDocument::find($document_id);
+
+        $articleCodes = $purchaseDocument->lines->pluck('code')->filter()->unique();
+
+        // Get all existing article codes from F_ARTICLE
+        $existingCodes = DB::connection($company_db)
+            ->table('F_ARTICLE')
+            ->whereIn('AR_Ref', $articleCodes)
+            ->pluck('AR_Ref')
+            ->toArray();
+
+        // Find missing ones
+        $missingCodes = $articleCodes->diff($existingCodes);
+
+        if ($missingCodes->isNotEmpty()) {
+            return response()->json([
+                'message' => 'Some article codes do not exist in F_ARTICLE',
+                'missing_codes' => $missingCodes->values(),
+            ], 400);
+        }
+
+    }
+
 
     public function generatePiece($DO_Souche): string
     {
@@ -339,7 +363,6 @@ class PurchaseDocumentController extends Controller
 
     public function transfer(Request $request)
     {
-        // Validate incoming request
         $validator = Validator::make($request->all(), [
             'souche' => 'required|integer|in:0,1,2',
             'reference' => 'required|string|max:50',
@@ -347,7 +370,6 @@ class PurchaseDocumentController extends Controller
             'company_db' => 'required|string|max:30'
         ]);
 
-        // Return validation errors with HTTP 422 status
         if ($validator->fails()) {
             return response()->json([
                 'message' => $validator->errors()->first(),
@@ -356,15 +378,24 @@ class PurchaseDocumentController extends Controller
         }
 
         try {
-            // Generate piece and create document
-            $piece = $this->generatePiece($request->souche);
-            $DO_Date = $this->createDocentent(
+             $purchaseDocument = PurchaseDocument::find($request->document_id);
+             $piece = $this->generatePiece($request->souche);
+
+             $this->checkArticles($request->company_db, $request->document_id);
+
+            $DO_Date = $this->createDocentete(
                 $piece,
                 $request->supplier,
                 $request->reference,
                 $request->souche,
                 $request->company_db
             );
+
+           
+
+            foreach ($purchaseDocument->lines as $line) {
+                $this->createDocligne($piece, $request->reference, $request->supplier, $DO_Date, 1, 10, $line->code, $line->description, $line->quantity, $line->unit);
+            }
 
             $lastDRNo = DB::connection($request->company_db)
                 ->table('F_DOCREGL')
@@ -390,34 +421,21 @@ class PurchaseDocumentController extends Controller
                 'DO_DocType' => 10,
                 'cbProt' => 0,
                 'cbCreateur' => 'ERP1',
-                'cbModification' => $DO_Date,
+                'cbModification' => DB::raw('GETDATE()'),
                 'cbReplication' => 0,
                 'cbFlag' => 0,
-                'cbCreation' => $DO_Date,
+                'cbCreation' => DB::raw('GETDATE()'),
                 'cbHashVersion' => 1,
-                'cbHashDate' => null,
-                'cbHashOrder' => null,
                 'DR_Libelle' => '',
                 'DR_AdressePaiement' => '',
                 'cbCreationUser' => "77384016-921F-472F-B56D-1D563B7DDF3C"
             ]);
 
-            // Log successful transfer
-            \Log::info("Transfer completed", [
-                'souche' => $request->souche,
-                'reference' => $request->reference,
-                'supplier' => $request->supplier,
-                'company_db' => $request->company_db,
-                'piece' => $piece
-            ]);
-
-            // Return successful JSON response
             return response()->json([
                 'message' => 'Transfer successful',
                 'piece' => $piece
             ], 200);
         } catch (\Exception $e) {
-            // Log any exceptions
             \Log::error("Transfer failed: " . $e->getMessage(), [
                 'souche' => $request->souche,
                 'reference' => $request->reference,
@@ -425,7 +443,6 @@ class PurchaseDocumentController extends Controller
                 'company_db' => $request->company_db
             ]);
 
-            // Return error response
             return response()->json([
                 'message' => 'Transfer failed',
                 'error' => $e->getMessage()
@@ -433,124 +450,148 @@ class PurchaseDocumentController extends Controller
         }
     }
 
-
-    public function createDocentent(string $DO_Piece, string $DO_Tiers, string $DO_Ref, $DO_Souche, $company_db): string
+    public function createDocentete(string $DO_Piece, string $DO_Tiers, string $DO_Ref, $DO_Souche, $company_db): string
     {
         try {
-            $DO_Domaine = 1;
-            $DO_Type    = 10;
-            $DO_Date    = now()->format('Y-m-d H:i:s');
-            $DO_Statut  = 0;
+
+            $currentDateTime = DB::connection($company_db)
+                ->selectOne('SELECT GETDATE() as [current_date]')
+                ->current_date;
+
+
+
+             $DO_Date = DB::connection($company_db)
+                ->selectOne('SELECT CAST(CAST(GETDATE() AS DATE) AS DATETIME) as [current_date]')
+                ->current_date;
 
 
             DB::connection($company_db)->table('F_DOCENTETE')->insert([
-                'DO_Domaine'       => $DO_Domaine,
-                'DO_Type'          => $DO_Type,
-                'DO_Piece'         => $DO_Piece,
-                'DO_Date'          => $DO_Date,
-                'DO_Ref'           => $DO_Ref,
-                'DO_Tiers'         => $DO_Tiers,
-                'CO_No'            => 0,
-                'cbCreationUser'   => '69C8CD64-D06F-4097-9CAC-E488AC2610F9',
-                'cbModification'   => DB::raw('GETDATE()'),
-                'cbCreation'       => DB::raw('GETDATE()'),
-                'DO_Statut'        => $DO_Statut,
-                'CT_NumPayeur'     => $DO_Tiers,
-                'DO_Period'        => 1,
-                'DO_Devise'        => 1,
-                'DO_Cours'       => floatval(1),
-                'LI_No'         => 0,
-                'DO_Expedit' => 1,
-                'DO_NbFacture' => 1,
-                'DO_BLFact' => 0,
-                'DO_TxEscompte' => floatval(0),
-                'DO_Reliquat' => 0,
-                'DO_Imprim' => 0,
-                'DO_Souche' => $DO_Souche,
-                'DO_DateLivr' => null,
-                "DO_Condition"    => 1,
-                'DO_Tarif' => 1,
-                "DO_Colisage" => 1,
-                'DO_TypeColis' => 1,
-                'DO_Transaction' => 11,
-                'DE_No' => 1,
-                'DO_Langue' => 0,
-                'CA_Num' => '',
-                'DO_Ecart' => floatval(0),
-                'DO_Regime' => 11,
-                'N_CatCompta' => 5,
-                'DO_Ventile' => 0,
-                'AB_No' => 0,
-                'CG_Num' => 44110000,
-                'DO_Heure' => $this->generateHeure(),
-                'CA_No' => 0,
-                'CO_NoCaissier' => 0,
-                'DO_Transfere' => 0,
-                'DO_Cloture' => 0,
-                'DO_Attente' => 0,
-                'DO_Provenance' => 0,
-                'DO_DebutAbo' => '1753-01-01 00:00:00.000',
-                'DO_FinAbo' => '1753-01-01 00:00:00.000',
-                'DO_DebutPeriod' => '1753-01-01 00:00:00.000',
-                'DO_FinPeriod' => '1753-01-01 00:00:00.000',
-                'MR_No' => 0,
-                'DO_TypeFrais' => 0,
-                'DO_ValFrais' => 0,
-                'DO_TypeLigneFrais' => 0,
-                'DO_TypeFranco' => 0,
-                'DO_ValFranco' => 0,
-                'DO_TypeLigneFranco' => 0,
-                'DO_Taxe1' => 0,
-                'DO_TypeTaux1' => 0,
-                'DO_TypeTaxe1' => 0,
-                'DO_Taxe2' => 0,
-                'DO_TypeTaux2' => 0,
-                'DO_TypeTaxe2' => 0,
-                'DO_Taxe3' => 0,
-                'DO_TypeTaux3' => 0,
-                'DO_TypeTaxe3' => 0,
-                'DO_MajCpta' => 0,
-                'DO_TotalHTNet' => 0,
-                'DO_TotalTTC' => 0,
-                'DO_NetAPayer' => 0,
-                'DO_MontantRegle' => 0,
-                'DO_StatutBAP' => 0,
-                'DO_Escompte' => 0,
-                'DO_DocType' => 10,
-                'DO_TypeCalcul' => 0,
-                'DO_TotalHT' => 0,
-                'DO_Valide' => 0,
-                'DO_Coffre' => 0,
-                'DO_PieceOrig' => '',
-                'DO_EStatut' => '',
-                'DO_DemandeRegul' => '',
-                'ET_No' => '',
-
-                'DO_Contact' => '',
-                'DO_FactureElec' => 0,
-                'DO_TypeTransac' => 0,
-                'DO_DateLivrRealisee' => '1753-01-01 00:00:00.000',
-                'DO_DateExpedition' => '1753-01-01 00:00:00.000',
-                'DO_FactureFrs' => '',
-                'DO_Motif' => '',
-                'CA_NumIFRS' => '',
-                'DO_NoWeb' => '',
-                'DO_DateLivr' => '1753-01-01 00:00:00.000',
-                'DO_Coord01' => '',
-                'DO_Coord02' => '',
-                'DO_Coord03' => '',
-                'DO_Coord04' => '',
-                'DO_AdressePaiement' => '',
-                'DO_PaiementLigne' => 0,
-                'DO_MotifDevis' => 0,
-                'DO_Conversion' => 0,
-
-                // 'DO_TotalHTNet' => $total['TotalHT'],
-                // 'DO_TotalTTC' => $total['TotalTTC'], 
-                // 'DO_NetAPayer' => $total['TotalTTC'],
-                // 'Montant_S_DT' => $total['TotalTTC']
-
-            ]);
+            'DO_Domaine'            => 1,
+            'DO_Type'               => 10,
+            'DO_Piece'              => $DO_Piece,
+            'DO_Date'               => $DO_Date,
+            'DO_Ref'                => $DO_Ref,
+            'DO_Tiers'              => $DO_Tiers,
+            'CO_No'                 => 0,
+            'DO_Period'             => 1,
+            'DO_Devise'             => 1,
+            'DO_Cours'              => 1.000000,
+            'DE_No'                 => 1,
+            'LI_No'                 => 0,
+            'CT_NumPayeur'          => $DO_Tiers,
+            'DO_Expedit'            => 1,
+            'DO_NbFacture'          => 1,
+            'DO_BLFact'             => 0,
+            'DO_TxEscompte'         => 0.000000,
+            'DO_Reliquat'           => 0,
+            'DO_Imprim'             => 0,
+            'CA_Num'                => '',
+            'DO_Coord01'            => '',
+            'DO_Coord02'            => '',
+            'DO_Coord03'            => '',
+            'DO_Coord04'            => '',
+            'DO_Souche'             => 0,
+            'DO_DateLivr'           => '2025-11-11 00:00:00.000',
+            'DO_Condition'          => 1,
+            'DO_Tarif'              => 1,
+            'DO_Colisage'           => 1,
+            'DO_TypeColis'          => 1,
+            'DO_Transaction'        => 11,
+            'DO_Langue'             => 0,
+            'DO_Ecart'              => 0.000000,
+            'DO_Regime'             => 11,
+            'N_CatCompta'           => 5,
+            'DO_Ventile'            => 0,
+            'AB_No'                 => 0,
+            'DO_DebutAbo'           => '1753-01-01 00:00:00.000',
+            'DO_FinAbo'             => '1753-01-01 00:00:00.000',
+            'DO_DebutPeriod'        => '1753-01-01 00:00:00.000',
+            'DO_FinPeriod'          => '1753-01-01 00:00:00.000',
+            'CG_Num'                => '44110000',
+            'DO_Statut'             => 0,
+            'DO_Heure'              => $this->generateHeure(),
+            'CA_No'                 => 0,
+            'CO_NoCaissier'         => 0,
+            'DO_Transfere'          => 0,
+            'DO_Cloture'            => 0,
+            'DO_NoWeb'              => '',
+            'DO_Attente'            => 0,
+            'DO_Provenance'         => 0,
+            'CA_NumIFRS'            => '',
+            'MR_No'                 => 0,
+            'DO_TypeFrais'          => 0,
+            'DO_ValFrais'           => 0.000000,
+            'DO_TypeLigneFrais'     => 0,
+            'DO_TypeFranco'         => 0,
+            'DO_ValFranco'          => 0.000000,
+            'DO_TypeLigneFranco'    => 0,
+            'DO_Taxe1'              => 0.000000,
+            'DO_TypeTaux1'          => 0,
+            'DO_TypeTaxe1'          => 0,
+            'DO_Taxe2'              => 0.000000,
+            'DO_TypeTaux2'          => 0,
+            'DO_TypeTaxe2'          => 0,
+            'DO_Taxe3'              => 0.000000,
+            'DO_TypeTaux3'          => 0,
+            'DO_TypeTaxe3'          => 0,
+            'DO_MajCpta'            => 0,
+            'DO_Motif'              => '',
+            'CT_NumCentrale'        => null,
+            'DO_Contact'            => '',
+            'DO_FactureElec'        => 0,
+            'DO_TypeTransac'        => 0,
+            'DO_DateLivrRealisee'   => '1753-01-01 00:00:00.000',
+            'DO_DateExpedition'     => '1753-01-01 00:00:00.000',
+            'DO_FactureFrs'         => '',
+            'DO_PieceOrig'          => '',
+            'DO_GUID'               => null,
+            'DO_EStatut'            => 0,
+            'DO_DemandeRegul'       => 0,
+            'ET_No'                 => 0,
+            'DO_Valide'             => 0,
+            'DO_Coffre'             => 0,
+            'DO_CodeTaxe1'          => null,
+            'DO_CodeTaxe2'          => null,
+            'DO_CodeTaxe3'          => null,
+            'DO_TotalHT'            => 0.000000,
+            'DO_StatutBAP'          => 0,
+            'DO_Escompte'           => 0,
+            'DO_DocType'            => 10,
+            'DO_TypeCalcul'         => 0,
+            'DO_FactureFile'        => null,
+            'DO_TotalHTNet'         => 0.000000,
+            'DO_TotalTTC'           => 0.000000,
+            'DO_NetAPayer'          => 0.000000,
+            'DO_MontantRegle'       => 0.000000,
+            'DO_RefPaiement'        => null,
+            'DO_AdressePaiement'    => '',
+            'DO_PaiementLigne'      => 0,
+            'DO_MotifDevis'         => 0,
+            'DO_Conversion'         => 0,
+            'cbProt'                => 0,
+            'cbCreateur'            => 'ERP1',
+            'cbModification'        => $currentDateTime,
+            'cbReplication'         => 0,
+            'cbFlag'                => 0,
+            'cbCreation'            => $currentDateTime,
+            'cbCreationUser'        => '77384016-921F-472F-B56D-1D563B7DDF3C',
+            'cbHash'                => null,
+            'cbHashVersion'         => 1,
+            'cbHashDate'            => null,
+            'cbHashOrder'           => null,
+            // 'N° d\'expédition'      => null,
+            'Port'                  => null,
+            'Messagerie'            => null,
+            'Livraison'             => null,
+            'Nature de Marchandises' => null,
+            'Nbre Colis'            => null,
+            'Nbre de Palettes'      => null,
+            // 'D.TIMBRE'              => 0.000000,
+            'Montant_S_DT'          => 0.000000,
+            'Transfert'             => null,
+            'Type'                  => null,
+            'Fournisseur'           => null
+        ]);
 
             return $DO_Date;
         } catch (Exception $e) {
@@ -559,26 +600,35 @@ class PurchaseDocumentController extends Controller
         }
     }
 
-
+    private function generateHeure(): string
+    {
+        $now = new DateTime();
+        $timeString = $now->format('His'); // HHmmss
+        $timeString = str_pad($timeString, 9, '0', STR_PAD_LEFT);
+        return $timeString;
+    }
 
     public function createDocligne($DO_Piece, $DO_Ref, $CT_Num, $DO_Date, $DO_Domaine, $DO_Type, $AR_Ref, $DL_Design, $DL_Qte, $EU_Enumere)
     {
+        $nextDLNo = DB::connection('sqlsrv_inter')
+            ->table('F_DOCLIGNE')
+            ->max('DL_No') + 1;
         DB::connection('sqlsrv_inter')->table('F_DOCLIGNE')->insert([
-            'DO_Domaine' => $DO_Domaine, // e.g. 1
-            'DO_Type' => $DO_Type, // e.g. 10
-            'CT_Num' => $CT_Num, // e.g. 'FR001'
-            'DO_Piece' => $DO_Piece, // e.g. '23DA000002'
+            'DO_Domaine' => $DO_Domaine,
+            'DO_Type' => $DO_Type,
+            'CT_Num' => substr($CT_Num, 0, 17),
+            'DO_Piece' => substr($DO_Piece, 0, 13),
             'DO_Date' => $DO_Date,
             'DL_DateBC' => '1753-01-01 00:00:00',
             'DL_DateBL' => '1753-01-01 00:00:00',
             'DL_Ligne' => 1000,
-            'DO_Ref' => $DO_Ref, // e.g. 'First Achat test'
+            'DO_Ref' => $DO_Ref,
             'DL_TNomencl' => 0,
             'DL_TRemPied' => 0,
             'DL_TRemExep' => 0,
-            'AR_Ref' => $AR_Ref, // e.g. 'CAB009301'
-            'DL_Design' => $DL_Design, // e.g. 'caisson bas four blanc 800x600'
-            'DL_Qte' => $DL_Qte, // e.g. 1
+            'AR_Ref' => $AR_Ref,
+            'DL_Design' => substr($DL_Design, 0, 69),
+            'DL_Qte' => $DL_Qte,
             'DL_QteBC' => $DL_Qte,
             'DL_QteBL' => 0.000000,
             'DL_PoidsNet' => 0.000000,
@@ -597,7 +647,7 @@ class PurchaseDocumentController extends Controller
             'DL_Taxe2' => 0,
             'DL_TypeTaux2' => 0,
             'DL_TypeTaxe2' => 0,
-            'cbCO_No' => 0,
+            // 'cbCO_No' => 0,
             'AG_No1' => 0,
             'AG_No2' => 0,
             'DL_PrixRU' => 0.000000,
@@ -605,8 +655,7 @@ class PurchaseDocumentController extends Controller
             'DL_MvtStock' => 0,
             'DT_No' => 0,
             'cbDT_No' => 0,
-            'cbAF_RefFourniss' => '',
-            'EU_Enumere' => $EU_Enumere, // e.g. 'Kit'
+            'EU_Enumere' => $EU_Enumere,
             'EU_Qte' => $DL_Qte,
             'DL_TTC' => 0,
             'DE_No' => 1,
@@ -615,8 +664,8 @@ class PurchaseDocumentController extends Controller
             'DL_TypePL' => 0,
             'DL_PUDevise' => 0.000000,
             'DL_PUTTC' => 0,
-            'DL_No' => 249758,
-            'DO_DateLivr' => '1753-01-01 00:00:00',
+            'DL_No' => $nextDLNo,
+            'DO_DateLivr' => null,
             'DL_Taxe3' => 0.000000,
             'DL_TypeTaux3' => 0,
             'DL_TypeTaxe3' => 0,
@@ -630,33 +679,24 @@ class PurchaseDocumentController extends Controller
             'DL_Escompte' => 0,
             'DL_DatePL' => '1753-01-01 00:00:00',
             'DL_QtePL' => 0.000000,
-            'DL_NoColis' => 0,
+            'DL_NoColis' => '0',
             'DL_QteRessource' => 0.000000,
             'DL_DateAvancement' => '1753-01-01 00:00:00',
             'DL_PieceOFProd' => 0,
             'DL_DateDE' => $DO_Date,
             'DL_QteDE' => $DL_Qte,
-            'DL_Operation' => 0,
+            'DL_Operation' => '0',
             'DL_NoSousTotal' => 0,
             'CA_No' => 0,
             'DO_DocType' => 10,
             'cbProt' => 0,
-            'cbCreateur' => 'ERP1',
-            'cbModification' => $DO_Date,
-            'cbReplication' => $DO_Date,
+            'cbCreateur' => substr('ERP1', 0, 4),
+            'cbModification' => $DO_Date,   // datetime ✔️
+            'cbReplication' => 0,           // int ✔️
             'cbFlag' => 0,
-            'cbCreation' => $DO_Date,
-            'cbCreationUser' => "77384016-921F-472F-B56D-1D563B7DDF3C",
-            'cbHash' => 1,
+            'cbCreation' => $DO_Date,       // datetime ✔️
+            'cbCreationUser' => '77384016-921F-472F-B56D-1D563B7DDF3C',
+            'PF_Num' => 0,
         ]);
-    }
-
-
-    private function generateHeure(): string
-    {
-        $now = new DateTime();
-        $timeString = $now->format('His'); // HHmmss
-        $timeString = str_pad($timeString, 9, '0', STR_PAD_LEFT);
-        return $timeString;
     }
 }
