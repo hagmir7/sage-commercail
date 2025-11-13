@@ -138,8 +138,12 @@ class SellController extends Controller
         try {
             $DO_Domaine = 1;
             $DO_Type    = 13;
-            $DO_Date    = now()->format('Y-m-d H:i:s');
+            // $DO_Date    = now()->format('Y-m-d H:i:s');
             $DO_Statut  = 2;
+
+            $DO_Date = DB::connection()
+                ->selectOne('SELECT CAST(CAST(GETDATE() AS DATE) AS DATETIME) as [current_date]')
+                ->current_date;
 
             // Step 1: Get the source row
             $source = DB::connection('sqlsrv')
@@ -151,6 +155,8 @@ class SellController extends Controller
                 Log::error("Source document not found: " . $sourcePiece);
                 throw new Exception("Source document not found: " . $sourcePiece);
             }
+
+
 
             DB::connection('sqlsrv')->table('F_DOCENTETE')->insert([
                 'DO_Domaine'       => $DO_Domaine,

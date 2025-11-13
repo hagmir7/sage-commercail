@@ -2,7 +2,6 @@
 
 namespace App\Providers;
 
-use App\Http\Middleware\Utf8JsonEncodingMiddleware;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\ServiceProvider;
 
