@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Article;
 use App\Models\CurrentPiece;
 use App\Models\PurchaseDocument;
 use App\Models\PurchaseLine;
@@ -391,10 +392,25 @@ class PurchaseDocumentController extends Controller
                 $request->company_db
             );
 
-           
+            $documentArticles = $purchaseDocument->lines->pluck('code');
+
+            $existingArticles = Article::on($request->company_db)
+                ->whereIn('AR_Ref', $documentArticles)
+                ->pluck('AR_Ref');
+
+
+            $missing = $documentArticles->diff($existingArticles);
+
+            if ($missing->isNotEmpty()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Some article are missing in the database.' . $missing->values(),
+                    'missing_codes' => $missing->values(),
+                ], 404);
+            }
 
             foreach ($purchaseDocument->lines as $line) {
-                $this->createDocligne($piece, $request->reference, $request->supplier, $DO_Date, 1, 10, $line->code, $line->description, $line->quantity, $line->unit);
+                $this->createDocligne($request->company_db, $piece, $request->reference, $request->supplier, 1, 10, $line->code, $line->description, $line->quantity, $line->unit);
             }
 
             $lastDRNo = DB::connection($request->company_db)
@@ -453,9 +469,15 @@ class PurchaseDocumentController extends Controller
 public function createDocentete(string $DO_Piece, string $DO_Tiers, string $DO_Ref, $DO_Souche, $company_db): string
 {
     try {
-        $currentDateTime = date('Y-d-m H:i:s.000');
-        $DO_Date  = date('Y-d-m') . ' 00:00:00.000';
-        // 2022-01-18 00:00:00.000
+        
+        if($company_db == 'sqlsrv'){
+             $DO_Date  = date('Y-m-d') . ' 00:00:00.000';
+             $currentDateTime = date('Y-m-d H:i:s.000');
+        }else{  
+            $DO_Date  = date('Y-d-m') . ' 00:00:00.000';
+            $currentDateTime = date('Y-d-m H:i:s.000');
+        }
+       
 
         $DO_Heure = $this->generateHeure();
 
@@ -488,7 +510,7 @@ public function createDocentete(string $DO_Piece, string $DO_Tiers, string $DO_R
             'DO_Coord02'            => '',
             'DO_Coord03'            => '',
             'DO_Coord04'            => '',
-            'DO_Souche'             => 0,
+            'DO_Souche'             => $DO_Souche,
             'DO_DateLivr'           => '2025-11-11 00:00:00.000',
             'DO_Condition'          => 1,
             'DO_Tarif'              => 1,
@@ -590,12 +612,20 @@ public function createDocentete(string $DO_Piece, string $DO_Tiers, string $DO_R
         return $timeString;
     }
 
-    public function createDocligne($DO_Piece, $DO_Ref, $CT_Num, $DO_Date, $DO_Domaine, $DO_Type, $AR_Ref, $DL_Design, $DL_Qte, $EU_Enumere)
+    public function createDocligne($company_db, $DO_Piece, $DO_Ref, $CT_Num, $DO_Domaine, $DO_Type, $AR_Ref, $DL_Design, $DL_Qte, $EU_Enumere)
     {
-        $nextDLNo = DB::connection('sqlsrv_inter')
+         if($company_db == 'sqlsrv'){
+             $DO_Date  = date('Y-m-d') . ' 00:00:00.000';
+             $currentDateTime = date('Y-m-d H:i:s.000');
+        }else{  
+            $DO_Date  = date('Y-d-m') . ' 00:00:00.000';
+            $currentDateTime = date('Y-d-m H:i:s.000');
+        }
+
+        $nextDLNo = DB::connection($company_db)
             ->table('F_DOCLIGNE')
             ->max('DL_No') + 1;
-        DB::connection('sqlsrv_inter')->table('F_DOCLIGNE')->insert([
+        DB::connection($company_db)->table('F_DOCLIGNE')->insert([
             'DO_Domaine' => $DO_Domaine,
             'DO_Type' => $DO_Type,
             'CT_Num' => substr($CT_Num, 0, 17),
@@ -665,7 +695,7 @@ public function createDocentete(string $DO_Piece, string $DO_Tiers, string $DO_R
             'DL_QteRessource' => 0.000000,
             'DL_DateAvancement' => '1753-01-01 00:00:00',
             'DL_PieceOFProd' => 0,
-            'DL_DateDE' => $DO_Date,
+            'DL_DateDE' => $currentDateTime,
             'DL_QteDE' => $DL_Qte,
             'DL_Operation' => '0',
             'DL_NoSousTotal' => 0,
@@ -673,10 +703,10 @@ public function createDocentete(string $DO_Piece, string $DO_Tiers, string $DO_R
             'DO_DocType' => 10,
             'cbProt' => 0,
             'cbCreateur' => substr('ERP1', 0, 4),
-            'cbModification' => $DO_Date,   // datetime ✔️
-            'cbReplication' => 0,           // int ✔️
+            'cbModification' => $currentDateTime,
+            'cbReplication' => 0,   
             'cbFlag' => 0,
-            'cbCreation' => $DO_Date,       // datetime ✔️
+            'cbCreation' => $currentDateTime,      
             'cbCreationUser' => '77384016-921F-472F-B56D-1D563B7DDF3C',
             'PF_Num' => 0,
         ]);
