@@ -1107,20 +1107,32 @@ class DocenteteController extends Controller
                 }
 
 
-            // Generate new piece
+  
             $new_piece = $this->generatePiece($piece, $souche);
 
-            // Update document
             $docentete->update([
                 'DO_Piece'  => $new_piece,
                 'DO_Tiers'  => $request->client ?? $docentete->DO_Tiers,
                 'DO_Souche' => $souche
             ]);
 
-            // Update doc lines
+ 
             Docligne::where("DO_Piece", $piece)->update([
                 'DO_Piece' => $new_piece
             ]);
+
+            DB::table('F_DOCREGL')
+                ->where('DO_Piece', $piece)
+                ->update([
+                    'DO_Piece' => $new_piece
+                ]);
+
+            // Update F_REGLECH
+            DB::table('F_REGLECH')
+                ->where('DO_Piece', $piece)
+                ->update([
+                    'DO_Piece' => $new_piece
+                ]);
 
             return response()->json([
                 'status' => 'success',
