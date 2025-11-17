@@ -14,6 +14,7 @@ use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Carbon;
 use App\Http\Controllers\SellController;
 use App\Models\ArticleStock;
+use App\Models\Compte;
 use App\Models\Palette;
 
 class DocenteteController extends Controller
@@ -1034,30 +1035,111 @@ class DocenteteController extends Controller
         return response()->json($results);
     }
 
+    public function generatePiece($piece, $souche): string
+    {
+        return DB::transaction(function () use ($souche, $piece) {
+
+            $cbMarq = null;
+
+            if (intval($souche) == 0) {
+
+                if (str_contains($piece, 'BFA')) {
+                    $cbMarq = 7;
+                } elseif (str_contains($piece, 'BBL')) {
+                    $cbMarq = 4; // BL
+                }
+
+            } elseif (intval($souche) == 1) {
+
+                if (str_contains($piece, 'FA')) {
+                    $cbMarq = 16; // BFA
+                } elseif (str_contains($piece, 'BL')) {
+                    $cbMarq = 13; // BBL
+                }
+            }
+
+            if (!$cbMarq) {
+                throw new \Exception("No cbMarq determined for piece '$piece' and souche '$souche'");
+            }
+
+            $result = DB::selectOne("SELECT TOP 1 * FROM F_DOCCURRENTPIECE WHERE cbMarq = ?", [$cbMarq]);
+            $currentPiece = $result?->DC_Piece ?? '25FA000000';
+            if (preg_match('/^([A-Z0-9]+?)(\d+)$/', $currentPiece, $matches)) {
+                $prefix = $matches[1];
+                $number = (int)$matches[2];
+                $nextNumber = $number + 1;
+
+                $newPiece = $prefix . str_pad($nextNumber, strlen($matches[2]), '0', STR_PAD_LEFT);
+            } else {
+                $newPiece = '25FA000001';
+            }
+
+            DB::update("UPDATE F_DOCCURRENTPIECE SET DC_Piece = ? WHERE cbMarq = ?", [$newPiece, $cbMarq]);
+
+            return $currentPiece;
+        });
+    }
+
 
     public function duplicate($piece, Request $request)
     {
-        $duplication = new DuplicationController();
+        try {
 
-        $client = $request->client ?? null;
-        $souche = $request->souche ?? null;
+            $souche = $request->souche === 'Souche A' ? 0 : 1;
+
+            $docentete = Docentete::where('DO_Piece', $piece)->firstOrFail();
+
+            if ($souche == intval($docentete->DO_Souche)) {
+                $soucheName = $souche == 0 ? "Souche A" : "Souche B";
+                return response()->json([
+                    'status' => 'error',
+                    'message' => "Ce document est déjà dans la $soucheName"
+                ], 400);
+            }
+
+                $client = Compte::where('CT_Num', $request->client)->exists();
+
+                if (!$client && !empty($request->client)) {
+                    return response()->json([
+                        'status' => 'error',
+                        'message' => "Le client n'existe pas : {$request->client}"
+                    ], 400);
+                }
 
 
-        if ($souche === 'Souche A') {
-            $souche = 0;
-        } elseif ($souche === 'Souche B') {
-            $souche = 1;
-        } else {
-            $souche = null;
+            // Generate new piece
+            $new_piece = $this->generatePiece($piece, $souche);
+
+            // Update document
+            $docentete->update([
+                'DO_Piece'  => $new_piece,
+                'DO_Tiers'  => $request->client ?? $docentete->DO_Tiers,
+                'DO_Souche' => $souche
+            ]);
+
+            // Update doc lines
+            Docligne::where("DO_Piece", $piece)->update([
+                'DO_Piece' => $new_piece
+            ]);
+
+            return response()->json([
+                'status' => 'success',
+                'message' => $new_piece,
+            ]);
+        } catch (\Illuminate\Database\QueryException $e) {
+            if (str_contains($e->getMessage(), "Cet élément est en cours d'utilisation")) {
+
+                return response()->json([
+                    'status' => 'error',
+                    'message' => "Ce document est actuellement ouvert ou utilisé dans Sage. 
+                               Fermez-le et réessayez."
+                ], 409);
+            }
+
+            throw $e;
         }
-
-        $result = $duplication->duplicat($piece, [], $client, $souche);
-
-        return response()->json([
-            'message' => 'Duplication executed',
-            'data' => $result
-        ]);
     }
+
 
 
 
@@ -1066,13 +1148,11 @@ class DocenteteController extends Controller
     {
         $docentete = Docentete::findOrFail($piece);
 
-        // Update the Docentete record
         $docentete->update([
             'DO_Tiers'  => 'CL150',
             'DO_Souche' => '0',
         ]);
 
-        // Loop through related doclignes
         foreach ($docentete->doclignes as $docligne) {
             $docligne->update([
                 'CT_Num' => 'CL150',
