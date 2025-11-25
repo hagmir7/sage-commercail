@@ -158,5 +158,20 @@ class UserController extends Controller
     }
 
 
+    public function destroy(User $user)
+    {
+        if (auth()->user()->hasRole('admin')) {
+            $user->update([
+                'is_active' => false
+            ]);
+            return response()->json([
+                'message' => "Utilisateur supprimé avec succès"
+            ]);
+        }
+
+        return response()->json(['message' => "You are not unauthorized"], 403);
+    }
+
+
 
 }

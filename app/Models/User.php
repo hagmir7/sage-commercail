@@ -26,7 +26,8 @@ class User extends Authenticatable
         'password',
         'phone',
         'company_id',
-        'service_id'
+        'service_id',
+        'is_active'
     ];
 
     // protected $dateFormat = 'Y-d-m H:i:s.v';

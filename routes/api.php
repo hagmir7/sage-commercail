@@ -104,7 +104,7 @@ Route::get('/users', function (Request $request) {
         'chargements as chargements_count' => function ($query) use ($startOfMonth, $endOfMonth) {
             $query->whereBetween('created_at', [$startOfMonth, $endOfMonth]);
         },
-    ])->get();
+    ])->where('is_active', true)->get();
 });
 
 Route::get('inventory/{inventory}/movements/export', [InventoryExportController::class, 'movements']);
@@ -123,6 +123,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::prefix('user')->controller(UserController::class)->group(function(){
         Route::get('update-password', 'updatePassword');
         Route::post('{userId}/update-password', 'updateUserPassword');
+        Route::delete('{user}/destroy', 'destroy');
     });
 
     // Roles
