@@ -12,7 +12,6 @@ use App\Models\Palette;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
-use DateTime;
 use Exception;
 use Illuminate\Support\Facades\Log;
 
@@ -21,7 +20,7 @@ class InventoryController extends Controller
 
     public function list()
     {
-        $inventories = Inventory::paginate(10);
+        $inventories = Inventory::latest()->paginate(10);
         return $inventories;
     }
 

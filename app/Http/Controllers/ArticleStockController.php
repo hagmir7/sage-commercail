@@ -97,7 +97,6 @@ class ArticleStockController extends Controller
         ]);
 
         try {
-            // Set higher limits for large imports
             ini_set('max_execution_time', 7200); // 2 hours
             ini_set('memory_limit', '4G'); // 1GB memory
 
@@ -128,6 +127,11 @@ class ArticleStockController extends Controller
      */
     public function store(Request $request)
     {
+
+        if(!auth()->user()->hasRole('admin')){
+            return response()->json(['message' => "Vous n'êtes pas authentifié ⚠️"], 402);
+        }
+        
         $validator = Validator::make($request->all(), [
             'code' => 'required|string|max:100',
             'description' => 'nullable|string|max:255',
@@ -211,6 +215,12 @@ class ArticleStockController extends Controller
 
     public function update(Request $request, ArticleStock $article_stock)
     {
+        if(!auth()->user()->hasRole('admin')){
+            return response()->json(['message' => "Vous n'êtes pas authentifié ⚠️"], 402);
+        }
+        
+
+
         $validator = Validator::make($request->all(), [
             'code' => 'required|string|max:100',
             'description' => 'nullable|string|max:255',
