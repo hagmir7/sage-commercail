@@ -355,9 +355,25 @@ class DocumentController extends Controller
             ->unique('DO_Piece');
     }
 
+
+    public function deleteEmptyPalettes($document)
+    {
+        if ((int) $document->status_id <= 8) {
+            return;
+        }
+
+        foreach ($document->palettes as $palette) {
+            if ($palette->lines()->count() === 0) {
+                $palette->delete();
+            }
+        }
+    }
+
     public function convertDocument(Document $document)
     {
         return DB::transaction(function () use ($document) {
+            $this->deleteEmptyPalettes($document);
+
             $docs = $this->getDocumentsBL($document->piece);
 
             if ($docs->isEmpty()) {
@@ -377,14 +393,31 @@ class DocumentController extends Controller
             }
 
             // Update the main document
+            $statusId = $document->status_id;
+
+  
+            if (str_contains($doc->DO_Piece, 'BL')) {
+                $statusId = $document->status_id < 12 ? 12 : $document->status_id;
+            }
+
+            $pieceBL = $document->piece_bl;
+            if (str_contains($doc->DO_Piece, 'BL')) {
+                $pieceBL = $doc->DO_Piece;
+            } elseif ($docs->first()) {
+                $pieceBL = $docs->first()->DL_PieceBL ?? $document->piece_bl;
+            }
+
+            $pieceFA = str_contains($doc->DO_Piece, 'FA')
+                ? $doc->DO_Piece
+                : $document->piece_fa;
+
             $document->update([
                 'docentete_id' => $doc->cbMarq,
-                'status_id'    => str_contains($doc->DO_Piece, 'BL') ? 12 : $document->status_id,
-                'piece_bl'     => str_contains($doc->DO_Piece, 'BL') ? $doc->DO_Piece : ($docs->first()->DL_PieceBL ?? $document->piece_bl),
-                'piece_fa'     => str_contains($doc->DO_Piece, 'FA') ? $doc->DO_Piece : $document->piece_fa,
+                'status_id'    => $statusId,
+                'piece_bl'     => $pieceBL,
+                'piece_fa'     => $pieceFA,
             ]);
-
-            // Update related lines
+    
             $lines = Line::where('document_id', $document->id)->get();
 
             foreach ($lines as $line) {
@@ -412,7 +445,6 @@ class DocumentController extends Controller
             }
         }
 
-        // 🔹 Main query for BLs
         $query = Docentete::with([
             'document' => function ($q) {
                 $q->with(['status', 'companies'])

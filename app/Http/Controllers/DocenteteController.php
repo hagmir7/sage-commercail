@@ -131,7 +131,7 @@ class DocenteteController extends Controller
 
         $user = auth()->user();
 
-        if (!$user->hasRole("fabrication") ||  !$user->hasRole("montage")) {
+        if ($user->hasRole("fabrication") ||  $user->hasRole("montage")) {
             foreach ($request->lines as $line) {
                 $line = Line::find($line);
 

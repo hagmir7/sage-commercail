@@ -274,7 +274,7 @@ class PaletteController extends Controller
             if (!$palette) {
                 return response()->json([
                     'error' => 'Palette not found',
-                    'message' => 'No palette found with the provided code.'
+                    'message' => 'Aucune palette trouvée avec le code fourni.'
                 ], 404);
             }
 
@@ -330,6 +330,7 @@ class PaletteController extends Controller
             : false;
 
 
+            \Log::alert($allPalettesDelivered);
             if ($allPalettesDelivered) {
                 $document->update([
                     'status_id' => 14

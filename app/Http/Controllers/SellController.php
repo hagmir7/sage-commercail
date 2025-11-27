@@ -47,19 +47,15 @@ class SellController extends Controller
         $TotalTTC = 0;
 
         foreach ($doclignes as $line) {
-            // Prix unitaire après remise
             $prixApresRemise = $line->DL_PrixUnitaire * (1 - round($line->DL_Remise01REM_Valeur / 100, 2));
 
-            // Application du coefficient 0.92
             $prixNet = round($prixApresRemise * 0.92, 2);
 
-            // Total HT pour la ligne
             $lineTotalHT = $prixNet * $line->DL_QteBL;
 
-            // Total TTC (ajout TVA 20%)
             $lineTotalTTC = round($prixNet * 1.2, 2) * $line->DL_QteBL;
 
-            // Add to global totals
+
             $TotalHT += $lineTotalHT;
             $TotalTTC += $lineTotalTTC;
            
@@ -84,10 +80,8 @@ class SellController extends Controller
 
             foreach ($grouped as $companyCode => $companyLines) {
 
-                // Generate new DO_Piece per company
                 $DO_Piece = $this->generatePiece();
 
-                // Calculate total for this company
                 $total = $this->calculateTotal($companyLines);
 
                 $DO_Date = $this->createDocumentFromTemplate($sourcePiece, $DO_Piece, $total, $companyCode);
@@ -103,7 +97,6 @@ class SellController extends Controller
                         $sourcePiece
                     );
 
-                    // Insert into F_DOCLIGNEEMPL
                     DB::table('F_DOCLIGNEEMPL')->insert([
                         'DL_No'             => $newDL_No,
                         'DP_No'             => 1,
@@ -120,8 +113,6 @@ class SellController extends Controller
                         ]);
                 }
             }
-
-            // ✅ Commit all if everything succeeded
             DB::commit();
 
             return response()->json(['success' => true]);
