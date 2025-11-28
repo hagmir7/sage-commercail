@@ -445,12 +445,14 @@ class DocumentController extends Controller
             }
         }
 
-        $query = Docentete::with([
-            'document' => function ($q) {
-                $q->with(['status', 'companies'])
-                    ->withCount('palettes');
-            },
-        ])
+            $query = Docentete::with([
+                'document' => function ($q) {
+                    $q->with(['status', 'companies'])
+                        ->withCount(['palettes as palettes_count' => function ($p) {
+                            $p->where('company_id', auth()->user()->company_id);
+                        }]);
+                },
+            ])
             ->select(
                 'DO_Domaine',
                 'DO_Type',
