@@ -183,7 +183,7 @@ class DocumentController extends Controller
         $documents = Document::whereHas('docentete', function ($query) {
             $query->where('DO_Statut', 2)
                 ->where('DO_Domaine', 0)
-                ->where('DO_Type', 2);
+                ->where('DO_Type', 1);
         })
             ->with([
                 'docentete' => function ($query) {
@@ -223,7 +223,7 @@ class DocumentController extends Controller
             ->whereHas('docentete', function ($query) {
                 $query->where('DO_Domaine', 0)
                     ->where('DO_Statut', 1)
-                    ->where('DO_Type', 2);
+                    ->where('DO_Type', 1);
             })
             ->whereHas('lines', function ($q) use ($user_roles) {
                 $q->where('company_id', auth()->user()->company_id);
@@ -466,13 +466,12 @@ class DocumentController extends Controller
                 'DO_DateLivr',
                 'DO_Expedit'
             )
-            ->where('DO_Type', 3)
+            ->where('DO_Type', 1)
             ->whereBetween('DO_Date', [
                 Carbon::today()->subDays(40),
                 Carbon::today()
             ]);
 
-        // 🔹 Restrict for controleur role
         if (auth()->user()->hasRole("controleur")) {
             $query->whereHas('document.companies', function ($q) {
                 $q->where('companies.id', auth()->user()->company_id);

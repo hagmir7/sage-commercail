@@ -62,7 +62,7 @@ class DocenteteController extends Controller
         if ($request->has('status')) {
             $query->where('DO_Type', $request->type);
         } else {
-            $query->where('DO_Type', 2);
+            $query->where('DO_Type', 1);
         }
 
         if ($request->has('search') && $request->search !== '') {
@@ -171,7 +171,7 @@ class DocenteteController extends Controller
             ->orderByDesc("cbCreation")
             ->where('DO_Domaine', 0)
             ->where('DO_Statut', 1)
-            ->where('DO_Type', $request->type ?? 2);
+            ->where('DO_Type', $request->type ?? 1);
 
         $query->with('document.status');
 
@@ -955,7 +955,7 @@ class DocenteteController extends Controller
         if ($request->has('status')) {
             $query->where('DO_Type', $request->type);
         } else {
-            $query->where('DO_Type', 2);
+            $query->where('DO_Type', 1);
         }
 
         if ($request->has('search') && $request->search !== '') {
@@ -1038,44 +1038,38 @@ class DocenteteController extends Controller
     public function generatePiece($piece, $souche): string
     {
         return DB::transaction(function () use ($souche, $piece) {
-
             $cbMarq = null;
-
-            if (intval($souche) == 0) {
-
-                if (str_contains($piece, 'BFA')) {
-                    $cbMarq = 7;
-                } elseif (str_contains($piece, 'BBL')) {
-                    $cbMarq = 4; // BL
-                }
-
-            } elseif (intval($souche) == 1) {
-
+            if (intval($souche) == 1) {
                 if (str_contains($piece, 'FA')) {
-                    $cbMarq = 16; // BFA
+                    $cbMarq = null; // BFA
                 } elseif (str_contains($piece, 'BL')) {
                     $cbMarq = 13; // BBL
+                } elseif (str_contains($piece, 'PL')) {
+                    $cbMarq = 12; // BBL
+                }
+            } elseif (intval($souche) == 0) {
+                if (str_contains($piece, 'BFA')) {
+                    $cbMarq = null; // FA
+                } elseif (str_contains($piece, 'BBL')) {
+                    $cbMarq = 4; // BL
+                } elseif (str_contains($piece, 'BPL')) {
+                    $cbMarq = 3; // PL
                 }
             }
-
             if (!$cbMarq) {
-                throw new \Exception("No cbMarq determined for piece '$piece' and souche '$souche'");
+                throw new \Exception("Impossible de modifier ce document '$piece' and et '$souche'");
             }
-
             $result = DB::selectOne("SELECT TOP 1 * FROM F_DOCCURRENTPIECE WHERE cbMarq = ?", [$cbMarq]);
             $currentPiece = $result?->DC_Piece ?? '25FA000000';
             if (preg_match('/^([A-Z0-9]+?)(\d+)$/', $currentPiece, $matches)) {
                 $prefix = $matches[1];
                 $number = (int)$matches[2];
                 $nextNumber = $number + 1;
-
                 $newPiece = $prefix . str_pad($nextNumber, strlen($matches[2]), '0', STR_PAD_LEFT);
             } else {
                 $newPiece = '25FA000001';
             }
-
             DB::update("UPDATE F_DOCCURRENTPIECE SET DC_Piece = ? WHERE cbMarq = ?", [$newPiece, $cbMarq]);
-
             return $currentPiece;
         });
     }
