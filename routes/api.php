@@ -30,6 +30,7 @@ use App\Http\Controllers\TransferController;
 use App\Http\Controllers\UnitController;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\UserPermissionController;
+use App\Http\Controllers\WhatsappController;
 use App\Imports\MovementImport;
 use App\Models\User;
 use Illuminate\Http\Request;
@@ -340,6 +341,11 @@ Route::post('/register', [AuthController::class, 'register']);
 Route::get('/user/{id}', [AuthController::class, 'show']);
 
 Route::post('/user/update/{id}', [UserController::class, 'update']);
+
+
+
+Route::get('/webhook', [WhatsappController::class, 'verify']);
+Route::post('/webhook', [WhatsAppController::class, 'receive']);
 
 
 
