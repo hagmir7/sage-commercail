@@ -28,6 +28,11 @@ class ArticleStockController extends Controller
             $query->where('category', $request->category);
         }
 
+        $company = null;
+        if ($request->has('company') && $request->company !== '') {
+            $company = $request->company;
+        }
+
         if ($request->has('search') && $request->search !== '') {
             $search = $request->search;
             $query->where(function ($q) use ($search) {
@@ -42,10 +47,10 @@ class ArticleStockController extends Controller
 
 
         // Map stock quantity for each article
-        $articles->getCollection()->transform(function ($article) {
+        $articles->getCollection()->transform(function ($article) use($company) {
             $article->stock_prepare = $this->calculateStockPreparation($article->code);
             $article->stock_prepartion = $this->calculateZoonPrepartion($article->code);
-            $article->stock = $this->calculateStock($article->code);
+            $article->stock = $this->calculateStock($article->code, $company);
 
             return $article;
         });
@@ -54,19 +59,23 @@ class ArticleStockController extends Controller
     }
 
 
-    public function calculateStock($ref_article)
+    public function calculateStock($ref_article, $company_id = null)
     {
         $article = ArticleStock::where('code', $ref_article)->first();
 
         if (! $article) {
             return 0;
         }
-        $totalQuantity = $article->palettes()
-            ->where("type", "Stock")
-            ->sum("article_palette.quantity");
 
-        return $totalQuantity;
+        $query = $article->palettes()->where('type', 'Stock');
+
+        if ($company_id) {
+            $query->where('company_id', $company_id);
+        }
+
+        return $query->sum('article_palette.quantity');
     }
+
 
 
 
@@ -74,7 +83,7 @@ class ArticleStockController extends Controller
     {
 
         return Docligne::where('AR_Ref', $ref_article)
-            ->whereIn('DO_Type', [2, 3])
+            ->whereIn('DO_Type', [2, 3, 1])
             ->whereColumn("DL_Qte", '>', 'DL_QteBL')
             ->sum('DL_Qte');
     }
@@ -83,7 +92,7 @@ class ArticleStockController extends Controller
     {
 
         return Docligne::where('AR_Ref', $ref_article)
-            ->whereIn('DO_Type', [2, 3])
+            ->whereIn('DO_Type', [2, 3, 1])
             ->sum('DL_QteBL');
     }
 

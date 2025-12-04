@@ -418,13 +418,13 @@ class DocenteteController extends Controller
     public function validate(Request $request, $piece)
     {
         if (!$request->user()->hasRole('preparation')) {
-            return response()->json(["error" => "L'utilisateur n'est pas autorisé"], 401);
+            return response()->json(["message" => "L'utilisateur n'est pas autorisé"], 401);
         }
 
         $document = Document::where('piece', $piece)->first();
 
         if (!$document) {
-            return response()->json(["error" => "Le document n'existe pas"], 404);
+            return response()->json(["message" => "Le document n'existe pas"], 404);
         }
 
         DB::transaction(function () use ($document) {
@@ -847,12 +847,17 @@ class DocenteteController extends Controller
             ], 200);
         } catch (\Exception $e) {
             DB::rollBack();
-            \Log::error('❌Error: TransferCompany failed: ' . $e->getMessage());
 
-            return response()->json([
-                'status' => 'error',
-                'message' => $e->getMessage(),
-            ], 500);
+            if (str_contains($e->getMessage(), "Cet élément est en cours d'utilisation")) {
+
+                return response()->json([
+                    'status' => 'error',
+                    'message' => "Ce document est actuellement ouvert dans Sage. 
+                               Fermez-le et réessayez."
+                ], 409);
+            }
+
+            // throw $e;
         }
     }
 
@@ -860,31 +865,53 @@ class DocenteteController extends Controller
     // Transfer funciton controller
     public function transfer(Request $request)
     {
-        $user = auth()->user();
-        if ($user->hasRole("commercial")) {
-            $validator = Validator::make($request->all(), [
-                'company' => 'required|integer|exists:companies,id',
-                'lines' => 'required|array'
-            ]);
 
-            if ($validator->fails()) {
-                return response()->json(['errors' => $validator->errors()], 422);
+        try {
+            $user = auth()->user();
+
+            if ($user->hasRole("commercial")) {
+
+                $validator = Validator::make($request->all(), [
+                    'company' => 'required|integer|exists:companies,id',
+                    'lines' => 'required|array'
+                ]);
+
+                if ($validator->fails()) {
+                    return response()->json(['errors' => $validator->errors()], 422);
+                }
+
+                return $this->transferCompany($request);
+
+            } else {
+
+                $validator = Validator::make($request->all(), [
+                    'roles' => 'required',
+                    'lines' => 'required|array'
+                ]);
+
+                if ($validator->fails()) {
+                    return response()->json(['errors' => $validator->errors()], 422);
+                }
+
+                return $this->roleTransfer($request);
             }
 
-            $this->transferCompany($request);
-        } else {
-            $validator = Validator::make($request->all(), [
-                'roles' => 'required',
-                'lines' => 'required|array'
-            ]);
+        } catch (\Illuminate\Database\QueryException $e) {
 
-            if ($validator->fails()) {
-                return response()->json(['errors' => $validator->errors()], 422);
+           if (str_contains($e->getMessage(), "Cet élément est en cours d'utilisation")) {
+
+                return response()->json([
+                    'status' => 'error',
+                    'message' => "Ce document est actuellement ouvert dans Sage. 
+                               Fermez-le et réessayez."
+                ], 409);
             }
 
-            $this->roleTransfer($request);
+            throw $e;
         }
     }
+
+
 
 
     // Document list with pregress

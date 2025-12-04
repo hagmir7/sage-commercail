@@ -320,7 +320,7 @@ class DocumentController extends Controller
 
     public function validationControllerList(Request $request)
     {
-        $query = Document::with(['companies', 'lines', 'docentete:DO_Piece,cbMarq,DO_DateLivr']);
+        $query = Document::with(['companies', 'lines', 'docentete:DO_Piece,cbMarq,DO_DateLivr,DO_Date']);
 
         if (auth()->user()->hasRole('commercial')) {
             $query = $query->whereIn('status_id', [8, 9, 10, 11]);
