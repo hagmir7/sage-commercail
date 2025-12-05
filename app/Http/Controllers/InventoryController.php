@@ -639,58 +639,56 @@ public function insert(Request $request, Inventory $inventory)
     }
 
 
-    public function resetToStock(Inventory $inventory)
-    {
-        try {
-            DB::transaction(function () use ($inventory) {
+        public function resetToStock(Inventory $inventory)
+        {
+            try {
+                DB::transaction(function () use ($inventory) {
 
-                Palette::where('type', 'Stock')
-                    ->whereNull('inventory_id')
-                    ->delete();
+                    Palette::where('type', 'Stock')
+                        ->whereNotNull('inventory_id')
+                        ->update(['type' => 'Inventaire']);
 
+                    Palette::where('type', 'Stock')
+                        ->whereNull('inventory_id')
+                        ->delete();
 
-                Palette::where('type', 'Stock')
-                    ->whereNotNull('inventory_id')
-                    ->update(['type' => 'Inventaire']);
+                    foreach ($inventory->palettes as $palette) {
 
+                        $newPalette = Palette::create([
+                            'code'           => $this->generatePaletteCode(),
+                            'company_id'     => $palette->company_id,
+                            'emplacement_id' => $palette->emplacement_id,
+                            'type'           => 'Stock',
+                            'user_id'        => $palette->user_id ?? auth()->id(),
+                        ]);
 
-                foreach ($inventory->palettes as $palette) {
-
-                    $palette->update(['type' => 'Stock']);
-
-                    $articlesToAttach = [];
-
-                    foreach ($palette->inventoryArticles as $inventoryArticle) {
-                        $article = ArticleStock::where('code', $inventoryArticle->code_article)->first();
-
-                        if ($article) {
-                            $articlesToAttach[$article->id] = [
-                                'quantity' => $inventoryArticle->pivot->quantity,
-                                'created_at' => now(),
-                                'updated_at' => now(),
-                            ];
+                        foreach ($palette->inventoryArticles as $inventoryStock) {
+      
+                            $newPalette->articles()->attach(
+                                $inventoryStock->article->id,
+                                [ 'quantity' => $inventoryStock->pivot->quantity ?? 1 ]
+                            );
                         }
                     }
+                });
 
-                    if (!empty($articlesToAttach)) {
-                        $palette->articles()->attach($articlesToAttach);
-                    }
-                }
-            });
+                return response()->json([
+                    'success' => true,
+                    'message' => 'Stock initialized successfully',
+                ]);
 
+            } catch (\Throwable $e) {
 
-            return response()->json([
-                'success' => true,
-                'message' => 'Stock initialized successfully',
-            ]);
-        } catch (\Exception $e) {
+                Log::error('Stock reset failed', ['error' => $e->getMessage()]);
 
-            return response()->json([
-                'success' => false,
-                'message' => 'Failed to initialize stock: ' . $e->getMessage(),
-            ], 500);
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Failed to initialize stock',
+                    'error'   => $e->getMessage(),
+                ], 500);
+            }
         }
-    }
+
 
 
 
