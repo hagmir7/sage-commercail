@@ -349,8 +349,11 @@ class DocumentController extends Controller
 
     public function getDocumentsBL($piece)
     {
+        \Log::alert($piece);
+        $piece_type = str_contains($piece, "PL")  ? "DL_PiecePL" : 'DL_PieceBC';
+        \Log::alert($piece_type);
         return Docligne::with('docentete')
-            ->where("DL_PiecePL", $piece)
+            ->where($piece_type, $piece)
             ->get()
             ->unique('DO_Piece');
     }
@@ -466,7 +469,7 @@ class DocumentController extends Controller
                 'DO_DateLivr',
                 'DO_Expedit'
             )
-            ->where('DO_Type', 1)
+            ->whereIn('DO_Type', [3])
             ->whereBetween('DO_Date', [
                 Carbon::today()->subDays(40),
                 Carbon::today()
