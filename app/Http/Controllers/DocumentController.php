@@ -349,9 +349,7 @@ class DocumentController extends Controller
 
     public function getDocumentsBL($piece)
     {
-        \Log::alert($piece);
         $piece_type = str_contains($piece, "PL")  ? "DL_PiecePL" : 'DL_PieceBC';
-        \Log::alert($piece_type);
         return Docligne::with('docentete')
             ->where($piece_type, $piece)
             ->get()
@@ -475,18 +473,18 @@ class DocumentController extends Controller
                 Carbon::today()
             ]);
 
-        if (auth()->user()->hasRole("controleur")) {
+        if (auth()->user()->hasRole(["controleur", 'chargement'])) {
             $query->whereHas('document.companies', function ($q) {
                 $q->where('companies.id', auth()->user()->company_id);
             });
         }
 
 
-        if (auth()->user()->hasRole("chargement")) {
-            $query->whereHas("document.palettes", function ($q) {
-                $q->where('delivered_by', auth()->id());
-            });
-        }
+        // if (auth()->user()->hasRole("chargement")) {
+        //     $query->whereHas("document.palettes", function ($q) {
+        //         $q->where('delivered_by', auth()->id());
+        //     });
+        // }
 
 
 
