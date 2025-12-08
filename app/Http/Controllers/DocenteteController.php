@@ -256,8 +256,8 @@ class DocenteteController extends Controller
 
     public function validatePartial(Request $request, $piece)
     {
-        if (!$request->user()->hasRole('controleur')) {
-            return response()->json(["error" => "L'utilisateur n'est pas autorisé"], 401);
+        if (!$request->user()->hasRole('preparation')) {
+            return response()->json(["message" => "L'utilisateur n'est pas autorisé"], 401);
         }
 
         $lineData = $request->lines;
@@ -293,7 +293,7 @@ class DocenteteController extends Controller
         }
 
         $invalidQte = $lines->first(function ($line) {
-            $qte = (float) ($line->docligne->DL_QteBL ?? 0);
+            $qte = (float) ($line->docligne->DL_QtePL ?? 0);
             return $qte <= 0;
         });
 
@@ -312,7 +312,7 @@ class DocenteteController extends Controller
         $document = Document::where('piece', $piece)->first();
 
         if (!$document) {
-            return response()->json(["error" => "Le document n'existe pas"], 404);
+            return response()->json(["message" => "Le document n'existe pas"], 404);
         }
 
         DB::transaction(function () use ($document, $lines) {
@@ -338,10 +338,10 @@ class DocenteteController extends Controller
             foreach ($lines as $line) {
 
                 $line->update([
-                    'quantity_prepare' => floatval($line->docligne->DL_QteBL),
+                    'quantity_prepare' => floatval($line->docligne->DL_QtePL),
                 ]);
 
-                if (floatval($line->docligne->DL_Qte) == floatval($line->docligne->DL_QteBL)) {
+                if (floatval($line->docligne->DL_Qte) == floatval($line->docligne->DL_QtePL)) {
 
                     $line->update([
                         'status_id' => 11,
@@ -541,7 +541,7 @@ class DocenteteController extends Controller
             }
         ])
 
-            ->select("DO_Piece", "AR_Ref", 'DL_Design', 'DL_Qte', "Nom", "Hauteur", "Largeur", "Profondeur", "Langeur", "Couleur", "Chant", "Episseur", "cbMarq", "DL_Ligne", 'Description', "Poignée as Poignee", "Rotation", 'DL_QteBL', 'EU_Qte')
+            ->select("DO_Piece", "AR_Ref", 'DL_Design', 'DL_Qte', "Nom", "Hauteur", "Largeur", "Profondeur", "Langeur", "Couleur", "Chant", "Episseur", "cbMarq", "DL_Ligne", 'Description', "Poignée as Poignee", "Rotation", 'DL_QtePL', 'EU_Qte')
             ->OrderBy("DL_Ligne")
             ->where('DO_Piece', $id);
 
@@ -552,11 +552,11 @@ class DocenteteController extends Controller
             if ($docentete->DO_Reliquat == "1") {
                 foreach ($docligneQuery->get() as $docligne) {
                     $prepared = (float) ($docligne->line->quantity_prepare ?? 0);
-                    $delivered = (float) ($docligne->DL_QteBL ?? 0);
+                    $delivered = (float) ($docligne->DL_QtePL ?? 0);
 
                     if ($prepared > 0) {
                         $docligne->update([
-                            "DL_QteBL" => max(0, $delivered - $prepared)
+                            "DL_QtePL" => max(0, $delivered - $prepared)
                         ]);
 
                         $line = $docligne->line;
@@ -619,7 +619,7 @@ class DocenteteController extends Controller
         $document = Document::where("piece", $piece)->first();
 
         if (!$document) {
-            return response()->json(['error' => "Document does not exist"], 404);
+            return response()->json(['message' => "Document does not exist"], 404);
         }
 
         foreach ($document->lines as $line) {
@@ -628,7 +628,7 @@ class DocenteteController extends Controller
 
 
         if (!auth()->user()->hasRole("commercial")) {
-            return response()->json(['error' => "Unauthorized"], 403);
+            return response()->json(['message' => "Unauthorized"], 403);
         }
 
         $document->delete();
@@ -808,7 +808,7 @@ class DocenteteController extends Controller
                 }
 
                 // Reset quantity
-                $currentDocligne->DL_QteBL = 0;
+                $currentDocligne->DL_QtePL = 0;
                 $currentDocligne->save();
 
                 $article = ArticleStock::where('code', $currentDocligne->AR_Ref)->first();
@@ -877,7 +877,10 @@ class DocenteteController extends Controller
                 ]);
 
                 if ($validator->fails()) {
-                    return response()->json(['errors' => $validator->errors()], 422);
+                    return response()->json([
+                        'errors' => $validator->errors(),
+                        'message' => $validator->errors()->first()
+                    ], 422);
                 }
 
                 return $this->transferCompany($request);
@@ -890,7 +893,10 @@ class DocenteteController extends Controller
                 ]);
 
                 if ($validator->fails()) {
-                    return response()->json(['errors' => $validator->errors()], 422);
+                    return response()->json([
+                        'errors' => $validator->errors(),
+                        'message' => $validator->errors()->first()
+                    ], 422);
                 }
 
                 return $this->roleTransfer($request);
@@ -920,7 +926,7 @@ class DocenteteController extends Controller
         $document = Document::with(['docentete.doclignes', 'lines.palettes'])->where("piece", $piece)->first();
 
         if (!$document) {
-            return response()->json(["error" => "Document not found"], 404);
+            return response()->json(["message" => "Document not found"], 404);
         }
 
         $required_qte = $document->lines->sum("quantity") ?? 0;
@@ -1051,7 +1057,7 @@ class DocenteteController extends Controller
                 $documents->whereBetween('created_at', [$start, $end]);
             } catch (\Exception $e) {
                 return response()->json([
-                    'error' => 'Invalid date format provided.'
+                    'message' => 'Invalid date format provided.'
                 ], 422);
             }
         }
@@ -1208,9 +1214,7 @@ public function delete($piece = '25FA002095', $type = 6)
         ]);
 
     } catch (\Illuminate\Database\QueryException $e) {
-        // Check if the error is 82176 (trigger warning)
         if (str_contains($e->getMessage(), '82176')) {
-            // Ignore it, log for reference
             \Log::info("Trigger warning 82176 ignored during deletion of $piece");
             return response()->json([
                 'success' => true,
@@ -1218,7 +1222,7 @@ public function delete($piece = '25FA002095', $type = 6)
             ]);
         }
 
-        // Rethrow other errors
+
         \Log::error('Erreur suppression document: ' . $e->getMessage());
 
         return response()->json([

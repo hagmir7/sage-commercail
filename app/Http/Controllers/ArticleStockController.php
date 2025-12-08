@@ -327,7 +327,7 @@ class ArticleStockController extends Controller
 
        
         $emplacements = Emplacement::whereHas('palettes.articles', function ($query) use ($article) {
-            $query->where('article_stocks.id', $article->id);
+            $query->where('article_stocks.id', $article->id)->where("type", 'Stock');
         })
             ->with([
                 'depot.company',
@@ -342,5 +342,66 @@ class ArticleStockController extends Controller
 
         return response()->json($emplacements);
     }
+
+
+
+    public function decrementQuantity($code, $quantity)
+    {
+        // 1) Find Article
+        $article = ArticleStock::with('companies')->where('code', $code)
+            ->orWhere('code_supplier', $code)
+            ->orWhere('code_supplier_2', $code)
+            ->orWhere('qr_code', $code)
+            ->first();
+
+        if (!$article) {
+            return response()->json(['message' => 'Article introuvable.'], 404);
+        }
+
+        // 2) Get the FIRST emplacement where article exists (ONLY ONE!)
+        $emplacement = Emplacement::whereHas('palettes.articles', function ($query) use ($article) {
+            $query->where('article_stocks.id', $article->id)->where("type", 'Stock');
+        })
+            ->with([
+                'depot.company',
+                'palettes' => function ($q) use ($article) {
+                    $q->whereHas('articles', fn($a) => $a->where('article_stocks.id', $article->id))
+                        ->with(['articles' => fn($a) => $a->where('article_stocks.id', $article->id)]);
+                }
+            ])
+            ->orderBy('id', 'ASC') //🔹 first emplacement
+            ->first();
+
+        if (!$emplacement) {
+            return response()->json(['message' => 'Aucun emplacement trouvé'], 404);
+        }
+
+        // 3) Find article in the palette (pivot row which contains quantity)
+        $palette = $emplacement->palettes->first(); // first palette
+        $paletteArticle = $palette->articles()->where('article_stocks.id', $article->id)->first();
+
+        if (!$paletteArticle) {
+            return response()->json(['message' => 'Article non trouvé dans palette'], 404);
+        }
+
+        // 4) Decrement quantity
+        $currentQty = $paletteArticle->pivot->quantity;
+
+        if ($quantity > $currentQty) {
+            return response()->json(['message' => "Stock insuffisant. Disponible: $currentQty"], 400);
+        }
+
+        $palette->articles()->updateExistingPivot($article->id, [
+            'quantity' => $currentQty - $quantity
+        ]);
+
+        return response()->json([
+            'message' => 'Quantité mise à jour avec succès',
+            'emplacement' => $emplacement,
+            'quantity_before' => $currentQty,
+            'quantity_after' => $currentQty - $quantity
+        ]);
+    }
+
     
 }

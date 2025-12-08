@@ -45,7 +45,7 @@ class DocumentController extends Controller
             ->whereNotIn('design', ['Special', '', 'special']);
 
         $required_qte = $lines->sum(fn($line) => $line->docligne?->DL_Qte ?? 0);
-        $current_qte  = $lines->sum(fn($line) => $line->docligne?->DL_QteBL ?? 0);
+        $current_qte  = $lines->sum(fn($line) => $line->docligne?->DL_QtePL ?? 0);
 
         $progress = $required_qte > 0
             ? round(($current_qte / $required_qte) * 100, 2)
@@ -130,7 +130,7 @@ class DocumentController extends Controller
                 ->whereNotIn('design', ['Special', '', 'special']);
 
             $required_qte = $lines->sum(fn($line) => $line->docligne?->DL_Qte ?? 0);
-            $current_qte  = $lines->sum(fn($line) => $line->docligne?->DL_QteBL ?? 0);
+            $current_qte  = $lines->sum(fn($line) => $line->docligne?->DL_QtePL ?? 0);
 
             $progress = $required_qte > 0
                 ? round(($current_qte / $required_qte) * 100, 2)
@@ -294,7 +294,7 @@ class DocumentController extends Controller
             'lines.article_stock',
             'lines.palettes',
 
-            'lines.docligne:DO_Domaine,DO_Type,CT_Num,DO_Piece,DL_Ligne,DL_Design,DO_Ref,DL_PieceDE,DL_PieceBC,DL_PiecePL,DL_PieceBL,DL_Qte,AR_Ref,cbMarq,Nom,Hauteur,Largeur,Profondeur,Langeur,Couleur,Chant,Episseur,Description,Poignée,Rotation,DL_QteBL',
+            'lines.docligne:DO_Domaine,DO_Type,CT_Num,DO_Piece,DL_Ligne,DL_Design,DO_Ref,DL_PieceDE,DL_PieceBC,DL_PiecePL,DL_PieceBL,DL_Qte,AR_Ref,cbMarq,Nom,Hauteur,Largeur,Profondeur,Langeur,Couleur,Chant,Episseur,Description,Poignée,Rotation,DL_QtePL',
         ]);
 
         $lines = $document->lines
@@ -302,7 +302,7 @@ class DocumentController extends Controller
             ->whereNotIn('design', ['Special', '', 'special']);
 
         $required_qte = $lines->sum(fn($line) => $line->docligne?->DL_Qte ?? 0);
-        $current_qte  = $lines->sum(fn($line) => $line->docligne?->DL_QteBL ?? 0);
+        $current_qte  = $lines->sum(fn($line) => $line->docligne?->DL_QtePL ?? 0);
 
         $progress = $required_qte > 0
             ? round(($current_qte / $required_qte) * 100, 2)
@@ -438,13 +438,13 @@ class DocumentController extends Controller
     public function livraison(Request $request)
     {
 
-        if (!$request->filled('search')) {
-            $documents = Document::whereDoesntHave('docentete')->whereNull('piece_bl')->orWhereNull('piece_fa')->get();
+        // if (!$request->filled('search')) {
+        //     $documents = Document::whereDoesntHave('docentete')->whereNull('piece_bl')->orWhereNull('piece_fa')->get();
 
-            if ($documents->isNotEmpty()) {
-                $documents->each(fn($document) => $this->convertDocument($document));
-            }
-        }
+        //     if ($documents->isNotEmpty()) {
+        //         $documents->each(fn($document) => $this->convertDocument($document));
+        //     }
+        // }
 
             $query = Docentete::with([
                 'document' => function ($q) {

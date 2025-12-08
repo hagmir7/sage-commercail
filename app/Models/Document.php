@@ -83,7 +83,7 @@ class Document extends Model
 
         foreach ($lines as $line) {
             $totalToPrepare = floatval($line->docligne->DL_Qte);
-            $totalPrepared = floatval($line->docligne->DL_QteBL);
+            $totalPrepared = floatval($line->docligne->DL_QtePL);
 
             if ($totalToPrepare != $totalPrepared) {
                 return false;
@@ -111,7 +111,7 @@ class Document extends Model
             ->get();
 
         foreach ($lines as $line) {
-            $totalPrepared = floatval($line->docligne->DL_QteBL);
+            $totalPrepared = floatval($line->docligne->DL_QtePL);
 
             if ($totalPrepared < $line->docligne->DL_Qte) {
                 return false;
