@@ -438,13 +438,13 @@ class DocumentController extends Controller
     public function livraison(Request $request)
     {
 
-        // if (!$request->filled('search')) {
-        //     $documents = Document::whereDoesntHave('docentete')->whereNull('piece_bl')->orWhereNull('piece_fa')->get();
+        if (!$request->filled('search')) {
+            $documents = Document::whereDoesntHave('docentete')->whereNull('piece_bl')->orWhereNull('piece_fa')->get();
 
-        //     if ($documents->isNotEmpty()) {
-        //         $documents->each(fn($document) => $this->convertDocument($document));
-        //     }
-        // }
+            if ($documents->isNotEmpty()) {
+                $documents->each(fn($document) => $this->convertDocument($document));
+            }
+        }
 
             $query = Docentete::with([
                 'document' => function ($q) {

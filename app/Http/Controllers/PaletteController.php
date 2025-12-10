@@ -291,19 +291,16 @@ class PaletteController extends Controller
         }
     }
 
+    // use Illuminate\Support\Facades\DB;
+
     public function confirmPalette($code, $piece)
     {
+        DB::beginTransaction(); 
+
         try {
-
-            $document = Document::with('palettes')->where('piece_fa', $piece)->first();
-
-            if (!$document) {
-                $document = Document::with('palettes')->where('piece_bl', $piece)->first();
-            }
-
-            if (!$document) {
-                $document = Document::with('palettes')->where('piece', $piece)->first();
-            }
+            $document = Document::with('palettes')->where('piece_fa', $piece)->first()
+                ?? Document::with('palettes')->where('piece_bl', $piece)->first()
+                ?? Document::with('palettes')->where('piece', $piece)->first();
 
             if (!$document) {
                 return response()->json([
@@ -314,7 +311,6 @@ class PaletteController extends Controller
 
             $palette = $document->palettes->where('code', $code)->first();
 
-
             if (!$palette) {
                 return response()->json([
                     'error' => 'Palette not found',
@@ -322,26 +318,49 @@ class PaletteController extends Controller
                 ], 404);
             }
 
+            // Update delivered date
+            $palette->update(['delivered_at' => now()]);
 
-            $palette->delivered_at = now();
-            $palette->save();
+            $emplacement = Emplacement::find('17075');
+            $stockService = new StockMovementController();
 
-
-            $allPalettesDelivered = $document->palettes && $document->palettes->count() > 0
-            ? $document->palettes->every(fn($p) => !is_null($p->delivered_at))
-            : false;
-
-
-            \Log::alert($allPalettesDelivered);
-            if ($allPalettesDelivered) {
-                $document->update([
-                    'status_id' => 14
+            foreach ($palette->lines as $line) {
+                StockMovement::create([
+                    'code_article'     => $line->article_stock->code,
+                    'designation'      => $line->article_stock->description,
+                    'emplacement_id'   => '17075',
+                    'movement_type'    => "OUT",
+                    'article_stock_id' => $line->article_stock->id,
+                    'quantity'         => $line->docligne->DL_Qte,
+                    'moved_by'         => auth()->id(),
+                    'company_id'       => auth()?->user()?->company_id ?? 1,
+                    'movement_date'    => now(),
                 ]);
+
+                // Stock Out
+                $stockService->stockOut(
+                    $emplacement,
+                    $line->article_stock,
+                    $line->docligne->DL_Qte,
+                    'Livraison'
+                );
             }
 
+            // If all palettes delivered, update document status
+            $allPalettesDelivered = $document->palettes
+                ->every(fn($p) => !is_null($p->delivered_at));
+
+            if ($allPalettesDelivered) {
+                $document->update(['status_id' => 14]);
+            }
+
+            DB::commit();
 
             return response()->json($palette);
-        } catch (\Exception $e) {
+        } catch (\Throwable $e) {
+
+            DB::rollBack();
+
             return response()->json([
                 'error' => 'An error occurred while processing the scan.',
                 'message' => $e->getMessage()
@@ -421,9 +440,13 @@ class PaletteController extends Controller
 
                 // ✅ Attach palette to line
                 $line->palettes()->attach($palette->id, ['quantity' => $request->quantity]);
+
                 $line->update(['status_id' => 8]);
 
                 $palette->load(['lines.article_stock']);
+                $palette->update([
+                    'emplacement_id' => '17075'
+                ]);
 
                 // ✅ Decrement stock if emplacement is specified
                 if ($request->emplacement) {
@@ -435,24 +458,27 @@ class PaletteController extends Controller
                         'code_article'     => $line->ref,
                         'designation'      => $article_stock->description ?? '',
                         'emplacement_id'   => $emplacement?->id,
-                        'movement_type'    => "OUT",
+                        'movement_type'    => "TRANSFER",
                         'article_stock_id' => $article_stock->id,
                         'quantity'         => floatval($request->quantity),
                         'moved_by'         => auth()->id(),
                         'company_id'       => auth()->user()->company_id,
+                        'to_company_id'    => null,
                         'movement_date'    => now(),
+                        'to_emplacement_id' => '17075'
                     ]);
 
+                    $new_emplacement = Emplacement::find(17075);
 
                     $stock_movement = new StockMovementController();
                     $stock_movement->stockOut($emplacement, $article_stock, $request->quantity);
+                    $stock_movement->stockInsert($new_emplacement, $article_stock, $request->quantity, 'Piece', null, null);
                 }else{
                     try {
                         // new ArticleStockController()->decrementQuantity($line->ref, $request->emplacement);
                     } catch (\Throwable $th) {
                         //throw $th;
-                    }
-                    
+                    }   
                 }
 
                 // ✅ Update doc line

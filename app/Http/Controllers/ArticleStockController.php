@@ -327,7 +327,7 @@ class ArticleStockController extends Controller
 
        
         $emplacements = Emplacement::whereHas('palettes.articles', function ($query) use ($article) {
-            $query->where('article_stocks.id', $article->id)->where("type", 'Stock');
+            $query->where('article_stocks.id', $article->id);
         })
             ->with([
                 'depot.company',
@@ -369,7 +369,7 @@ class ArticleStockController extends Controller
                         ->with(['articles' => fn($a) => $a->where('article_stocks.id', $article->id)]);
                 }
             ])
-            ->orderBy('id', 'ASC') //🔹 first emplacement
+            ->orderBy('id', 'ASC')
             ->first();
 
         if (!$emplacement) {
@@ -377,7 +377,7 @@ class ArticleStockController extends Controller
         }
 
         // 3) Find article in the palette (pivot row which contains quantity)
-        $palette = $emplacement->palettes->first(); // first palette
+        $palette = $emplacement->palettes->first();
         $paletteArticle = $palette->articles()->where('article_stocks.id', $article->id)->first();
 
         if (!$paletteArticle) {

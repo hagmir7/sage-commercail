@@ -15,8 +15,6 @@ use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Validator;
 use Maatwebsite\Excel\Facades\Excel;
 
-// use App\Models\Palette;
-
 
 class StockMovementController extends Controller
 {
@@ -95,7 +93,7 @@ class StockMovementController extends Controller
             return response()->json(['error' => 'Invalid types provided'], 422);
         }
 
-        $movements = StockMovement::with(['movedBy:id,full_name', 'emplacement:id,code','to_emplacement:id,code', 'to_company'])
+        $movements = StockMovement::with(['movedBy:id,full_name', 'emplacement:id,code', 'to_emplacement:id,code', 'to_company'])
             ->when($types, fn($q) => $q->whereIn('movement_type', $types));
 
         if (!auth()->user()->hasRole('admin') && !auth()->user()->hasRole('supper_admin')) {
@@ -278,7 +276,9 @@ class StockMovementController extends Controller
 
                 // ✅ Handle palettes
                 if ($request->type_colis === "Palette") {
+
                     for ($i = 1; $i <= intval($request->quantity); $i++) {
+
                         $palette = Palette::create([
                             "code"           => $this->generatePaletteCode(),
                             "emplacement_id" => $emplacement->id,
@@ -286,27 +286,36 @@ class StockMovementController extends Controller
                             "user_id"        => auth()->id(),
                             "type"           => "Stock",
                         ]);
-                        $article->palettes()->attach($palette->id, ['quantity' => floatval($conditionMultiplier)]);
+
+                        // attach article to new palette
+                        $palette->articles()->attach($article->id, [
+                            'quantity' => floatval($conditionMultiplier)
+                        ]);
                     }
                 } else {
-                    // One palette per emplacement
+
+                    // Find or create ONE palette for this emplacement
                     $palette = Palette::firstOrCreate(
-                        ["emplacement_id" => $emplacement->id],
+                        ["emplacement_id" => $emplacement->id, "type" => "Stock"],
                         [
                             "code"       => $this->generatePaletteCode(),
                             "company_id" => $companyId,
-                            "user_id"    => auth()->id(),
-                            "type"       => "Stock"
+                            "user_id"    => auth()->id()
                         ]
                     );
 
-                    if ($article->palettes()->where('palette_id', $palette->id)->exists()) {
-                        $article->palettes()->updateExistingPivot(
-                            $palette->id,
-                            ['quantity' => DB::raw('quantity + ' . (int) $qte_value)]
+                    // check article exist inside palette
+                    $existing = $palette->articles()->where('article_stock_id', $article->id)->first();
+
+                    if ($existing) {
+                        // UPDATE correctly
+                        $palette->articles()->updateExistingPivot(
+                            $article->id,
+                            ['quantity' => DB::raw('quantity + ' . $qte_value)]
                         );
                     } else {
-                        $article->palettes()->attach($palette->id, ['quantity' => $qte_value]);
+                        // INSERT normally
+                        $palette->articles()->attach($article->id, ['quantity' => $qte_value]);
                     }
                 }
             });
@@ -482,7 +491,7 @@ class StockMovementController extends Controller
                 $this->stockOut($emplacement, $article, $qte_value);
 
 
-                if(!empty($request->second_emplacement_code)){
+                if (!empty($request->second_emplacement_code)) {
                     $second_emplacement = Emplacement::where('code', $request->second_emplacement_code)->first();
                     $this->stockInsert($second_emplacement, $article, $qte_value, $conditionMultiplier, $request->type_colise, $request->quantity);
                 }
@@ -567,10 +576,11 @@ class StockMovementController extends Controller
     }
 
 
-    public function stockOut($emplacement, $article, $qte_value)
+    public function stockOut($emplacement, $article, $qte_value, $type=null)
     {
         // 1️⃣ Get all palettes in this emplacement that have this article
         $palettes = Palette::where('emplacement_id', $emplacement->id)
+            ->where('type', $type ? $type : 'Stock')
             ->whereHas('articles', function ($q) use ($article) {
                 $q->where('article_stocks.id', $article->id);
             })
@@ -580,7 +590,8 @@ class StockMovementController extends Controller
             ->lockForUpdate()
             ->get();
 
-        if ($palettes->isEmpty()) {
+        if ($palettes->isEmpty() && $type == 'Stock') {
+            \Log::alert($emplacement);
             throw new \Exception("Article non trouvé dans cet emplacement.");
         }
 
