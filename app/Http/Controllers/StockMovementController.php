@@ -591,7 +591,6 @@ class StockMovementController extends Controller
             ->get();
 
         if ($palettes->isEmpty() && $type == 'Stock') {
-            \Log::alert($emplacement);
             throw new \Exception("Article non trouvé dans cet emplacement.");
         }
 
