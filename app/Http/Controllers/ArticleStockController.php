@@ -333,6 +333,7 @@ class ArticleStockController extends Controller
                 'depot.company',
                 'palettes' => function ($q) use ($article) {
                     $q->whereHas('articles', fn($a) => $a->where('article_stocks.id', $article->id))
+                        ->where('type', 'Stock')
                         ->with([
                             'articles' => fn($a) => $a->where('article_stocks.id', $article->id)
                         ]);
