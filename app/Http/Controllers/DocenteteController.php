@@ -330,6 +330,8 @@ class DocenteteController extends Controller
                     'validated_by' => auth()->id(),
                     'controlled_by' => $document->controlled_by,
                     'client_id' => $document->client_id,
+                    'created_at' => now(),
+                    'updated_at' => now(),
                 ]
             );
 

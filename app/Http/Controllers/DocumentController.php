@@ -101,7 +101,7 @@ class DocumentController extends Controller
         $documents = Document::with(['status', 'lines.palettes'])
             ->whereHas('docentete')
             ->withCount('lines')
-            ->orderByDesc('updated_at');
+            ->orderByDesc('id');
 
 
         // Searche
@@ -115,12 +115,25 @@ class DocumentController extends Controller
         }
 
         // Date filtter
-        if ($request->dates) {
-            $date_array = explode(',', $request->dates);
-            $start_date = DateTime::createFromFormat('d/m/Y', trim($date_array[0]))->format('Y-m-d');
-            $end_date = DateTime::createFromFormat('d/m/Y', trim($date_array[1]))->format('Y-m-d');
-            $documents->whereBetween('created_at', [$start_date, $end_date]);
-        }
+        // if ($request->dates) {
+        //     $date_array = explode(',', $request->dates);
+        //     $start_date = DateTime::createFromFormat('d/m/Y', trim($date_array[0]))->format('Y-m-d');
+        //     $end_date = DateTime::createFromFormat('d/m/Y', trim($date_array[1]))->format('Y-m-d');
+        //     $documents->whereBetween('created_at', [$start_date, $end_date]);
+        // }
+
+    if ($request->filled('dates')) {
+
+        $dates = explode(',', $request->dates);
+        $start = Carbon::parse(urldecode($dates[0]))->startOfDay();
+        $end = Carbon::parse(urldecode($dates[1] ?? $dates[0]))->endOfDay();
+
+        $documents->where(function ($query) use ($start, $end) {
+            $query->whereDate('created_at', '>=', $start)
+                ->whereDate('created_at', '<=', $end);
+        });
+    }
+
 
 
         $documents = $documents->get()->map(function ($document) {
