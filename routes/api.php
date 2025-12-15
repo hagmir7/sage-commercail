@@ -48,6 +48,9 @@ Route::get('/user', function (Request $request) {
 
 
 
+
+
+
 Route::post('import-movements', function (Request $request) {
     $request->validate([
         'file' => 'required|mimes:xlsx,csv,xls'
@@ -161,6 +164,7 @@ Route::middleware('auth:sanctum')->group(function () {
 
 
     Route::prefix('emplacement')->controller(EmplacementController::class)->group(function () {
+        Route::get('{code}/articles', 'articles');
         Route::post('create', 'create');
         Route::get('{emplacement:code}/inventory/{inventory}', 'showForInventory');
         Route::post('{depot}/import', 'import');

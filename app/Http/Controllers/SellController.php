@@ -87,30 +87,32 @@ class SellController extends Controller
                 $DO_Date = $this->createDocumentFromTemplate($sourcePiece, $DO_Piece, $total, $companyCode);
 
                 foreach ($companyLines as $line) {
+                    // \Log::alert($line->AR_Ref);
+                    if ($line->AR_Ref != 'TF') {
+                        $newDL_No = $this->createDocumentLineFromTemplate(
+                            $line->DL_No,
+                            $DO_Piece,
+                            $DO_Date,
+                            floatval($line->DL_QteBL),
+                            $companyCode,
+                            $sourcePiece
+                        );
 
-                    $newDL_No = $this->createDocumentLineFromTemplate(
-                        $line->DL_No,
-                        $DO_Piece,
-                        $DO_Date,
-                        floatval($line->DL_QteBL),
-                        $companyCode,
-                        $sourcePiece
-                    );
-
-                    DB::table('F_DOCLIGNEEMPL')->insert([
-                        'DL_No'             => $newDL_No,
-                        'DP_No'             => 1,
-                        'DL_Qte'            => $line->DL_Qte,
-                        'DL_QteAControler'  => 0,
-                        'cbCreationUser'    => self::CB_CREATION_USER,
-                    ]);
-
-                    // Update stock
-                    DB::table('F_ARTSTOCK')
-                        ->where('AR_Ref', $line->AR_Ref)
-                        ->update([
-                            'AS_QteSto' => DB::raw("AS_QteSto + " . floatval($line->DL_Qte))
+                        DB::table('F_DOCLIGNEEMPL')->insert([
+                            'DL_No'             => $newDL_No,
+                            'DP_No'             => 1,
+                            'DL_Qte'            => $line->DL_Qte,
+                            'DL_QteAControler'  => 0,
+                            'cbCreationUser'    => self::CB_CREATION_USER,
                         ]);
+
+                        // Update stock
+                        DB::table('F_ARTSTOCK')
+                            ->where('AR_Ref', $line->AR_Ref)
+                            ->update([
+                                'AS_QteSto' => DB::raw("AS_QteSto + " . floatval($line->DL_Qte))
+                            ]);
+                    }
                 }
             }
             DB::commit();

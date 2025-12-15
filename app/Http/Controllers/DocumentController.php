@@ -621,7 +621,7 @@ class DocumentController extends Controller
             ->whereHas('docentete')
             ->when($request->filled('type'), function ($q) use ($request) {
                 if ($request->type == 1) {
-                    $q->where('piece', 'like', '%PL%');
+                    $q->where('piece', 'like', '%BC%');
                 } elseif ($request->type == 2) {
                     $q->where(function ($q2) {
                         $q2->where('piece_bl', 'like', '%BL%')

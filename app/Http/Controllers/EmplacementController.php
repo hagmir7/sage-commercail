@@ -50,6 +50,18 @@ class EmplacementController extends Controller
         return response()->json(['message' => "Added successfully"]);
     }
 
+        public function articles($code)
+        {
+            return Emplacement::where('code', $code)
+                ->with([
+                    'palettes' => function ($q) {
+                        $q->select('id', 'code', 'emplacement_id')
+                        ->where('type', 'Stock')
+                        ->with('articles:id,code,description,name,color,quantity,thickness,height,width,depth');
+                    }
+                ])
+                ->firstOrFail();
+        }
 
     public function delete(Emplacement $emplacement)
     {
