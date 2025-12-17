@@ -634,6 +634,8 @@ class StockMovementController extends Controller
                         $this->stockOut($emplacement, $article, $stock_movement->quantity);
                     }elseif($stock_movement->movement_type == "OUT"){
                         $this->stockInsert($emplacement, $article, $stock_movement->quantity, false, false, 0);
+                    }elseif($stock_movement->movement_type == "RETURN"){
+                        $this->stockOut($emplacement, $article, $stock_movement->quantity);
                     }
                     $stock_movement->delete();
                 } else {
