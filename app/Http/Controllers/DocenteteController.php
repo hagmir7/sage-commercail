@@ -35,7 +35,6 @@ class DocenteteController extends Controller
 
             $common = array_intersect($user_roles->toArray(), ['fabrication', 'montage', 'preparation_cuisine', 'preparation_trailer', 'magasinier']);
             if (!empty($common)) {
-
                 $line = $query->whereIn("role_id", $user_roles->keys());
             }
             return $line;
@@ -168,10 +167,18 @@ class DocenteteController extends Controller
                 'DO_DateLivr',
                 'DO_Expedit'
             ])
-            ->orderByDesc("cbCreation")
+            ->orderByDesc('cbCreation')
             ->where('DO_Domaine', 0)
             ->where('DO_Statut', 1)
-            ->where('DO_Type', $request->type ?? 1);
+            ->where(function($q) {
+                // Type 1 is always included
+                $q->where('DO_Type', 1)
+                // Type 2 only if it has a document
+                ->orWhere(function($sub) {
+                    $sub->where('DO_Type', 2)
+                        ->whereHas('document'); // ensures related document exists
+                });
+            });
 
         $query->with('document.status');
 
@@ -293,7 +300,7 @@ class DocenteteController extends Controller
         }
 
         $invalidQte = $lines->first(function ($line) {
-            $qte = (float) ($line->docligne->DL_QtePL ?? 0);
+            $qte = (float) ($line->docligne->DL_QteBL ?? 0);
             return $qte <= 0;
         });
 
@@ -340,10 +347,10 @@ class DocenteteController extends Controller
             foreach ($lines as $line) {
 
                 $line->update([
-                    'quantity_prepare' => floatval($line->docligne->DL_QtePL),
+                    'quantity_prepare' => floatval($line->docligne->DL_QteBL),
                 ]);
 
-                if (floatval($line->docligne->DL_Qte) == floatval($line->docligne->DL_QtePL)) {
+                if (floatval($line->docligne->DL_Qte) == floatval($line->docligne->DL_QteBL)) {
 
                     $line->update([
                         'status_id' => 11,
@@ -539,11 +546,11 @@ class DocenteteController extends Controller
             'line.status',
             'line.roleQuantity',
             'stock' => function ($query) {
-                $query->select('code', 'qte_inter', 'qte_serie');
+                $query->select('code', 'qte_inter', 'qte_serie', 'code_supplier');
             }
         ])
 
-            ->select("DO_Piece", "AR_Ref", 'DL_Design', 'DL_Qte', "Nom", "Hauteur", "Largeur", "Profondeur", "Langeur", "Couleur", "Chant", "Episseur", "cbMarq", "DL_Ligne", 'Description', "Poignée as Poignee", "Rotation", 'DL_QtePL', 'EU_Qte')
+            ->select("DO_Piece", "AR_Ref", 'DL_Design', 'DL_Qte', "Nom", "Hauteur", "Largeur", "Profondeur", "Langeur", "Couleur", "Chant", "Episseur", "cbMarq", "DL_Ligne", 'Description', "Poignée as Poignee", "Rotation", 'DL_QteBL', 'EU_Qte')
             ->OrderBy("DL_Ligne")
             ->where('DO_Piece', $id);
 
@@ -554,11 +561,11 @@ class DocenteteController extends Controller
             if ($docentete->DO_Reliquat == "1") {
                 foreach ($docligneQuery->get() as $docligne) {
                     $prepared = (float) ($docligne->line->quantity_prepare ?? 0);
-                    $delivered = (float) ($docligne->DL_QtePL ?? 0);
+                    $delivered = (float) ($docligne->DL_QteBL ?? 0);
 
                     if ($prepared > 0) {
                         $docligne->update([
-                            "DL_QtePL" => max(0, $delivered - $prepared)
+                            "DL_QteBL" => max(0, $delivered - $prepared)
                         ]);
 
                         $line = $docligne->line;
@@ -762,106 +769,104 @@ class DocenteteController extends Controller
 
 
     // Transfer to Company controller (Adill)
-    public function transferCompany($request)
-    {
-        DB::beginTransaction();
+public function transferCompany($request)
+{
+    DB::beginTransaction();
 
-        try {
-            $docligne = Docligne::where('cbMarq', $request->lines[0])->first();
+    try {
+        // Get document header with validation
+        $docligne = Docligne::with('docentete')->findOrFail($request->lines[0]);
+        $docentete = $docligne->docentete ?? throw new \Exception('Document header not found');
 
-            if (!$docligne || !$docligne->docentete) {
-                throw new \Exception('Invalid document line or header');
-            }
+        // Get or create document
+        $document = Document::where('docentete_id', $docentete->cbMarq)->first();
+        
+        if (!$document) {
+            // Generate piece only if DO_Piece contains 'BC', otherwise use DO_Piece as is
+            $piece = str_contains($docentete->DO_Piece, 'BC') 
+                ? $this->generatePiece(2, $docentete->DO_Souche)
+                : $docentete->DO_Piece;
 
-            $docentete = Docentete::where('cbMarq', intval($docligne->docentete->cbMarq))->first();
+            $document = Document::create([
+                'docentete_id' => $docentete->cbMarq,
+                'piece' => $piece,
+                'type' => $docentete->Type,
+                'transfer_by' => auth()->id(),
+                'ref' => $docentete->DO_Ref,
+                'client_id' => $docentete->DO_Tiers,
+                'expedition' => $docentete->DO_Expedit,
+            ]);
+        }
 
-            if (!$docentete) {
-                throw new \Exception('Docentete not found');
-            }
+        // Attach company if needed
+        $document->companies()->syncWithoutDetaching([
+            $request->company => [
+                'status_id' => 1,
+                'updated_at' => now(),
+                'printed' => false
+            ]
+        ]);
 
-            $document = Document::firstOrCreate(
-                ['docentete_id' => $docentete->cbMarq],
+        // Load all lines and articles efficiently
+        $doclignes = Docligne::with('article')->whereIn('cbMarq', $request->lines)->get();
+        $articles = ArticleStock::whereIn('code', $doclignes->pluck('AR_Ref')->filter())->get()->keyBy('code');
+
+        // Process lines
+        foreach ($doclignes as $line) {
+            $line->update(['DL_QteBL' => 0]);
+
+            if (!$line->AR_Ref) continue;
+
+            $article = $articles->get($line->AR_Ref);
+            
+            Line::firstOrCreate(
+                ['docligne_id' => $line->cbMarq],
                 [
-                    'piece' => $docentete->DO_Piece,
-                    'type' => $docentete->Type,
-                    'transfer_by' => auth()->id(),
-                    'ref' => $docentete->DO_Ref,
-                    'client_id' => $docentete->DO_Tiers,
-                    'expedition' => $docentete->DO_Expedit,
-                    'validated_by' => null,
+                    'tiers' => $line->CT_Num,
+                    'name' => $line->Nom ?: trim(implode(' ', array_filter([
+                        $line->article?->Nom,
+                        $line->article?->Couleur,
+                        $line->Description
+                    ]))),
+                    'ref' => $line->AR_Ref,
+                    'design' => $line->DL_Design,
+                    'quantity' => $line->DL_Qte,
+                    'dimensions' => $this->generateLineDimensions($line),
+                    'company_id' => $request->company,
+                    'first_company_id' => $request->company,
+                    'document_id' => $document->id,
+                    'company_code' => $article?->company_code
                 ]
             );
-
-            if (!$document->companies()->where('company_id', $request->company)->exists()) {
-                $document->companies()->attach($request->company, [
-                    'status_id' => 1,
-                    'updated_at' => now(),
-                    'printed' => false
-                ]);
-            }
-
-            $lines = [];
-
-            foreach ($request->lines as $lineId) {
-                $currentDocligne = Docligne::where('cbMarq', $lineId)->first();
-
-                if (!$currentDocligne) {
-                    throw new \Exception("Invalid line: {$lineId}");
-                }
-
-                // Reset quantity
-                $currentDocligne->DL_QtePL = 0;
-                $currentDocligne->save();
-
-                $article = ArticleStock::where('code', $currentDocligne->AR_Ref)->first();
-
-                if (!$article) {
-                    \Log::alert("No article with this Ref " . $currentDocligne->AR_Ref);
-                }
-
-                if ($currentDocligne->AR_Ref != null) {
-                    $line = Line::firstOrCreate(
-                        ['docligne_id' => $currentDocligne->cbMarq],
-                        [
-                            'docligne_id' => $currentDocligne->cbMarq,
-                            'tiers' => $currentDocligne->CT_Num,
-                            'name' => $currentDocligne->Nom ?: ($currentDocligne?->article?->Nom ?? null) . ' ' . $currentDocligne?->article?->Couleur  . ' ' . $currentDocligne?->Description,
-                            'ref' => $currentDocligne->AR_Ref,
-                            'design' => $currentDocligne->DL_Design,
-                            'quantity' => $currentDocligne->DL_Qte,
-                            'dimensions' => $this->generateLineDimensions($currentDocligne),
-                            'company_id' => $request->company,
-                            'first_company_id'  => $request->company,
-                            'document_id' => $document->id,
-                            'company_code' => $article?->company_code ?? null
-                        ]
-                    );
-
-                    $lines[] = $line;
-                }
-            }
-
-            DB::commit();
-
-            return response()->json([
-                'status'  => 'success',
-                'message' => 'Document transferred successfully',
-            ], 200);
-        } catch (\Exception $e) {
-            DB::rollBack();
-
-            if (str_contains($e->getMessage(), "Cet élément est en cours d'utilisation")) {
-
-                return response()->json([
-                    'status' => 'error',
-                    'message' => "Ce document est actuellement ouvert dans Sage. 
-                               Fermez-le et réessayez."
-                ], 409);
-            }
-
-            // throw $e;
         }
+
+        // Update piece only if document was just created AND DO_Piece contains 'BC'
+        if ($document->wasRecentlyCreated && str_contains($docentete->DO_Piece, 'BC')) {
+            DB::statement('EXEC Update_DO_Piece ?, ?, ?', [$docentete->DO_Piece, $document->piece, 2]);
+        }
+
+        DB::commit();
+
+        return response()->json([
+            'status' => 'success',
+            'piece' => $document->piece,
+            'message' => 'Document transferred successfully',
+        ]);
+
+    } catch (\Exception $e) {
+        DB::rollBack();
+        \Log::error('Transfer failed: ' . $e->getMessage());
+
+        if (str_contains($e->getMessage(), "Cet élément est en cours d'utilisation")) {
+            return response()->json([
+                'status' => 'error',
+                'message' => "Ce document est actuellement ouvert dans Sage. Fermez-le et réessayez."
+            ], 409);
+        }
+
+        return response()->json(['status' => 'error', 'message' => 'Transfer failed'], 500);
     }
+}
 
 
     // Transfer funciton controller
@@ -1070,7 +1075,7 @@ class DocenteteController extends Controller
         return response()->json($results);
     }
 
-    public function generatePiece($piece, $souche): string
+    public function generatePieceForDuplication($piece, $souche): string
     {
         return DB::transaction(function () use ($souche, $piece) {
             $cbMarq = null;
@@ -1110,10 +1115,44 @@ class DocenteteController extends Controller
     }
 
 
+    public function generatePiece(string $type, string $souche): string
+    {
+        return DB::transaction(function () use ($type, $souche) {
+            $result = DB::selectOne(
+                "SELECT TOP 1 * 
+                FROM F_DOCCURRENTPIECE WITH (UPDLOCK, HOLDLOCK) 
+                WHERE DC_IdCol = ? AND DC_Souche = ?",
+                [$type, $souche]
+            );
+
+            $currentPiece = $result?->DC_Piece ?? '26PL000001';
+
+            if (preg_match('/^([A-Z0-9]+?)(\d+)$/', $currentPiece, $matches)) {
+                $prefix = $matches[1];
+                $number = (int)$matches[2];
+                $nextNumber = $number + 1;
+                $newPiece = $prefix . str_pad($nextNumber, strlen($matches[2]), '0', STR_PAD_LEFT);
+            } else {
+                $newPiece = '26PL000001';
+            }
+
+            DB::update(
+                "UPDATE F_DOCCURRENTPIECE 
+                SET DC_Piece = ? 
+                WHERE DC_IdCol = ? AND DC_Souche = ?",
+                [$newPiece, $type, $souche]
+            );
+
+    
+            return $newPiece;
+        });
+    }
+
+
+
     public function duplicate($piece, Request $request)
     {
         try {
-
             $souche = $request->souche === 'Souche A' ? 0 : 1;
 
             $docentete = Docentete::where('DO_Piece', $piece)->firstOrFail();
@@ -1137,7 +1176,7 @@ class DocenteteController extends Controller
 
 
   
-            $new_piece = $this->generatePiece($piece, $souche);
+            $new_piece = $this->generatePieceForDuplication($piece, $souche);
 
             $docentete->update([
                 'DO_Piece'  => $new_piece,

@@ -223,7 +223,7 @@ class PaletteController extends Controller
                 ->whereIn('status_id', [7, 8])
                 ->whereIn('role_id', auth()->user()->roles()->pluck('id')->toArray())
                 ->whereHas('docligne', function ($query) {
-                    $query->whereColumn('DL_Qte', '>', 'DL_QtePL');
+                    $query->whereColumn('DL_Qte', '>', 'DL_QteBL');
                 });
 
             if (!$request->has('all') || $request->all !== 'true') {
@@ -385,7 +385,7 @@ class PaletteController extends Controller
 
         foreach ($lines as $line) {
 
-            if (floatval($line->docligne->DL_QtePL) < floatval($line->docligne->DL_Qte)) {
+            if (floatval($line->docligne->DL_QteBL) < floatval($line->docligne->DL_Qte)) {
                 return false;
             }
         }
@@ -430,7 +430,7 @@ class PaletteController extends Controller
             DB::transaction(function () use ($document, $request, $line, $palette) {
 
                 // ✅ Check line qty validity
-                if (floatval($line?->docligne?->DL_Qte) < ($line?->docligne?->DL_QtePL + floatval($request->quantity))) {
+                if (floatval($line?->docligne?->DL_Qte) < ($line?->docligne?->DL_QteBL + floatval($request->quantity))) {
                     throw new \Exception("La quantité n'est pas valide", 422);
                 }
 
@@ -482,7 +482,7 @@ class PaletteController extends Controller
                 }
 
                 // ✅ Update doc line
-                Docligne::where('cbMarq', $line->docligne_id)->increment('DL_QtePL', floatval($request->quantity));
+                Docligne::where('cbMarq', $line->docligne_id)->increment('DL_QteBL', floatval($request->quantity));
 
                 // ✅ Document status
                 if ($document->validation()) {
@@ -759,7 +759,7 @@ class PaletteController extends Controller
                     // Decrement docligne quantity
                     if ($line->docligne) {
                         $line->docligne->update([
-                            'DL_QtePL' => floatval($line->docligne->DL_QtePL) - $pivot->quantity
+                            'DL_QteBL' => floatval($line->docligne->DL_QteBL) - $pivot->quantity
                         ]);
                     }
 

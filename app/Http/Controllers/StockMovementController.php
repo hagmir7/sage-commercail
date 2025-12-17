@@ -623,6 +623,41 @@ class StockMovementController extends Controller
         }
     }
 
+    public function deleteMovement(StockMovement $stock_movement)
+    {
+        try {
+            DB::transaction(function () use ($stock_movement) {
+                $emplacement = Emplacement::find($stock_movement->emplacement_id);
+                $article = ArticleStock::find($stock_movement->article_stock_id);
+                if ($stock_movement) {
+                    if($stock_movement->movement_type == "IN"){
+                        $this->stockOut($emplacement, $article, $stock_movement->quantity);
+                    }elseif($stock_movement->movement_type == "OUT"){
+                        $this->stockInsert($emplacement, $article, $stock_movement->quantity, false, false, 0);
+                    }
+                    $stock_movement->delete();
+                } else {
+                    throw new \Exception('Article introuvable en stock : ' . $stock_movement->code_article);
+                }
+            });
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Mouvement supprimé avec succès',
+                'data' => [
+                    'movement_id' => $stock_movement->id,
+                    'code_article' => $stock_movement->code_article
+                ]
+            ], 200);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => $e->getMessage(),
+                'error' => $e->getMessage()
+            ], 400);
+        }
+    }
+
 
     public function exportMovements(Request $request)
     {

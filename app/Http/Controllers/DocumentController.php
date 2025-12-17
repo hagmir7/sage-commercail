@@ -16,7 +16,7 @@ class DocumentController extends Controller
 {
     public function checkControlled($piece)
     {
-        $document = Document::with('palettes')->where('piece', $piece)->first();
+        $document = Document::with('palettes')->whereHas('piece', $piece)->first();
         if (!$document) {
             return response()->json(['error' => "Document not found!"], 404);
         }
@@ -45,7 +45,7 @@ class DocumentController extends Controller
             ->whereNotIn('design', ['Special', '', 'special']);
 
         $required_qte = $lines->sum(fn($line) => $line->docligne?->DL_Qte ?? 0);
-        $current_qte  = $lines->sum(fn($line) => $line->docligne?->DL_QtePL ?? 0);
+        $current_qte  = $lines->sum(fn($line) => $line->docligne?->DL_QteBL ?? 0);
 
         $progress = $required_qte > 0
             ? round(($current_qte / $required_qte) * 100, 2)
@@ -143,7 +143,7 @@ class DocumentController extends Controller
                 ->whereNotIn('design', ['Special', '', 'special']);
 
             $required_qte = $lines->sum(fn($line) => $line->docligne?->DL_Qte ?? 0);
-            $current_qte  = $lines->sum(fn($line) => $line->docligne?->DL_QtePL ?? 0);
+            $current_qte  = $lines->sum(fn($line) => $line->docligne?->DL_QteBL ?? 0);
 
             $progress = $required_qte > 0
                 ? round(($current_qte / $required_qte) * 100, 2)
@@ -231,12 +231,12 @@ class DocumentController extends Controller
 
         $query = Document::with([
             'companies',
-            'docentete:cbMarq,DO_Date,DO_DateLivr,DO_Reliquat'
+            'docentete:cbMarq,DO_Date,DO_DateLivr,DO_Reliquat,DO_Piece'
         ])
             ->whereHas('docentete', function ($query) {
                 $query->where('DO_Domaine', 0)
                     ->where('DO_Statut', 1)
-                    ->where('DO_Type', 1);
+                    ->whereIn('DO_Type', [1,2]);
             })
             ->whereHas('lines', function ($q) use ($user_roles) {
                 $q->where('company_id', auth()->user()->company_id);
@@ -307,7 +307,7 @@ class DocumentController extends Controller
             'lines.article_stock',
             'lines.palettes',
 
-            'lines.docligne:DO_Domaine,DO_Type,CT_Num,DO_Piece,DL_Ligne,DL_Design,DO_Ref,DL_PieceDE,DL_PieceBC,DL_PiecePL,DL_PieceBL,DL_Qte,AR_Ref,cbMarq,Nom,Hauteur,Largeur,Profondeur,Langeur,Couleur,Chant,Episseur,Description,Poignée,Rotation,DL_QtePL',
+            'lines.docligne:DO_Domaine,DO_Type,CT_Num,DO_Piece,DL_Ligne,DL_Design,DO_Ref,DL_PieceDE,DL_PieceBC,DL_PiecePL,DL_PieceBL,DL_Qte,AR_Ref,cbMarq,Nom,Hauteur,Largeur,Profondeur,Langeur,Couleur,Chant,Episseur,Description,Poignée,Rotation,DL_QteBL',
         ]);
 
         $lines = $document->lines
@@ -315,7 +315,7 @@ class DocumentController extends Controller
             ->whereNotIn('design', ['Special', '', 'special']);
 
         $required_qte = $lines->sum(fn($line) => $line->docligne?->DL_Qte ?? 0);
-        $current_qte  = $lines->sum(fn($line) => $line->docligne?->DL_QtePL ?? 0);
+        $current_qte  = $lines->sum(fn($line) => $line->docligne?->DL_QteBL ?? 0);
 
         $progress = $required_qte > 0
             ? round(($current_qte / $required_qte) * 100, 2)

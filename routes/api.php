@@ -231,6 +231,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('movements', 'listGeneral');
         Route::get('movements/export', 'exportMovements');
         Route::get('movements/{company}', 'list');
+        Route::delete('movements/delete/{stock_movement}', 'deleteMovement');
         Route::put('movements/update/{stock_movement}', 'update');
        
     });

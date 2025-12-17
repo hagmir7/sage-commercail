@@ -28,7 +28,7 @@ class Document extends Model
 
     // const CREATED_AT = 'created_at';
     // const UPDATED_AT = 'updated_at';
-     public $timestamps = false;
+    //  public $timestamps = false;
 
 
     // Relations
@@ -83,7 +83,7 @@ class Document extends Model
 
         foreach ($lines as $line) {
             $totalToPrepare = floatval($line->docligne->DL_Qte);
-            $totalPrepared = floatval($line->docligne->DL_QtePL);
+            $totalPrepared = floatval($line->docligne->DL_QteBL);
 
             if ($totalToPrepare != $totalPrepared) {
                 return false;
@@ -111,7 +111,7 @@ class Document extends Model
             ->get();
 
         foreach ($lines as $line) {
-            $totalPrepared = floatval($line->docligne->DL_QtePL);
+            $totalPrepared = floatval($line->docligne->DL_QteBL);
 
             if ($totalPrepared < $line->docligne->DL_Qte) {
                 return false;
