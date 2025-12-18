@@ -47,7 +47,7 @@ class ArticleStockController extends Controller
 
 
         // Map stock quantity for each article
-        $articles->getCollection()->transform(function ($article) use($company) {
+        $articles->getCollection()->transform(function ($article) use ($company) {
             $article->stock_prepare = $this->calculateStockPreparation($article->code);
             $article->stock_prepartion = $this->calculateZoonPrepartion($article->code);
             $article->stock = $this->calculateStock($article->code, $company);
@@ -137,10 +137,10 @@ class ArticleStockController extends Controller
     public function store(Request $request)
     {
 
-        if(!auth()->user()->hasRole('admin')){
+        if (!auth()->user()->hasRole('admin')) {
             return response()->json(['message' => "Vous n'êtes pas authentifié ⚠️"], 402);
         }
-        
+
         $validator = Validator::make($request->all(), [
             'code' => 'required|string|max:100',
             'description' => 'nullable|string|max:255',
@@ -224,10 +224,10 @@ class ArticleStockController extends Controller
 
     public function update(Request $request, ArticleStock $article_stock)
     {
-        if(!auth()->user()->hasRole('admin')){
+        if (!auth()->user()->hasRole('admin')) {
             return response()->json(['message' => "Vous n'êtes pas authentifié ⚠️"], 402);
         }
-        
+
 
 
         $validator = Validator::make($request->all(), [
@@ -325,7 +325,7 @@ class ArticleStockController extends Controller
             return response()->json(['message' => 'Article introuvable.'], 404);
         }
 
-       
+
         $emplacements = Emplacement::whereHas('palettes.articles', function ($query) use ($article) {
             $query->where('article_stocks.id', $article->id);
         })
@@ -404,5 +404,19 @@ class ArticleStockController extends Controller
         ]);
     }
 
-    
+    public function search(Request $request)
+    {
+        $query = $request->input('q');
+
+        $articles = ArticleStock::select('code', 'description')
+            ->when($query, function ($q) use ($query) {
+                $q->where(function ($subQuery) use ($query) {
+                    $subQuery->where('code', 'like', $query . '%')
+                        ->orWhere('description', 'like', '%' . $query . '%');
+                });
+            })
+            ->paginate(100);
+
+        return response()->json($articles);
+    }
 }

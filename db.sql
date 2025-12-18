@@ -174,7 +174,7 @@ INSERT INTO F_DOCLIGNE (
     DL_Taxe2, DL_TypeTaux2, DL_TypeTaxe2,
     CO_No, AG_No1, AG_No2,
     DL_PrixRU, DL_CMUP, DL_MvtStock, DT_No, AF_RefFourniss,
-    EU_Enumere, EU_Qte, DL_TTC, DE_No,  DL_TypePL,
+    EU_Enumere,EU_Qte, DL_TTC, DE_No,  DL_TypePL,
     DL_PUDevise, DL_PUTTC, DL_No, DO_DateLivr, CA_Num,
     DL_Taxe3, DL_TypeTaux3, DL_TypeTaxe3, DL_Frais, DL_Valorise,
     AR_RefCompose, AC_RefClient,

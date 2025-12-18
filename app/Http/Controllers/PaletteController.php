@@ -223,7 +223,7 @@ class PaletteController extends Controller
                 ->whereIn('status_id', [7, 8])
                 ->whereIn('role_id', auth()->user()->roles()->pluck('id')->toArray())
                 ->whereHas('docligne', function ($query) {
-                    $query->whereColumn('DL_Qte', '>', 'DL_QteBL');
+                    $query->whereColumn('EU_Qte', '>', 'DL_QteBL');
                 });
 
             if (!$request->has('all') || $request->all !== 'true') {
@@ -385,7 +385,7 @@ class PaletteController extends Controller
 
         foreach ($lines as $line) {
 
-            if (floatval($line->docligne->DL_QteBL) < floatval($line->docligne->DL_Qte)) {
+            if (floatval($line->docligne->DL_QteBL) < floatval($line->docligne->EU_Qte)) {
                 return false;
             }
         }
@@ -400,6 +400,21 @@ class PaletteController extends Controller
         }
 
         return true;
+    }
+
+
+
+    function parseCT($value)
+    {
+        if (str_contains($value, 'CT')) {
+            return (float) str_replace('CT', '', $value);
+        }
+
+        if (is_numeric($value)) {
+            return 1;
+        }
+
+        return null;
     }
 
 
@@ -430,7 +445,7 @@ class PaletteController extends Controller
             DB::transaction(function () use ($document, $request, $line, $palette) {
 
                 // ✅ Check line qty validity
-                if (floatval($line?->docligne?->DL_Qte) < ($line?->docligne?->DL_QteBL + floatval($request->quantity))) {
+                if (floatval($line?->docligne?->EU_Qte) < ($line?->docligne?->DL_QteBL + floatval($request->quantity))) {
                     throw new \Exception("La quantité n'est pas valide", 422);
                 }
 
@@ -482,7 +497,7 @@ class PaletteController extends Controller
                 }
 
                 // ✅ Update doc line
-                Docligne::where('cbMarq', $line->docligne_id)->increment('DL_QteBL', floatval($request->quantity));
+                Docligne::where('cbMarq', $line->docligne_id)->increment('DL_QteBL', floatval($request->quantity) * $this->parseCT(''));
 
                 // ✅ Document status
                 if ($document->validation()) {
@@ -584,7 +599,7 @@ class PaletteController extends Controller
     public function show($code)
     {
         $palette = Palette::with([
-            'lines.docligne:DL_No,cbMarq,AR_Ref,Nom,DL_Design,Description,Hauteur,Largeur,Profondeur,Couleur,Chant,Episseur,DL_Qte,Poignée',
+            'lines.docligne:DL_No,cbMarq,AR_Ref,Nom,DL_Design,Description,Hauteur,Largeur,Profondeur,Couleur,Chant,Episseur,DL_Qte,Poignée,EU_Qte',
             'document',
             'user',
             'lines.docligne.article:cbMarq,AR_Ref,Nom,Hauteur,Largeur,Couleur,Profonduer,Episseur,Chant'

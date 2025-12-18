@@ -350,7 +350,7 @@ class DocenteteController extends Controller
                     'quantity_prepare' => floatval($line->docligne->DL_QteBL),
                 ]);
 
-                if (floatval($line->docligne->DL_Qte) == floatval($line->docligne->DL_QteBL)) {
+                if (floatval($line->docligne->EU_Qte) == floatval($line->docligne->DL_QteBL)) {
 
                     $line->update([
                         'status_id' => 11,
@@ -488,10 +488,10 @@ class DocenteteController extends Controller
             });
 
             // Compare with required_quantity
-            if ($totalPaletteQuantity < floatval($line->docligne->DL_Qte)) {
+            if ($totalPaletteQuantity < floatval($line->docligne->EU_Qte)) {
                 $invalidLines[] = [
                     'line_id' => $line->id,
-                    'quantity' => floatval($line->docligne->DL_Qte),
+                    'quantity' => floatval($line->docligne->EU_Qte),
                     'total_palette_quantity' => $totalPaletteQuantity
                 ];
             }
@@ -557,25 +557,45 @@ class DocenteteController extends Controller
 
         // Reliqa rest
 
-        DB::transaction(function () use ($docentete, $docligneQuery) {
-            if ($docentete->DO_Reliquat == "1") {
-                foreach ($docligneQuery->get() as $docligne) {
-                    $prepared = (float) ($docligne->line->quantity_prepare ?? 0);
-                    $delivered = (float) ($docligne->DL_QteBL ?? 0);
 
-                    if ($prepared > 0) {
-                        $docligne->update([
-                            "DL_QteBL" => max(0, $delivered - $prepared)
-                        ]);
+        function parseCT($value)
+            {
+                if (str_contains($value, 'CT')) {
+                    return (float) str_replace('CT', '', $value);
+                }
 
-                        $line = $docligne->line;
-                        $line->update([
-                            'quantity_prepare' => 0
-                        ]);
+                if (is_numeric($value)) {
+                    return 1;
+                }
+
+                return null;
+            }
+
+            DB::transaction(function () use ($docentete, $docligneQuery) {
+                if ($docentete->DO_Reliquat == "1") {
+                    foreach ($docligneQuery->get() as $docligne) {
+
+                        if (!$docligne->line) {
+                            continue;
+                        }
+
+                        $prepared  = (float) $docligne->line->quantity_prepare;
+                        $delivered = (float) ($docligne->DL_QteBL ?? 0);
+                        $ct        = (float) parseCT($docligne->EU_Enumere);
+
+                        if ($prepared > 0) {
+                            $docligne->update([
+                                'DL_QteBL' => max(0, ($delivered * $ct) - $prepared),
+                            ]);
+
+                            $docligne->line->update([
+                                'quantity_prepare' => 0,
+                            ]);
+                        }
                     }
                 }
-            }
-        });
+            });
+
 
 
 
@@ -830,7 +850,7 @@ public function transferCompany($request)
                     ]))),
                     'ref' => $line->AR_Ref,
                     'design' => $line->DL_Design,
-                    'quantity' => $line->DL_Qte,
+                    'quantity' => $line->EU_Qte,
                     'dimensions' => $this->generateLineDimensions($line),
                     'company_id' => $request->company,
                     'first_company_id' => $request->company,

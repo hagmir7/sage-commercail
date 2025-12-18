@@ -44,7 +44,7 @@ class DocumentController extends Controller
             ->where('ref', '!=', 'SP000001')
             ->whereNotIn('design', ['Special', '', 'special']);
 
-        $required_qte = $lines->sum(fn($line) => $line->docligne?->DL_Qte ?? 0);
+        $required_qte = $lines->sum(fn($line) => $line->docligne?->EU_Qte ?? 0);
         $current_qte  = $lines->sum(fn($line) => $line->docligne?->DL_QteBL ?? 0);
 
         $progress = $required_qte > 0
@@ -122,17 +122,17 @@ class DocumentController extends Controller
         //     $documents->whereBetween('created_at', [$start_date, $end_date]);
         // }
 
-    if ($request->filled('dates')) {
+        if ($request->filled('dates')) {
 
-        $dates = explode(',', $request->dates);
-        $start = Carbon::parse(urldecode($dates[0]))->startOfDay();
-        $end = Carbon::parse(urldecode($dates[1] ?? $dates[0]))->endOfDay();
+            $dates = explode(',', $request->dates);
+            $start = Carbon::parse(urldecode($dates[0]))->startOfDay();
+            $end = Carbon::parse(urldecode($dates[1] ?? $dates[0]))->endOfDay();
 
-        $documents->where(function ($query) use ($start, $end) {
-            $query->whereDate('created_at', '>=', $start)
-                ->whereDate('created_at', '<=', $end);
-        });
-    }
+            $documents->where(function ($query) use ($start, $end) {
+                $query->whereDate('created_at', '>=', $start)
+                    ->whereDate('created_at', '<=', $end);
+            });
+        }
 
 
 
@@ -142,7 +142,7 @@ class DocumentController extends Controller
                 ->where('ref', '!=', 'SP000001')
                 ->whereNotIn('design', ['Special', '', 'special']);
 
-            $required_qte = $lines->sum(fn($line) => $line->docligne?->DL_Qte ?? 0);
+            $required_qte = $lines->sum(fn($line) => $line->docligne?->EU_Qte ?? 0);
             $current_qte  = $lines->sum(fn($line) => $line->docligne?->DL_QteBL ?? 0);
 
             $progress = $required_qte > 0
@@ -231,12 +231,12 @@ class DocumentController extends Controller
 
         $query = Document::with([
             'companies',
-            'docentete:cbMarq,DO_Date,DO_DateLivr,DO_Reliquat,DO_Piece'
+            'docentete:cbMarq,DO_Date,DO_DateLivr,DO_Reliquat,DO_Piece,cbCreation'
         ])
             ->whereHas('docentete', function ($query) {
                 $query->where('DO_Domaine', 0)
                     ->where('DO_Statut', 1)
-                    ->whereIn('DO_Type', [1,2]);
+                    ->whereIn('DO_Type', [1, 2]);
             })
             ->whereHas('lines', function ($q) use ($user_roles) {
                 $q->where('company_id', auth()->user()->company_id);
@@ -247,7 +247,7 @@ class DocumentController extends Controller
                 );
 
                 if (!empty($common)) {
-                    $q->whereIn("role_id", $user_roles->keys());
+                    $q->whereIn('role_id', $user_roles->keys());
                 }
             })
             ->addSelect([
@@ -274,7 +274,20 @@ class DocumentController extends Controller
                 });
         }
 
-        $documents = $query->orderByDesc('id')->paginate(20);
+        // 📅 Date range on docentete.cbCreation
+        if ($request->filled('date')) {
+
+            $dates = explode(',', $request->date);
+
+            $start = Carbon::parse(urldecode($dates[0]))->startOfDay();
+            $end   = Carbon::parse(urldecode($dates[1] ?? $dates[0]))->endOfDay();
+
+            $query->whereHas('docentete', function ($q) use ($start, $end) {
+                $q->whereBetween('DO_Date', [$start, $end]);
+            });
+        }
+
+        $documents = $query->orderByDesc('id')->paginate(40);
 
         return response()->json($documents);
     }
@@ -307,14 +320,14 @@ class DocumentController extends Controller
             'lines.article_stock',
             'lines.palettes',
 
-            'lines.docligne:DO_Domaine,DO_Type,CT_Num,DO_Piece,DL_Ligne,DL_Design,DO_Ref,DL_PieceDE,DL_PieceBC,DL_PiecePL,DL_PieceBL,DL_Qte,AR_Ref,cbMarq,Nom,Hauteur,Largeur,Profondeur,Langeur,Couleur,Chant,Episseur,Description,Poignée,Rotation,DL_QteBL',
+            'lines.docligne:DO_Domaine,DO_Type,CT_Num,DO_Piece,DL_Ligne,DL_Design,DO_Ref,DL_PieceDE,DL_PieceBC,DL_PiecePL,DL_PieceBL,DL_Qte,AR_Ref,cbMarq,Nom,Hauteur,Largeur,Profondeur,Langeur,Couleur,Chant,Episseur,Description,Poignée,Rotation,DL_QteBL,EU_Qte',
         ]);
 
         $lines = $document->lines
             ->where('ref', '!=', 'SP000001')
             ->whereNotIn('design', ['Special', '', 'special']);
 
-        $required_qte = $lines->sum(fn($line) => $line->docligne?->DL_Qte ?? 0);
+        $required_qte = $lines->sum(fn($line) => $line->docligne?->EU_Qte ?? 0);
         $current_qte  = $lines->sum(fn($line) => $line->docligne?->DL_QteBL ?? 0);
 
         $progress = $required_qte > 0
@@ -409,7 +422,7 @@ class DocumentController extends Controller
             // Update the main document
             $statusId = $document->status_id;
 
-  
+
             if (str_contains($doc->DO_Piece, 'BL')) {
                 $statusId = $document->status_id < 12 ? 12 : $document->status_id;
             }
@@ -431,7 +444,7 @@ class DocumentController extends Controller
                 'piece_bl'     => $pieceBL,
                 'piece_fa'     => $pieceFA,
             ]);
-    
+
             $lines = Line::where('document_id', $document->id)->get();
 
             foreach ($lines as $line) {
@@ -459,14 +472,14 @@ class DocumentController extends Controller
             }
         }
 
-            $query = Docentete::with([
-                'document' => function ($q) {
-                    $q->with(['status', 'companies'])
-                        ->withCount(['palettes as palettes_count' => function ($p) {
-                            $p->where('company_id', auth()->user()->company_id);
-                        }]);
-                },
-            ])
+        $query = Docentete::with([
+            'document' => function ($q) {
+                $q->with(['status', 'companies'])
+                    ->withCount(['palettes as palettes_count' => function ($p) {
+                        $p->where('company_id', auth()->user()->company_id);
+                    }]);
+            },
+        ])
             ->select(
                 'DO_Domaine',
                 'DO_Type',
@@ -617,8 +630,22 @@ class DocumentController extends Controller
 
     public function archive(Request $request)
     {
-        $query = Document::with(['docentete:DO_Domaine,DO_Type,DO_Piece,DO_Date,DO_Ref,DO_Tiers,DO_Statut,cbMarq,cbCreation,DO_DateLivr,DO_Expedit', 'status'])
-            ->whereHas('docentete')
+        $query = Document::with([
+            'docentete:DO_Domaine,DO_Type,DO_Piece,DO_Date,DO_Ref,DO_Tiers,DO_Statut,cbMarq,cbCreation,DO_DateLivr,DO_Expedit',
+            'status'
+        ])
+            ->whereHas('docentete', function ($q) use ($request) {
+
+                // ✅ DATE RANGE FILTER ON cbCreation
+                if ($request->filled('date')) {
+                    $dates = explode(',', $request->date, 2);
+
+                    $start = Carbon::parse(urldecode($dates[0]))->startOfDay();
+                    $end   = Carbon::parse(urldecode($dates[1] ?? $dates[0]))->endOfDay();
+
+                    $q->whereBetween('cbCreation', [$start, $end]);
+                }
+            })
             ->when($request->filled('type'), function ($q) use ($request) {
                 if ($request->type == 1) {
                     $q->where('piece', 'like', '%BC%');
@@ -630,8 +657,9 @@ class DocumentController extends Controller
                 }
             });
 
-        if ($request->has('search') && $request->search !== '') {
+        if ($request->filled('search')) {
             $search = $request->search;
+
             $query->where(function ($q) use ($search) {
                 $q->where('piece_fa', 'like', "%$search%")
                     ->orWhere('piece', 'like', "%$search%")
@@ -641,15 +669,10 @@ class DocumentController extends Controller
             });
         }
 
-        if ($request->filled('date')) {
-            $dates = explode(',', $request->date, 2);
-            $start = Carbon::parse(urldecode($dates[0]))->startOfDay();
-            $end = Carbon::parse(urldecode($dates[1] ?? $dates[0]))->endOfDay();
-
-            $query->whereBetween('created_at', [$start, $end]);
-        }
-
-        $documents = $query->select('documents.*')->orderByDesc('id')->paginate(30);
+        $documents = $query
+            ->select('documents.*')
+            ->orderByDesc('id')
+            ->paginate(40);
 
         return response()->json($documents, 200, [], JSON_UNESCAPED_UNICODE);
     }

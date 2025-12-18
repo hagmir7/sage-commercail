@@ -82,7 +82,7 @@ class Document extends Model
             ->whereNotIn('design', ['Special', '', 'special']);
 
         foreach ($lines as $line) {
-            $totalToPrepare = floatval($line->docligne->DL_Qte);
+            $totalToPrepare = floatval($line->docligne->EU_Qte);
             $totalPrepared = floatval($line->docligne->DL_QteBL);
 
             if ($totalToPrepare != $totalPrepared) {
@@ -113,7 +113,7 @@ class Document extends Model
         foreach ($lines as $line) {
             $totalPrepared = floatval($line->docligne->DL_QteBL);
 
-            if ($totalPrepared < $line->docligne->DL_Qte) {
+            if ($totalPrepared < $line->docligne->EU_Qte) {
                 return false;
             }
         }

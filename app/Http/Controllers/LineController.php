@@ -68,7 +68,7 @@ class LineController extends Controller
         // attach palette to line
         $line->update(['palette_id' => $palette->id]);
 
-        $quantity = floatval($line->docligne->DL_Qte);
+        $quantity = floatval($line->docligne->EU_Qte);
 
         if ($line->palettes->contains($palette->id)) {
             $line->palettes()->updateExistingPivot($palette->id, ['quantity' => $quantity]);

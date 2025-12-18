@@ -272,6 +272,7 @@ Route::middleware('auth:sanctum')->group(function () {
 
         Route::get('update/{article:code}', 'update');
         Route::post('import', 'import');
+        Route::get('stock/search', 'search');
        
     });
 
