@@ -15,6 +15,7 @@ use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Validator;
 use Exception;
 
+
 class PurchaseDocumentController extends Controller
 {
     public function index(Request $request)
@@ -49,6 +50,9 @@ class PurchaseDocumentController extends Controller
             'note' => 'nullable|string',
             'urgent' => 'boolean',
             'reference' => 'required|string',
+            'status' => 'nullable|integer|min:1|max:8',  // ✅ ADD THIS
+            'service_id' => 'nullable|exists:services,id',  // ✅ ADD THIS
+            'user_id' => 'nullable|exists:users,id',  // ✅ ADD THIS
 
             // --- Lines array ---
             'lines' => 'required|array|min:1',
@@ -63,8 +67,6 @@ class PurchaseDocumentController extends Controller
             'lines.*.files.*' => 'nullable|file|max:10240|mimes:pdf,doc,docx,xls,xlsx,jpg,jpeg,png,gif',
         ]);
 
-
-
         if ($validator->fails()) {
             return response()->json([
                 'errors' => $validator->errors(),
@@ -72,55 +74,58 @@ class PurchaseDocumentController extends Controller
             ], 422);
         }
 
-        $validated = $validator->validated();
+    $validated = $validator->validated();
 
-        DB::beginTransaction();
+    DB::beginTransaction();
 
-        try {
-            // 1️⃣ Create Purchase Document
-            $document = PurchaseDocument::create([
-                'piece' => $validated['piece'] ?? null,
-                'note' => $validated['note'] ?? null,
-                'urgent' => $validated['urgent'] ?? false,
-                'reference' => $validated['reference']
-            ]);
+    try {
+        // 1️⃣ Create Purchase Document
+        $document = PurchaseDocument::create([
+            'piece' => $validated['piece'] ?? null,
+            'note' => $validated['note'] ?? null,
+            'urgent' => $validated['urgent'] ?? false,
+            'reference' => $validated['reference'],
+            'status' => $validated['status'] ?? 1,  // ✅ ADD THIS
+            'service_id' => $validated['service_id'] ?? null,  // ✅ ADD THIS
+            'user_id' => $validated['user_id'] ?? null,  // ✅ ADD THIS
+        ]);
 
-            // 2️⃣ Loop through lines and create them
-            foreach ($validated['lines'] as $lineData) {
-                $files = $lineData['files'] ?? [];
-                unset($lineData['files']); // Remove files before creating the line
+        // 2️⃣ Loop through lines and create them
+        foreach ($validated['lines'] as $lineData) {
+            $files = $lineData['files'] ?? [];
+            unset($lineData['files']); // Remove files before creating the line
 
-                $lineData['purchase_document_id'] = $document->id;
-                $line = PurchaseLine::create($lineData);
+            $lineData['purchase_document_id'] = $document->id;
+            $line = PurchaseLine::create($lineData);
 
-                // 3️⃣ Handle files for this line
-                foreach ($files as $file) {
-                    $path = $file->store('purchase_files', 'public');
+            // 3️⃣ Handle files for this line
+            foreach ($files as $file) {
+                $path = $file->store('purchase_files', 'public');
 
-                    PurchaseLineFile::create([
-                        'purchase_line_id' => $line->id,
-                        'file_path' => $path,
-                        'original_name' => $file->getClientOriginalName(),
-                    ]);
-                }
+                PurchaseLineFile::create([
+                    'purchase_line_id' => $line->id,
+                    'file_path' => $path,
+                    'original_name' => $file->getClientOriginalName(),
+                ]);
             }
-
-            DB::commit();
-
-            $document->load('lines.files');
-
-            return response()->json([
-                'message' => 'Document, lines, and files created successfully.',
-                'document' => $document,
-            ], 201);
-        } catch (\Throwable $e) {
-            DB::rollBack();
-            return response()->json([
-                'message' => 'An error occurred during saving.',
-                'error' => $e->getMessage(),
-            ], 500);
         }
+
+        DB::commit();
+
+        $document->load('lines.files');
+
+        return response()->json([
+            'message' => 'Document, lines, and files created successfully.',
+            'document' => $document,
+        ], 201);
+    } catch (\Throwable $e) {
+        DB::rollBack();
+        return response()->json([
+            'message' => 'An error occurred during saving.',
+            'error' => $e->getMessage(),
+        ], 500);
     }
+}
 
     public function show(PurchaseDocument $purchaseDocument)
     {
@@ -710,4 +715,22 @@ public function createDocentete(string $DO_Piece, string $DO_Tiers, string $DO_R
             'PF_Num' => 0,
         ]);
     }
+
+    public function download($id)
+    {
+        $file = PurchaseLineFile::find($id);
+
+        if (!$file) {
+            return response()->json(['message' => 'Fichier non trouvé'], 404);
+        }
+
+        // Check if file exists in storage
+        if (!Storage::disk('public')->exists($file->file_path)) {
+            return response()->json(['message' => 'Fichier introuvable sur le serveur'], 404);
+        }
+
+        // Force download with original filename
+        return Storage::disk('public')->download($file->file_path, $file->file_name);
+    }
+
 }

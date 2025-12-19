@@ -404,21 +404,6 @@ class PaletteController extends Controller
 
 
 
-    function parseCT($value)
-    {
-        if (str_contains($value, 'CT')) {
-            return (float) str_replace('CT', '', $value);
-        }
-
-        if (is_numeric($value)) {
-            return 1;
-        }
-
-        return null;
-    }
-
-
-
     public function confirm(Request $request)
     {
         $validator = Validator::make($request->all(), [
@@ -443,9 +428,15 @@ class PaletteController extends Controller
 
         try {
             DB::transaction(function () use ($document, $request, $line, $palette) {
+        
+                $docligne = $line?->docligne;
 
-                // ✅ Check line qty validity
-                if (floatval($line?->docligne?->EU_Qte) < ($line?->docligne?->DL_QteBL + floatval($request->quantity))) {
+                $ctValue = $docligne?->article?->conditions->where('EC_Enumere', $docligne?->EU_Enumere)->first()?->EC_Quantite;
+
+                $maxQty = (float) $docligne?->EU_Qte * ($ctValue || 1);
+                $currentQty = (float) $docligne?->DL_QteBL + (float) $request->quantity;
+
+                if ($maxQty < $currentQty) {
                     throw new \Exception("La quantité n'est pas valide", 422);
                 }
 
@@ -497,7 +488,11 @@ class PaletteController extends Controller
                 }
 
                 // ✅ Update doc line
-                Docligne::where('cbMarq', $line->docligne_id)->increment('DL_QteBL', floatval($request->quantity) * $this->parseCT(''));
+                
+                $multiplier = floatval($ctValue ?: 1);
+
+                Docligne::where('cbMarq', $line->docligne_id)
+                    ->increment('DL_QteBL', floatval($request->quantity) * $multiplier);
 
                 // ✅ Document status
                 if ($document->validation()) {
@@ -530,7 +525,6 @@ class PaletteController extends Controller
             ], in_array($e->getCode(), [404, 422]) ? $e->getCode() : 500);
         }
     }
-
 
     public function documentPalettes($piece)
     {

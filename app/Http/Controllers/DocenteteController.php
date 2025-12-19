@@ -556,48 +556,25 @@ class DocenteteController extends Controller
 
 
         // Reliqa rest
+       DB::transaction(function () use ($docentete, $docligneQuery) {
+            if ($docentete->DO_Reliquat == "1") {
+                foreach ($docligneQuery->get() as $docligne) {
+                    $prepared = (float) ($docligne->line->quantity_prepare ?? 0);
+                    $delivered = (float) ($docligne->DL_QtePL ?? 0);
 
+                    if ($prepared > 0) {
+                        $docligne->update([
+                            "DL_QtePL" => max(0, $delivered - $prepared)
+                        ]);
 
-        function parseCT($value)
-            {
-                if (str_contains($value, 'CT')) {
-                    return (float) str_replace('CT', '', $value);
-                }
-
-                if (is_numeric($value)) {
-                    return 1;
-                }
-
-                return null;
-            }
-
-            DB::transaction(function () use ($docentete, $docligneQuery) {
-                if ($docentete->DO_Reliquat == "1") {
-                    foreach ($docligneQuery->get() as $docligne) {
-
-                        if (!$docligne->line) {
-                            continue;
-                        }
-
-                        $prepared  = (float) $docligne->line->quantity_prepare;
-                        $delivered = (float) ($docligne->DL_QteBL ?? 0);
-                        $ct        = (float) parseCT($docligne->EU_Enumere);
-
-                        if ($prepared > 0) {
-                            $docligne->update([
-                                'DL_QteBL' => max(0, ($delivered * $ct) - $prepared),
-                            ]);
-
-                            $docligne->line->update([
-                                'quantity_prepare' => 0,
-                            ]);
-                        }
+                        $line = $docligne->line;
+                        $line->update([
+                            'quantity_prepare' => 0
+                        ]);
                     }
                 }
-            });
-
-
-
+            }
+        });
 
 
         if (in_array('preparation', $userRoles)) {

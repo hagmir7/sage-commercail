@@ -48,6 +48,9 @@ Route::get('/user', function (Request $request) {
 
 
 
+Route::get('/download/purchase-file/{id}', [PurchaseDocumentController::class, 'download'])
+    ->name('purchase.file.download');
+
 
 
 

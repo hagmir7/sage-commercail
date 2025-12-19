@@ -43,4 +43,18 @@ class Docligne extends Model
     {
         return $this->belongsTo(ArticleStock::class, 'AR_Ref', 'code');
     }
+
+
+      public function conditions()
+    {
+        return $this->hasManyThrough(
+            Condition::class,   
+            Article::class,  
+            'AR_Ref',  
+            'AR_Ref', 
+        );
+    }
+
+
+
 }

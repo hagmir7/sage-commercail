@@ -18,5 +18,10 @@ class Article extends Model
     const UPDATED_AT = 'cbModification';
 
     protected $guarded = [];
+
+
+    public function conditions(){
+        return $this->hasMany(Condition::class, 'AR_Ref');
+    }
     
 }
