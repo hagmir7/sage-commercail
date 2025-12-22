@@ -142,7 +142,7 @@ class ArticleStockController extends Controller
         }
 
         $validator = Validator::make($request->all(), [
-            'code' => 'required|string|max:100',
+            'code' => 'required|string|max:100|unique:article_stocks,code,except,code',
             'description' => 'nullable|string|max:255',
             'name' => 'string|max:150',
             'color' => 'nullable|string|max:50',

@@ -491,8 +491,9 @@ class PaletteController extends Controller
                 
                 $multiplier = floatval($ctValue ?: 1);
 
-                Docligne::where('cbMarq', $line->docligne_id)
-                    ->increment('DL_QteBL', floatval($request->quantity) * $multiplier);
+                $docligne = Docligne::where('cbMarq', $line->docligne_id);
+
+                $docligne->increment('DL_QteBL', floatval($request->quantity) * $multiplier);
 
                 // ✅ Document status
                 if ($document->validation()) {

@@ -84,8 +84,14 @@ class Document extends Model
         foreach ($lines as $line) {
             $totalToPrepare = floatval($line->docligne->EU_Qte);
             $totalPrepared = floatval($line->docligne->DL_QteBL);
+            $allStatus = $this->companies()
+                ->where('status_id', 8)
+                ->count() === $this->companies()->count();
 
-            if ($totalToPrepare != $totalPrepared) {
+            if (($totalToPrepare != $totalPrepared)) {
+                if($allStatus){
+                    return true;
+                }
                 return false;
             }
         }
