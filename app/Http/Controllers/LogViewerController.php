@@ -14,8 +14,7 @@ class LogViewerController extends Controller
         if (!File::exists($logPath)) {
             $logContent = "No log file found at: storage/logs/laravel.log";
         } else {
-            $logContent = File::get($logPath);
-            $logContent = substr($logContent, -10000);
+            $logContent = File::get($logPath); // ← show ALL logs
         }
 
         return view('logs', compact('logContent'));

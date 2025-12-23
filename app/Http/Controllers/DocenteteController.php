@@ -119,13 +119,24 @@ class DocenteteController extends Controller
     public function start(Request $request)
     {
 
-        $validator = Validator::make($request->all(), [
-            'complation_date'  => "required",
-            'lines' => 'required|array'
-        ]);
+        $validator = Validator::make(
+            $request->all(),
+            [
+                'complation_date'  => "required",
+                'lines' => 'required|array'
+            ],
+            [], // messages (empty if you just want custom names)
+            [
+                'complation_date' => 'date de complétion',
+                'lines' => 'lignes',
+            ]
+        );
 
         if ($validator->fails()) {
-            return response()->json(['errors' => $validator->errors()], 422);
+            return response()->json([
+                'errors' => $validator->errors(),
+                'message' => $validator->errors()->first()
+            ], 422);
         }
 
         $user = auth()->user();

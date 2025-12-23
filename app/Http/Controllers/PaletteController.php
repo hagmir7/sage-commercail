@@ -321,14 +321,14 @@ class PaletteController extends Controller
             // Update delivered date
             $palette->update(['delivered_at' => now()]);
 
-            $emplacement = Emplacement::find('17075');
+            $emplacement = Emplacement::find('7373');
             $stockService = new StockMovementController();
 
             foreach ($palette->lines as $line) {
                 StockMovement::create([
                     'code_article'     => $line->article_stock->code,
                     'designation'      => $line->article_stock->description,
-                    'emplacement_id'   => '17075',
+                    'emplacement_id'   => '7373',
                     'movement_type'    => "OUT",
                     'article_stock_id' => $line->article_stock->id,
                     'quantity'         => $line->docligne->DL_Qte,
@@ -451,7 +451,7 @@ class PaletteController extends Controller
 
                 $palette->load(['lines.article_stock']);
                 $palette->update([
-                    'emplacement_id' => '17075'
+                    'emplacement_id' => '7373'
                 ]);
 
                 // ✅ Decrement stock if emplacement is specified
@@ -471,10 +471,10 @@ class PaletteController extends Controller
                         'company_id'       => auth()->user()->company_id,
                         'to_company_id'    => null,
                         'movement_date'    => now(),
-                        'to_emplacement_id' => '17075'
+                        'to_emplacement_id' => '7373'
                     ]);
 
-                    $new_emplacement = Emplacement::find(17075);
+                    $new_emplacement = Emplacement::find(7373);
 
                     $stock_movement = new StockMovementController();
                     $stock_movement->stockOut($emplacement, $article_stock, $request->quantity);

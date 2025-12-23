@@ -23,41 +23,42 @@ class ArticleStockController extends Controller
     {
         $query = ArticleStock::query();
 
-        // Apply filters
-        if ($request->has('category')) {
+        // Apply category filter only if not "tout"
+        if ($request->filled('category') && $request->category !== 'tout') {
             $query->where('category', $request->category);
         }
 
         $company = null;
-        if ($request->has('company') && $request->company !== '') {
+        if ($request->filled('company')) {
             $company = $request->company;
         }
 
-        if ($request->has('search') && $request->search !== '') {
+        if ($request->filled('search')) {
             $search = $request->search;
             $query->where(function ($q) use ($search) {
-                $q->where('code', 'like', "%$search%")
-                    ->orWhere('name', 'like', "%$search%")
-                    ->orWhere('description', 'like', "%$search%")
-                    ->orWhere('color', 'like', "%$search%");
+                $q->where('code', 'like', "%{$search}%")
+                ->orWhere('name', 'like', "%{$search}%")
+                ->orWhere('description', 'like', "%{$search}%")
+                ->orWhere('color', 'like', "%{$search}%");
             });
         }
 
-        // Use per_page from request, default to 10
+        // Pagination
         $perPage = $request->get('per_page', 100);
         $articles = $query->paginate($perPage);
 
-        // Map stock quantity for each article
+        // Map stock quantities
         $articles->getCollection()->transform(function ($article) use ($company) {
-            $article->stock_prepare = $this->calculateStockPreparation($article->code);
+            $article->stock_prepare    = $this->calculateStockPreparation($article->code);
             $article->stock_prepartion = $this->calculateZoonPrepartion($article->code);
-            $article->stock = $this->calculateStock($article->code, $company);
+            $article->stock            = $this->calculateStock($article->code, $company);
 
             return $article;
         });
 
         return response()->json($articles);
     }
+
 
 
     public function calculateStock($ref_article, $company_id = null)

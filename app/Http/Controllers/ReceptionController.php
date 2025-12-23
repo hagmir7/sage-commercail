@@ -116,7 +116,7 @@ class ReceptionController extends Controller
                 'DO_Expedit',
                 'DO_TotalHT'
             )
-            ->with(['doclignes:DO_Piece,AR_Ref,DL_Design,DL_Qte,DL_QteBL,DL_Ligne,cbMarq', 'doclignes.line', 'doclignes.line.user_role', 'document'])
+            ->with(['doclignes:DO_Piece,AR_Ref,DL_Design,DL_Qte,DL_QteBL,DL_Ligne,cbMarq,DL_Qte', 'doclignes.line', 'doclignes.line.user_role', 'document'])
             ->find($piece);
     }
 

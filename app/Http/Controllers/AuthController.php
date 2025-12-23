@@ -17,7 +17,7 @@ class AuthController extends Controller
     {
 
         $validator = Validator::make($request->all(), [
-            'name' => 'required|string|max:255',
+            'name' => 'required|string|max:255|unique:users',
             'full_name' => 'required|string|max:255',
             'phone' => 'nullable|string|max:255',
             'email' => 'required|string|email|max:255|unique:users',
@@ -26,9 +26,9 @@ class AuthController extends Controller
 
         if ($validator->fails()) {
             return response()->json([
-                'status' => "error",
+                'message' => $validator->errors()->first(),
                 'errors' => $validator->errors()
-            ]);
+            ], 422);
         }
 
         $user = User::create([

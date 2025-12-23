@@ -451,6 +451,12 @@ class PurchaseDocumentController extends Controller
                 'cbCreationUser' => "77384016-921F-472F-B56D-1D563B7DDF3C"
             ]);
 
+            if ($purchaseDocument->status < 4) {
+                $purchaseDocument->update([
+                    'status' => 4,
+                ]);
+            }
+           
             return response()->json([
                 'message' => 'Transfer successful',
                 'piece' => $piece
