@@ -43,8 +43,9 @@ class ArticleStockController extends Controller
             });
         }
 
-        $articles = $query->paginate(100);
-
+        // Use per_page from request, default to 10
+        $perPage = $request->get('per_page', 100);
+        $articles = $query->paginate($perPage);
 
         // Map stock quantity for each article
         $articles->getCollection()->transform(function ($article) use ($company) {
