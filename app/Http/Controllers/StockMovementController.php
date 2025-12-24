@@ -39,8 +39,10 @@ class StockMovementController extends Controller
             ->with(['movedBy:id,full_name', 'emplacement:id,code', 'to_emplacement'])
             ->when($types, fn($q) => $q->whereIn('movement_type', $types));
 
-        if (!auth()->user()->hasRole('admin') && !auth()->user()->hasRole('supper_admin')) {
-            $movements->where("moved_by", auth()->id());
+        $rolesToCheck = ['admin', 'production', 'super_admin'];
+
+        if (!auth()->user()->hasAnyRole($rolesToCheck)) {
+            $movements->where('moved_by', auth()->id());
         }
 
         $depots = $request->filled('depots') ? explode(',', $request->depots) : null;
@@ -96,10 +98,11 @@ class StockMovementController extends Controller
         $movements = StockMovement::with(['movedBy:id,full_name', 'emplacement:id,code', 'to_emplacement:id,code', 'to_company'])
             ->when($types, fn($q) => $q->whereIn('movement_type', $types));
 
-        if (!auth()->user()->hasRole('admin') && !auth()->user()->hasRole('supper_admin')) {
-            $movements->where("moved_by", auth()->id());
-        }
+        $rolesToCheck = ['admin', 'production', 'super_admin'];
 
+        if (!auth()->user()->hasAnyRole($rolesToCheck)) {
+            $movements->where('moved_by', auth()->id());
+        }
         $depots = $request->filled('depots') ? explode(',', $request->depots) : null;
         $users = $request->filled('users') ? explode(',', $request->users) : null;
 
@@ -522,7 +525,7 @@ class StockMovementController extends Controller
     }
 
 
-    public function stockInsert($emplacement, $article, $qte_value, $conditionMultiplier, $type_colis, $quantity)
+    public function stockInsert($emplacement, $article, $qte_value, $conditionMultiplier=null, $type_colis=null, $quantity=null)
     {
         DB::transaction(function () use ($emplacement, $article, $qte_value, $conditionMultiplier, $type_colis, $quantity) {
 

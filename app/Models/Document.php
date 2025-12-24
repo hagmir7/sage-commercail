@@ -21,6 +21,7 @@ class Document extends Model
         'status_id',
         'piece_bl',
         'piece_fa',
+        'piece_bc',
         'user_id',
     ];
 

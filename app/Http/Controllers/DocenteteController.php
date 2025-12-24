@@ -15,7 +15,9 @@ use Illuminate\Support\Carbon;
 use App\Http\Controllers\SellController;
 use App\Models\ArticleStock;
 use App\Models\Compte;
+use App\Models\Emplacement;
 use App\Models\Palette;
+use App\Models\StockMovement;
 
 class DocenteteController extends Controller
 {
@@ -107,11 +109,56 @@ class DocenteteController extends Controller
                 $line->id => ['action_name' => $user->hasRole("fabrication") ? "Fabrication" : 'Montage']
             ]);
 
+
             $line->update([
                 'next_role_id' => null,
             ]);
+
+            $this->stockMovmentInser($line->ref, $line?->docligne?->DL_Qte);
         }
         return response()->json($request->all(), 200);
+    }
+
+
+    public function stockMovmentInser($article_code, $qte)
+    {
+        try {
+            $emplacement = Emplacement::where("code", 'K-3P')->first();
+            if (!$emplacement) {
+                throw new \Exception("Emplacement K-3P not found");
+            }
+
+            $article = ArticleStock::where('code', $article_code)->first();
+            if (!$article) {
+                throw new \Exception("Article {$article_code} not found");
+            }
+
+            DB::beginTransaction();
+
+            StockMovement::create([
+                'code_article'     => $article_code,
+                'designation'      => $article->description,
+                'emplacement_id'   => $emplacement->id,
+                'movement_type'    => "IN",
+                'article_stock_id' => $article->id,
+                'quantity'         => $qte,
+                'moved_by'         => auth()->id(),
+                'company_id'       => auth()->user()->company_id,
+                'movement_date'    => now(),
+            ]);
+
+            $stockService = new StockMovementController();
+            $stockService->stockInsert($emplacement, $article, $qte);
+
+            DB::commit();
+            return true;
+
+        } catch (\Throwable $th) {
+            DB::rollBack();
+            \Log::alert($th->getMessage());
+            \Log::alert("Transfer de fabrication error " . $article_code);
+            return false;
+        }
     }
 
 
@@ -777,104 +824,104 @@ class DocenteteController extends Controller
 
 
     // Transfer to Company controller (Adill)
-public function transferCompany($request)
-{
-    DB::beginTransaction();
+    public function transferCompany($request)
+    {
+        DB::beginTransaction();
 
-    try {
-        // Get document header with validation
-        $docligne = Docligne::with('docentete')->findOrFail($request->lines[0]);
-        $docentete = $docligne->docentete ?? throw new \Exception('Document header not found');
+        try {
+            // Get document header with validation
+            $docligne = Docligne::with('docentete')->findOrFail($request->lines[0]);
+            $docentete = $docligne->docentete ?? throw new \Exception('Document header not found');
 
-        // Get or create document
-        $document = Document::where('docentete_id', $docentete->cbMarq)->first();
-        
-        if (!$document) {
-            // Generate piece only if DO_Piece contains 'BC', otherwise use DO_Piece as is
-            $piece = str_contains($docentete->DO_Piece, 'BC') 
-                ? $this->generatePiece(2, $docentete->DO_Souche)
-                : $docentete->DO_Piece;
+            // Get or create document
+            $document = Document::where('docentete_id', $docentete->cbMarq)->first();
 
-            $document = Document::create([
-                'docentete_id' => $docentete->cbMarq,
-                'piece' => $piece,
-                'type' => $docentete->Type,
-                'transfer_by' => auth()->id(),
-                'ref' => $docentete->DO_Ref,
-                'client_id' => $docentete->DO_Tiers,
-                'expedition' => $docentete->DO_Expedit,
-            ]);
-        }
+            if (!$document) {
+                // Generate piece only if DO_Piece contains 'BC', otherwise use DO_Piece as is
+                $piece = str_contains($docentete->DO_Piece, 'BC')
+                    ? $this->generatePiece(2, $docentete->DO_Souche)
+                    : $docentete->DO_Piece;
 
-        // Attach company if needed
-        $document->companies()->syncWithoutDetaching([
-            $request->company => [
-                'status_id' => 1,
-                'updated_at' => now(),
-                'printed' => false
-            ]
-        ]);
+                $document = Document::create([
+                    'docentete_id' => $docentete->cbMarq,
+                    'piece' => $piece,
+                    'piece_bc' => $docentete?->DO_Piece,
+                    'type' => $docentete->Type,
+                    'transfer_by' => auth()->id(),
+                    'ref' => $docentete->DO_Ref,
+                    'client_id' => $docentete->DO_Tiers,
+                    'expedition' => $docentete->DO_Expedit,
+                ]);
+            }
 
-        // Load all lines and articles efficiently
-        $doclignes = Docligne::with('article')->whereIn('cbMarq', $request->lines)->get();
-        $articles = ArticleStock::whereIn('code', $doclignes->pluck('AR_Ref')->filter())->get()->keyBy('code');
-
-        // Process lines
-        foreach ($doclignes as $line) {
-            $line->update(['DL_QteBL' => 0]);
-
-            if (!$line->AR_Ref) continue;
-
-            $article = $articles->get($line->AR_Ref);
-            
-            Line::firstOrCreate(
-                ['docligne_id' => $line->cbMarq],
-                [
-                    'tiers' => $line->CT_Num,
-                    'name' => $line->Nom ?: trim(implode(' ', array_filter([
-                        $line->article?->Nom,
-                        $line->article?->Couleur,
-                        $line->Description
-                    ]))),
-                    'ref' => $line->AR_Ref,
-                    'design' => $line->DL_Design,
-                    'quantity' => $line->EU_Qte,
-                    'dimensions' => $this->generateLineDimensions($line),
-                    'company_id' => $request->company,
-                    'first_company_id' => $request->company,
-                    'document_id' => $document->id,
-                    'company_code' => $article?->company_code
+            // Attach company if needed
+            $document->companies()->syncWithoutDetaching([
+                $request->company => [
+                    'status_id' => 1,
+                    'updated_at' => now(),
+                    'printed' => false
                 ]
-            );
-        }
+            ]);
 
-        // Update piece only if document was just created AND DO_Piece contains 'BC'
-        if ($document->wasRecentlyCreated && str_contains($docentete->DO_Piece, 'BC')) {
-            DB::statement('EXEC Update_DO_Piece ?, ?, ?', [$docentete->DO_Piece, $document->piece, 2]);
-        }
+            // Load all lines and articles efficiently
+            $doclignes = Docligne::with('article')->whereIn('cbMarq', $request->lines)->get();
+            $articles = ArticleStock::whereIn('code', $doclignes->pluck('AR_Ref')->filter())->get()->keyBy('code');
 
-        DB::commit();
+            // Process lines
+            foreach ($doclignes as $line) {
+                $line->update(['DL_QteBL' => 0]);
 
-        return response()->json([
-            'status' => 'success',
-            'piece' => $document->piece,
-            'message' => 'Document transferred successfully',
-        ]);
+                if (!$line->AR_Ref) continue;
 
-    } catch (\Exception $e) {
-        DB::rollBack();
-        \Log::error('Transfer failed: ' . $e->getMessage());
+                $article = $articles->get($line->AR_Ref);
 
-        if (str_contains($e->getMessage(), "Cet élément est en cours d'utilisation")) {
+                Line::firstOrCreate(
+                    ['docligne_id' => $line->cbMarq],
+                    [
+                        'tiers' => $line->CT_Num,
+                        'name' => $line->Nom ?: trim(implode(' ', array_filter([
+                            $line->article?->Nom,
+                            $line->article?->Couleur,
+                            $line->Description
+                        ]))),
+                        'ref' => $line->AR_Ref,
+                        'design' => $line->DL_Design,
+                        'quantity' => $line->EU_Qte,
+                        'dimensions' => $this->generateLineDimensions($line),
+                        'company_id' => $request->company,
+                        'first_company_id' => $request->company,
+                        'document_id' => $document->id,
+                        'company_code' => $article?->company_code
+                    ]
+                );
+            }
+
+            // Update piece only if document was just created AND DO_Piece contains 'BC'
+            if ($document->wasRecentlyCreated && str_contains($docentete->DO_Piece, 'BC')) {
+                DB::statement('EXEC Update_DO_Piece ?, ?, ?', [$docentete->DO_Piece, $document->piece, 2]);
+            }
+
+            DB::commit();
+
             return response()->json([
-                'status' => 'error',
-                'message' => "Ce document est actuellement ouvert dans Sage. Fermez-le et réessayez."
-            ], 409);
-        }
+                'status' => 'success',
+                'piece' => $document->piece,
+                'message' => 'Document transferred successfully',
+            ]);
+        } catch (\Exception $e) {
+            DB::rollBack();
+            \Log::error('Transfer failed: ' . $e->getMessage());
 
-        return response()->json(['status' => 'error', 'message' => 'Transfer failed'], 500);
+            if (str_contains($e->getMessage(), "Cet élément est en cours d'utilisation")) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => "Ce document est actuellement ouvert dans Sage. Fermez-le et réessayez."
+                ], 409);
+            }
+
+            return response()->json(['status' => 'error', 'message' => 'Transfer failed'], 500);
+        }
     }
-}
 
 
     // Transfer funciton controller

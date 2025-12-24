@@ -449,15 +449,25 @@ class PaletteController extends Controller
 
                 $line->update(['status_id' => 8]);
 
+                $new_emplacement = Emplacement::where('code', 'K-4P')->first();
+
+               
+
+                \Log::alert("this is the id ". $new_emplacement?->id);
+                
                 $palette->load(['lines.article_stock']);
                 $palette->update([
-                    'emplacement_id' => '7373'
+                    'emplacement_id' => $new_emplacement->id
                 ]);
+
+               
 
                 // ✅ Decrement stock if emplacement is specified
                 if ($request->emplacement) {
                     $article_stock = ArticleStock::where('code', $line->ref)->first();
                      $emplacement = Emplacement::where("code", $request->emplacement)->first();
+
+                   
 
                     // ✅ Create stock OUT movement
                     StockMovement::create([
@@ -471,10 +481,10 @@ class PaletteController extends Controller
                         'company_id'       => auth()->user()->company_id,
                         'to_company_id'    => null,
                         'movement_date'    => now(),
-                        'to_emplacement_id' => '7373'
+                        'to_emplacement_id' => $new_emplacement->id
                     ]);
 
-                    $new_emplacement = Emplacement::find(7373);
+                    $new_emplacement = Emplacement::where('code', 'K-4P')->first();
 
                     $stock_movement = new StockMovementController();
                     $stock_movement->stockOut($emplacement, $article_stock, $request->quantity);
