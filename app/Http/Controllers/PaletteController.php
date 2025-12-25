@@ -451,10 +451,7 @@ class PaletteController extends Controller
 
                 $new_emplacement = Emplacement::where('code', 'K-4P')->first();
 
-               
 
-                \Log::alert("this is the id ". $new_emplacement?->id);
-                
                 $palette->load(['lines.article_stock']);
                 $palette->update([
                     'emplacement_id' => $new_emplacement->id
