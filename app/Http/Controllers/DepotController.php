@@ -53,7 +53,7 @@ class DepotController extends Controller
     public function show(Depot $depot)
     {
         $raw = DB::table('emplacements')
-            ->leftJoin('palettes', function($join) {
+            ->leftJoin('palettes', function ($join) {
                 $join->on('emplacements.id', '=', 'palettes.emplacement_id')
                     ->where('palettes.type', 'Stock');
             })
@@ -67,9 +67,8 @@ class DepotController extends Controller
                 'article_palette.quantity'
             )
             ->where('emplacements.depot_id', $depot->id)
+            ->orderBy('emplacements.code')
             ->get();
-
-
 
         $grouped = $raw->groupBy('emplacement_id')->map(function ($rows, $emplacementId) {
             $code = $rows->first()->code;
