@@ -58,7 +58,6 @@ class SellController extends Controller
 
             $TotalHT += $lineTotalHT;
             $TotalTTC += $lineTotalTTC;
-           
         };
         return ['TotalHT' => $TotalHT, 'TotalTTC' => $TotalTTC];
     }
@@ -118,7 +117,6 @@ class SellController extends Controller
             DB::commit();
 
             return response()->json(['success' => true]);
-
         } catch (Exception $e) {
             DB::rollBack();
             Log::error('Calculator operation failed: ' . $e->getMessage());
@@ -176,7 +174,7 @@ class SellController extends Controller
                 'DO_Imprim' => 0,
                 'DO_Souche' => 0,
                 'DO_DateLivr' => $source->DO_DateLivr,
-                "DO_Condition"	=> 1,
+                "DO_Condition"    => 1,
                 'DO_Tarif' => 1,
                 "DO_Colisage" => 1,
                 'DO_TypeColis' => 1,
@@ -192,12 +190,12 @@ class SellController extends Controller
                 'CA_No' => 0,
                 'CO_NoCaissier' => 0,
                 'DO_Transfere' => 0,
-            	'DO_Cloture' => 0,	
+                'DO_Cloture' => 0,
                 'DO_Attente' => 0,
                 'DO_Provenance' => 0,
 
                 'DO_TotalHTNet' => $total['TotalHT'],
-                'DO_TotalTTC' => $total['TotalTTC'], 
+                'DO_TotalTTC' => $total['TotalTTC'],
                 'DO_NetAPayer' => $total['TotalTTC'],
                 'Montant_S_DT' => $total['TotalTTC']
 
@@ -375,5 +373,4 @@ class SellController extends Controller
             throw $e;
         }
     }
-
 }

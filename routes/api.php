@@ -116,7 +116,9 @@ Route::get('/users', function (Request $request) {
 
 Route::get('inventory/{inventory}/movements/export', [InventoryExportController::class, 'movements']);
 
-Route::get('inventory/{inventory}/init', [InventoryController::class, 'resetToStock']);
+
+
+
 Route::get('inventory/{inventory}/export', [InventoryExportController::class, 'export']);
 
 
@@ -124,6 +126,7 @@ Route::get("progress/{piece}", [DocenteteController::class, 'progress']);
 
 
 Route::middleware('auth:sanctum')->group(function () {
+    Route::get('inventory/{inventory}/init', [InventoryController::class, 'resetToStock']);
     Route::post('/logout', [AuthController::class, 'logout']);
     Route::get('/user', [AuthController::class, 'user']);
 

@@ -641,6 +641,12 @@ public function insert(Request $request, Inventory $inventory)
 
         public function resetToStock(Inventory $inventory)
         {
+            if(!auth()->user()->hasRole('supper_admin')){
+                return response()->json([
+                    'message' => 'Non autorisé. Vous n\'avez pas les permissions nécessaires.'
+                ], 403);
+            }
+
             try {
                 DB::transaction(function () use ($inventory) {
 
