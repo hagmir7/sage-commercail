@@ -167,7 +167,6 @@ class ReceptionController extends Controller
 
                 $docligne->update([
                     'DL_QteBL' => floatval(0),
-                    'cbModification' => now()->format('Y-m-d H:i:s')
                 ]);
 
                 if ($docligne->AR_Ref != null) {
@@ -404,66 +403,10 @@ class ReceptionController extends Controller
                     $qte_value = $request->quantity;
                 }
 
-                $company_stock = CompanyStock::where('code_article', $request->code_article)
-                    ->where('company_id', $companyId)
-                    ->first();
 
-                if ($company_stock) {
-                    $company_stock->quantity += $qte_value;
-                    $company_stock->save();
-                } else {
-                    CompanyStock::create([
-                        'code_article' => $request->code_article,
-                        'designation'  => $article->description,
-                        'company_id'   => $companyId,
-                        'quantity'     => $qte_value
-                    ]);
-                }
+                $stock_insert = new StockMovementController();
+                $stock_insert->stockInsert($emplacement, $article, $request->quantity, $conditionMultiplier, $request->type_colis, $qte_value);
 
-                // ✅ Update emplacement pivot safely
-                $existing = $emplacement->articles()->find($article->id);
-
-                if ($existing) {
-                    $emplacement->articles()->updateExistingPivot($article->id, [
-                        'quantity' => DB::raw('quantity + ' . $qte_value)
-                    ]);
-                } else {
-                    $emplacement->articles()->attach($article->id, ['quantity' => $qte_value]);
-                }
-
-                // ✅ Handle palettes
-                if ($request->type_colis === "Palette") {
-                    for ($i = 1; $i <= intval($request->quantity); $i++) {
-                        $palette = Palette::create([
-                            "code"           => $this->generatePaletteCode(),
-                            "emplacement_id" => $emplacement->id,
-                            "company_id"     => $companyId,
-                            "user_id"        => auth()->id(),
-                            "type"           => "Stock",
-                        ]);
-                        $article->palettes()->attach($palette->id, ['quantity' => floatval($conditionMultiplier)]);
-                    }
-                } else {
-                    // One palette per emplacement
-                    $palette = Palette::firstOrCreate(
-                        ["emplacement_id" => $emplacement->id],
-                        [
-                            "code"       => $this->generatePaletteCode(),
-                            "company_id" => $companyId,
-                            "user_id"    => auth()->id(),
-                            "type"       => "Stock"
-                        ]
-                    );
-
-                    if ($article->palettes()->where('palette_id', $palette->id)->exists()) {
-                        $article->palettes()->updateExistingPivot(
-                            $palette->id,
-                            ['quantity' => DB::raw('quantity + ' . (int) $qte_value)]
-                        );
-                    } else {
-                        $article->palettes()->attach($palette->id, ['quantity' => $qte_value]);
-                    }
-                }
             });
 
             return response()->json(['message' => 'Stock successfully inserted or updated.']);

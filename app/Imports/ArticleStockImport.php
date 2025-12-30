@@ -25,7 +25,7 @@ class ArticleStockImport implements ToModel, WithHeadingRow
     }
 
     /**
-     * The model importer for each row
+     * Import each row
      */
     public function model(array $row): ?ArticleStock
     {
@@ -33,53 +33,49 @@ class ArticleStockImport implements ToModel, WithHeadingRow
         set_time_limit(3600);
 
         $refArticle = $row['code'] ?? null;
-
         $designation = trim((string) ($row['designation'] ?? ''));
 
-        if (empty($designation) || strtoupper($designation) === 'NULL') {
-            Log::info("Skipped row - empty or NULL designation", ['row' => $row]);
+        if (!$refArticle || empty($designation) || strtoupper($designation) === 'NULL') {
+            Log::info('Skipped row - invalid data', ['row' => $row]);
             return null;
         }
 
-        if (
-            !$refArticle ||
-            ArticleStock::where('code', (string) $refArticle)->exists() || is_null($row['designation'])
-        ) {
-            Log::warning("Skipped row - missing or duplicate", $row);
-            return null;
-        }
+        $article = ArticleStock::updateOrCreate(
+            ['code' => (string) $refArticle],
+            [
+                'description' => $this->parseValue($row['designation']),
+                'name'        => $this->parseValue($row['nom'] ?? null),
 
-        $article = new ArticleStock([
-            'code'               => (string) $refArticle,
-            'description'        => $this->parseValue($row['designation']),
-            'name'               => $this->parseValue($row['nom'] ?? null),
-            'height'             => $this->parseValue($row['hauteur'] ?? null, 0),
-            'width'              => $this->parseValue($row['largeur'] ?? null, 0),
-            'depth'              => $this->parseValue($row['profondeur'] ?? null, 0),
-            'color'              => $this->parseValue($row['couleur'] ?? null),
-            'thickness'          => $this->parseValue($row['epaisseur'] ?? null, 0),
-            'code_supplier'      => $this->parseValue($row['ref_four'] ?? null),
-            'condition'          => $this->parseValue($row['condition'] ?? null),
-            'category'           => $this->parseValue($row['codefamille'] ?? null),
-            'qr_code'            => $this->parseValue($row['code_barre'] ?? null),
-            'palette_condition'  => $this->parseValue($row['conditionpalette'] ?? null),
-            'code_supplier_2'    => $this->parseValue($row['ref_four2'] ?? null),
-        ]);
+                // Dimensions (UPDATED if exists)
+                'height'      => $this->parseValue($row['hauteur'] ?? null, 0),
+                'width'       => $this->parseValue($row['largeur'] ?? null, 0),
+                'depth'       => $this->parseValue($row['profondeur'] ?? null, 0),
+                'thickness'   => $this->parseValue($row['epaisseur'] ?? null, 0),
 
-        $article->save();
+                'color'             => $this->parseValue($row['couleur'] ?? null),
+                'code_supplier'     => $this->parseValue($row['ref_four'] ?? null),
+                'condition'         => $this->parseValue($row['condition'] ?? null),
+                'category'          => $this->parseValue($row['codefamille'] ?? null),
+                'qr_code'           => $this->parseValue($row['code_barre'] ?? null),
+                'palette_condition' => $this->parseValue($row['conditionpalette'] ?? null),
+                'code_supplier_2'   => $this->parseValue($row['ref_four2'] ?? null),
+            ]
+        );
 
+        // Attach companies only on creation
+        if ($article->wasRecentlyCreated) {
+            $societeRaw = $row['societe'] ?? '';
+            $societeCodes = explode('|', strtoupper(trim($societeRaw)));
 
-        $societeRaw = $row['societe'] ?? '';
-        $societeCodes = explode('|', strtoupper(trim($societeRaw)));
+            $companyIds = collect($societeCodes)
+                ->map(fn ($code) => $this->companyMap[$code] ?? null)
+                ->filter()
+                ->unique()
+                ->values();
 
-        $companyIds = collect($societeCodes)
-            ->map(fn($code) => $this->companyMap[$code] ?? null)
-            ->filter()
-            ->unique()
-            ->values();
-
-        if ($companyIds->isNotEmpty()) {
-            $article->companies()->attach($companyIds);
+            if ($companyIds->isNotEmpty()) {
+                $article->companies()->attach($companyIds);
+            }
         }
 
         return $article;

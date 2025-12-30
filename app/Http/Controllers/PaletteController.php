@@ -5,7 +5,6 @@ namespace App\Http\Controllers;
 use App\Http\Controllers\Controller;
 use App\Imports\PalettesImport;
 use App\Models\ArticleStock;
-use App\Models\CompanyStock;
 use App\Models\Docligne;
 use App\Models\Document;
 use App\Models\Emplacement;
@@ -449,7 +448,10 @@ class PaletteController extends Controller
 
                 $line->update(['status_id' => 8]);
 
-                $new_emplacement = Emplacement::where('code', 'K-4P')->first();
+             
+
+                $emplac_code = auth()->user()->company_id == 1 ? "K-4P" : "K-4SP";
+                $new_emplacement = Emplacement::where('code', $emplac_code)->first();
 
 
                 $palette->load(['lines.article_stock']);
@@ -481,7 +483,6 @@ class PaletteController extends Controller
                         'to_emplacement_id' => $new_emplacement->id
                     ]);
 
-                    $new_emplacement = Emplacement::where('code', 'K-4P')->first();
 
                     $stock_movement = new StockMovementController();
                     $stock_movement->stockOut($emplacement, $article_stock, $request->quantity);
@@ -496,7 +497,7 @@ class PaletteController extends Controller
 
                 // ✅ Update doc line
                 
-                $multiplier = floatval($ctValue ?: 1);
+               $multiplier = floatval($ctValue ?: 1); 
 
                 $docligne = Docligne::where('cbMarq', $line->docligne_id);
 

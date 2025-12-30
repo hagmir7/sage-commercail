@@ -123,9 +123,11 @@ class DocenteteController extends Controller
     public function stockMovmentInser($article_code, $qte)
     {
         try {
-            $emplacement = Emplacement::where("code", 'K-3P')->first();
+            $emplac_code = auth()->user()->company_id == 1 ? "K-3P" : "K-3SP";
+
+            $emplacement = Emplacement::where("code", $emplac_code)->first();
             if (!$emplacement) {
-                throw new \Exception("Emplacement K-3P not found");
+                throw new \Exception("Emplacement $emplac_code not found");
             }
 
             $article = ArticleStock::where('code', $article_code)->first();
