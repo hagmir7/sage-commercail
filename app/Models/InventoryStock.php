@@ -22,4 +22,9 @@ class InventoryStock extends Model
     public function article(){
         return $this->belongsTo(ArticleStock::class, 'code_article', 'code');
     }
+
+
+    public function palettes(){
+        return $this->belongsToMany(Palette::class, 'inventory_article_palette')->withPivot('quantity');
+    }
 }

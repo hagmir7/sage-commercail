@@ -56,7 +56,7 @@ class EmplacementController extends Controller
             ->with([
                 'palettes' => function ($q) {
                     $q->select('id', 'code', 'emplacement_id',)
-                        // ->whereIn('type', ['Stock', "Inventaire"])
+                        // ->whereIn('type', ['Stock', 'Inventaire'])
                         ->with('articles:id,code,description,name,color,quantity,thickness,height,width,depth');
                 }
             ])

@@ -208,7 +208,7 @@ public function insert(Request $request, Inventory $inventory)
             try {
                 $emplacement = Emplacement::where('code', $request->emplacement_code)->first();
                 
-                InventoryMovement::create([
+               InventoryMovement::create([
                     'code_article' => $request->article_code,
                     'designation' => $article->description,
                     'emplacement_code' => $request->emplacement_code,
@@ -254,7 +254,8 @@ public function insert(Request $request, Inventory $inventory)
                         ]);
 
                         $palette->inventoryArticles()->attach($inventory_stock->id, [
-                            'quantity' => $request->condition
+                            'quantity' => $request->condition,
+                
                         ]);
                     }
                 } else {
@@ -340,17 +341,64 @@ public function insert(Request $request, Inventory $inventory)
     {
         try {
             DB::transaction(function () use ($inventory_movement) {
-                $inventory_stock = InventoryStock::where("code_article", $inventory_movement->code_article)
+                $inventory_stock = InventoryStock::where('code_article', $inventory_movement->code_article)
+                    ->where('inventory_id', $inventory_movement->inventory_id)
+                    ->lockForUpdate()
                     ->first();
 
-                if ($inventory_stock) {
-                    $inventory_stock->update([
-                        'quantity' => $inventory_stock->quantity - $inventory_movement->quantity
-                    ]);
-                    $inventory_movement->delete();
-                } else {
-                    throw new \Exception('Inventory stock not found for article: ' . $inventory_movement->code_article);
+                if (! $inventory_stock) {
+                    throw new \Exception(
+                        'Inventory stock not found for article: ' . $inventory_movement->code_article
+                    );
                 }
+
+                $remainingQty = $inventory_movement->quantity;
+
+                $palettes = $inventory_stock->palettes()
+                    ->wherePivot('quantity', '>', 0)
+                    ->orderBy('inventory_article_palette.created_at')
+                    ->lockForUpdate()
+                    ->get();
+
+                if ($palettes->sum('pivot.quantity') < $remainingQty) {
+                    throw new \Exception('Not enough quantity across all palettes');
+                }
+
+                foreach ($palettes as $palette) {
+
+                    if ($remainingQty <= 0) {
+                        break;
+                    }
+
+                    $pivotQty = $palette->pivot->quantity;
+                    $deduct   = min($pivotQty, $remainingQty);
+                    $newQty   = $pivotQty - $deduct;
+
+                    if ($newQty === 0) {
+                        // 🧹 Delete pivot row
+                        $inventory_stock->palettes()->detach($palette->id);
+                    } else {
+                        // 🔽 Update remaining quantity
+                        $inventory_stock->palettes()->updateExistingPivot(
+                            $palette->id,
+                            ['quantity' => $newQty]
+                        );
+                    }
+
+                    $hasArticles = DB::table('inventory_article_palette')
+                        ->where('palette_id', $palette->id)
+                        ->exists();
+
+                    if (! $hasArticles) {
+                        $palette->delete();
+                    }
+
+                    $remainingQty -= $deduct;
+                }
+
+                $inventory_stock->decrement('quantity', $inventory_movement->quantity);
+
+                $inventory_movement->delete();
             });
 
             return response()->json([

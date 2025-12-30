@@ -490,10 +490,15 @@ class DocenteteController extends Controller
             return response()->json(["message" => "L'utilisateur n'est pas autorisé"], 401);
         }
 
-        $document = Document::where('piece', $piece)->first();
+        $document = Document::where('piece', $piece)
+            ->orWhere('piece_bl', $piece)
+            ->first();
 
         if (!$document) {
-            return response()->json(["message" => "Le document n'existe pas"], 404);
+            \Log::alert($piece);
+            return response()->json([
+                "message" => "Le document n'existe pas"
+            ], 404);
         }
 
         DB::transaction(function () use ($document) {

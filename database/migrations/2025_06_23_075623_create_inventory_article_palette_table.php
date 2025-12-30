@@ -1,5 +1,6 @@
 <?php
 
+use App\Models\InventoryMovement;
 use App\Models\InventoryStock;
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
