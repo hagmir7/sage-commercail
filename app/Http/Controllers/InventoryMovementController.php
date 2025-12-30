@@ -36,8 +36,9 @@ class InventoryMovementController extends Controller
             $newQty = (float) $request->quantity;
             $delta  = $newQty - $oldQty;
 
-            $article   = ArticleStock::where('code', $request->code_article)->first();
-            $newEmpl   = Emplacement::where('code', $request->emplacement)->first();
+            $article = ArticleStock::where('code', $request->code_article)->first();
+            $newEmpl = Emplacement::where('code', $request->emplacement)->first();
+
             $oldEmplId = $inventory_movement->emplacement_id;
 
             $inventoryStock = InventoryStock::where('code_article', $inventory_movement->code_article)
@@ -45,29 +46,33 @@ class InventoryMovementController extends Controller
                 ->lockForUpdate()
                 ->firstOrFail();
 
-            // ========== Quantity change ==========
+            // ================= Quantity change (ONLY old emplacement) =================
             if ($delta > 0) {
-                $this->increaseQuantity($inventoryStock, $delta);
+                $this->increaseQuantity($inventoryStock, $delta, $oldEmplId);
                 $inventoryStock->increment('quantity', $delta);
             } elseif ($delta < 0) {
-                $this->decreaseQuantity($inventoryStock, abs($delta));
+                $this->decreaseQuantity($inventoryStock, abs($delta), $oldEmplId);
                 $inventoryStock->decrement('quantity', abs($delta));
             }
 
-            // ========== Emplacement change ==========
+            // ================= Emplacement change (ONLY this movement palettes) =================
             if ($newEmpl->id !== $oldEmplId) {
-                $this->movePalettesToEmplacement($inventoryStock, $newEmpl->id);
+                $this->movePalettesToEmplacement(
+                    $inventoryStock,
+                    $oldEmplId,
+                    $newEmpl->id
+                );
             }
 
-            // ========== Update movement ==========
+            // ================= Update movement =================
             $inventory_movement->update([
                 'quantity'         => $newQty,
                 'emplacement_id'   => $newEmpl->id,
                 'emplacement_code' => $newEmpl->code,
                 'code_article'     => $request->code_article ?? $inventory_movement->code_article,
                 'designation'      => $request->code_article
-                                        ? $article->description
-                                        : $inventory_movement->designation
+                    ? $article->description
+                    : $inventory_movement->designation
             ]);
         });
 
@@ -76,9 +81,13 @@ class InventoryMovementController extends Controller
 
     // ================= Helper Methods =================
 
-    protected function decreaseQuantity(InventoryStock $stock, float $amount)
-    {
+    protected function decreaseQuantity(
+        InventoryStock $stock,
+        float $amount,
+        int $emplacementId
+    ) {
         $palettes = $stock->palettes()
+            ->where('palettes.emplacement_id', $emplacementId)
             ->wherePivot('quantity', '>', 0)
             ->orderBy('inventory_article_palette.created_at')
             ->lockForUpdate()
@@ -105,41 +114,53 @@ class InventoryMovementController extends Controller
         }
 
         if ($remaining > 0) {
-            throw new \Exception("Not enough quantity in palettes to decrease");
+            throw new \Exception('Not enough quantity in this emplacement');
         }
     }
 
-    protected function increaseQuantity(InventoryStock $stock, float $amount)
-    {
+    protected function increaseQuantity(
+        InventoryStock $stock,
+        float $amount,
+        int $emplacementId
+    ) {
         $palettes = $stock->palettes()
-            ->wherePivot('quantity', '>', 0)
+            ->where('palettes.emplacement_id', $emplacementId)
             ->orderBy('inventory_article_palette.created_at')
             ->lockForUpdate()
             ->get();
 
         if ($palettes->isEmpty()) {
-            // Create a new palette if none exists
             $palette = Palette::create([
-                'emplacement_id' => $stock->inventory_id // default emplacement
+                'emplacement_id' => $emplacementId
             ]);
-            $stock->palettes()->attach($palette->id, ['quantity' => $amount]);
+
+            $stock->palettes()->attach($palette->id, [
+                'quantity' => $amount
+            ]);
             return;
         }
 
-        // Add quantity to first palette (FIFO)
         $firstPalette = $palettes->first();
+
         $stock->palettes()->updateExistingPivot(
             $firstPalette->id,
             ['quantity' => $firstPalette->pivot->quantity + $amount]
         );
     }
 
-    protected function movePalettesToEmplacement(InventoryStock $stock, int $newEmplacementId)
-    {
-        $palettes = $stock->palettes()->get();
+    protected function movePalettesToEmplacement(
+        InventoryStock $stock,
+        int $oldEmplacementId,
+        int $newEmplacementId
+    ) {
+        $palettes = $stock->palettes()
+            ->where('palettes.emplacement_id', $oldEmplacementId)
+            ->get();
 
         foreach ($palettes as $palette) {
-            $palette->update(['emplacement_id' => $newEmplacementId]);
+            $palette->update([
+                'emplacement_id' => $newEmplacementId
+            ]);
         }
     }
 
