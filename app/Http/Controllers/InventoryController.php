@@ -178,7 +178,7 @@ public function insert(Request $request, Inventory $inventory)
                 'request_data' => $request->all(),
                 'inventory_id' => $inventory->id
             ]);
-            
+
             return response()->json([
                 'message' => $validator->errors()->first(),
                 'errors' => $validator->errors()
@@ -192,7 +192,7 @@ public function insert(Request $request, Inventory $inventory)
                 'article_code' => $request->article_code,
                 'inventory_id' => $inventory->id
             ]);
-            
+
             return response()->json([
                 'errors' => ['article' => 'Article non trouvé']
             ], 404);
@@ -207,7 +207,7 @@ public function insert(Request $request, Inventory $inventory)
         DB::transaction(function () use ($article, $request, $inventory, $inventory_stock, $conditionMultiplier) {
             try {
                 $emplacement = Emplacement::where('code', $request->emplacement_code)->first();
-                
+
                InventoryMovement::create([
                     'code_article' => $request->article_code,
                     'designation' => $article->description,
@@ -255,7 +255,7 @@ public function insert(Request $request, Inventory $inventory)
 
                         $palette->inventoryArticles()->attach($inventory_stock->id, [
                             'quantity' => $request->condition,
-                
+
                         ]);
                     }
                 } else {
@@ -298,7 +298,7 @@ public function insert(Request $request, Inventory $inventory)
         });
 
         return response()->json(['message' => 'Stock successfully inserted or updated.']);
-        
+
     } catch (\Illuminate\Database\QueryException $e) {
         Log::error('Database error in insert function', [
             'error' => $e->getMessage(),
@@ -308,12 +308,12 @@ public function insert(Request $request, Inventory $inventory)
             'request_data' => $request->all(),
             'inventory_id' => $inventory->id
         ]);
-        
+
         return response()->json([
             'message' => 'Une erreur de base de données s\'est produite.',
             'error' => 'Database error'
         ], 500);
-        
+
     } catch (\Exception $e) {
         Log::error('Unexpected error in insert function', [
             'error' => $e->getMessage(),
@@ -323,7 +323,7 @@ public function insert(Request $request, Inventory $inventory)
             'line' => $e->getLine(),
             'file' => $e->getFile()
         ]);
-        
+
         return response()->json([
             'message' => 'Une erreur inattendue s\'est produite.',
             'error' => 'Internal server error'
@@ -698,56 +698,53 @@ public function insert(Request $request, Inventory $inventory)
             try {
                 DB::transaction(function () use ($inventory) {
 
-                    Palette::where('type', 'Stock')
-                        ->whereNotNull('inventory_id')
-                        ->update(['type' => 'Inventaire']);
+                Palette::where('type', 'Stock')
+                    ->whereNotNull('inventory_id')
+                    ->update(['type' => 'Inventaire']);
 
-                    Palette::where('type', 'Stock')
-                        ->whereNull('inventory_id')
-                        ->delete();
+                Palette::where('type', 'Stock')
+                    ->whereNull('inventory_id')
+                    ->delete();
 
-                    foreach ($inventory->palettes as $palette) {
+                foreach ($inventory->palettes as $palette) {
 
-                        $newPalette = Palette::create([
-                            'code'           => $this->generatePaletteCode(),
-                            'company_id'     => $palette->company_id,
-                            'emplacement_id' => $palette->emplacement_id,
-                            'type'           => 'Stock',
-                            'user_id'        => $palette->user_id ?? auth()->id(),
-                        ]);
+                    $newPalette = Palette::create([
+                        'code'           => $this->generatePaletteCode(),
+                        'company_id'     => $palette->company_id,
+                        'emplacement_id' => $palette->emplacement_id,
+                        'type'           => 'Stock',
+                        'user_id'        => $palette->user_id ?? auth()->id(),
+                    ]);
 
-                        foreach ($palette->inventoryArticles as $inventoryStock) {
-      
-                            $newPalette->articles()->attach(
-                                $inventoryStock->article->id,
-                                [ 'quantity' => $inventoryStock->pivot->quantity ?? 1 ]
-                            );
-                        }
+                    foreach ($palette->inventoryArticles as $inventoryStock) {
+
+                        $newPalette->articles()->attach(
+                            $inventoryStock->article->id,
+                            ['quantity' => $inventoryStock->pivot->quantity ?? 1]
+                        );
                     }
-                });
+                }
+            });
 
-                return response()->json([
-                    'success' => true,
-                    'message' => 'Stock initialized successfully',
-                ]);
+            return response()->json([
+                'success' => true,
+                'message' => 'Stock initialized successfully',
+            ]);
+        } catch (\Throwable $e) {
 
-            } catch (\Throwable $e) {
+            Log::error('Stock reset failed', ['error' => $e->getMessage()]);
 
-                Log::error('Stock reset failed', ['error' => $e->getMessage()]);
-
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Failed to initialize stock',
-                    'error'   => $e->getMessage(),
-                ], 500);
-            }
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to initialize stock',
+                'error'   => $e->getMessage(),
+            ], 500);
         }
-
-
+    }
 
 
     public function controlle(InventoryMovement $inventory_movement){
-        
+
         $inventory_movement->update([
             'controlled_by' => auth()->id()
         ]);
