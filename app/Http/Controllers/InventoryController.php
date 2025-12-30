@@ -458,8 +458,20 @@ public function insert(Request $request, Inventory $inventory)
     public function overview(Inventory $inventory)
     {
         $inventory->load(['movements.article', 'stock.article']);
+
+
         $quantity_in = $inventory->movements->where('type', 'IN')->sum('quantity');
         $quantity_out = $inventory->movements->where('type', 'OUT')->sum('quantity');
+
+
+        $movements_in = $inventory->movements->where('type', 'IN')->count();
+        $movements_in_none_controlled = $inventory->movements->where('type', 'IN')
+            ->whereNull('controlled_by')->count();
+
+
+        $usedCodes = $inventory->stock()->pluck('code_article')->toArray();
+
+        $articles_non_used = ArticleStock::whereNotIn('code', $usedCodes)->count();
 
         $value_in = $inventory->movements->where('type', 'IN')->sum(function ($movement) {
             return $movement->quantity * ($movement->article->price ?? 0);
@@ -477,10 +489,13 @@ public function insert(Request $request, Inventory $inventory)
 
         return [
             'quantity_in' => $quantity_in,
+            'movements_in' => $movements_in,
             'quantity_out' => $quantity_out,
             'value_in' => $value_in,
             'value_out' => $value_out,
+            'articles_non_used' => $articles_non_used,
             'quantity' => $quantity,
+            'movements_in_none_controlled' => $movements_in_none_controlled,
             'value' => $value
         ];
     }
