@@ -102,7 +102,7 @@ class InventoryMovementController extends Controller
 
             if ($qty <= $remaining) {
                 $stock->palettes()->detach($palette->id);
-                $this->deletePaletteIfEmpty($palette);
+                // $this->deletePaletteIfEmpty($palette);
                 $remaining -= $qty;
             } else {
                 $stock->palettes()->updateExistingPivot(
@@ -164,14 +164,14 @@ class InventoryMovementController extends Controller
         }
     }
 
-    protected function deletePaletteIfEmpty(Palette $palette)
-    {
-        $exists = DB::table('inventory_article_palette')
-            ->where('palette_id', $palette->id)
-            ->exists();
+    // protected function deletePaletteIfEmpty(Palette $palette)
+    // {
+    //     $exists = DB::table('inventory_article_palette')
+    //         ->where('palette_id', $palette->id)
+    //         ->exists();
 
-        if (!$exists) {
-            $palette->delete();
-        }
-    }
+    //     if (!$exists) {
+    //         $palette->delete();
+    //     }
+    // }
 }

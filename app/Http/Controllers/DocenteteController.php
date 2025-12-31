@@ -123,7 +123,7 @@ class DocenteteController extends Controller
     public function stockMovmentInser($article_code, $qte)
     {
         try {
-            $emplac_code = auth()->user()->company_id == 1 ? "K-3P" : "K-3SP";
+            $emplac_code = intval(auth()->user()->company_id) == 1 ? "K-3P" : "K-3SP";
 
             $emplacement = Emplacement::where("code", $emplac_code)->first();
             if (!$emplacement) {
