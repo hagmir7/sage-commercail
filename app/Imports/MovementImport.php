@@ -93,7 +93,7 @@ class MovementImport implements ToCollection, WithHeadingRow, WithCalculatedForm
                     'code_article'      => $articleCode,
                     'designation'       => $row['description'] ?? null,
                     'emplacement_id'    => $primaryEmplacementId,
-                    'to_emplacement_id' => $newEmplacement?->id,
+                    'to_emplacement_id' => NULL,
                     'movement_date'     => $this->formatDate($row['date'] ?? null),
                     'quantity'          => (float) ($row['quantity'] ?? 0),
                     'moved_by'          => $row['user'] ?? null,
