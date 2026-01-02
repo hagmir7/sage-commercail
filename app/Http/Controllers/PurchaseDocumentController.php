@@ -155,7 +155,7 @@ class PurchaseDocumentController extends Controller
             'lines.*.estimated_price' => 'nullable|numeric|min:0',
 
             // --- Files per line ---
-            'lines.*.files.*' => 'nullable|file|max:10240|mimes:pdf,doc,docx,xls,xlsx,jpg,jpeg,png,gif',
+            'lines.*.files.*' => 'nullable|file|max:100240|mimes:pdf,doc,docx,xls,xlsx,jpg,jpeg,png,gif,ods',
             'lines.*.existing_file_ids' => 'array',
         ]);
 
