@@ -64,7 +64,7 @@ class PurchaseDocumentController extends Controller
 
             // --- Files for each line ---
             'lines.*.files' => 'nullable|array',
-            'lines.*.files.*' => 'nullable|file|max:10240|mimes:pdf,doc,docx,xls,xlsx,jpg,jpeg,png,gif',
+            'lines.*.files.*' => 'nullable|file|max:10240|mimes:pdf,doc,docx,xls,xlsx,jpg,jpeg,png,gif,ods',
         ]);
 
         if ($validator->fails()) {
