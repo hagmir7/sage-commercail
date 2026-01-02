@@ -138,15 +138,21 @@ class PurchaseDocumentController extends Controller
     public function update(Request $request, $id)
     {
         $validator = Validator::make($request->all(), [
-            // --- Document fields ---
-            'piece' => 'nullable|string|max:255',
-            'note' => 'nullable|string',
-            'reference' => 'required|string',
-            'urgent' => 'boolean',
-            'status' => 'nullable|numeric',
 
-            // --- Lines ---
+            // --------------------
+            // Document fields
+            // --------------------
+            'piece'     => 'nullable|string|max:255',
+            'note'      => 'nullable|string',
+            'reference' => 'required|string|max:255',
+            'urgent'    => 'nullable|boolean',
+            'status'    => 'nullable|numeric',
+
+            // --------------------
+            // Lines
+            // --------------------
             'lines' => 'required|array|min:1',
+
             'lines.*.id' => 'nullable|integer|exists:purchase_lines,id',
             'lines.*.code' => 'nullable|string|max:100',
             'lines.*.description' => 'required|string|max:1000',
@@ -154,18 +160,42 @@ class PurchaseDocumentController extends Controller
             'lines.*.unit' => 'nullable|string|max:50',
             'lines.*.estimated_price' => 'nullable|numeric|min:0',
 
-            // --- Files per line ---
-            'lines.*.files.*' => 'nullable|file|max:100240|mimes:pdf,doc,docx,xls,xlsx,jpg,jpeg,png,gif,ods',
-            'lines.*.existing_file_ids' => 'array',
+            // --------------------
+            // Files per line (ODS supported)
+            // --------------------
+            'lines.*.files' => 'nullable|array',
+
+            'lines.*.files.*' => [
+                'nullable',
+                'file',
+                'max:100240', // ~100MB
+                'mimetypes:
+                    application/pdf,
+                    application/msword,
+                    application/vnd.openxmlformats-officedocument.wordprocessingml.document,
+                    application/vnd.ms-excel,
+                    application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,
+                    application/vnd.oasis.opendocument.spreadsheet,
+                    image/jpeg,
+                    image/png,
+                    image/gif
+                ',
+            ],
+
+            // --------------------
+            // Existing files (when editing)
+            // --------------------
+            'lines.*.existing_file_ids' => 'nullable|array',
+            'lines.*.existing_file_ids.*' => 'integer|exists:purchase_line_files,id',
+
         ]);
 
         if ($validator->fails()) {
             return response()->json([
-                'errors' => $validator->errors(),
-                'message' => $validator->errors()->first(),
+                'message' => 'Validation failed',
+                'errors'  => $validator->errors(),
             ], 422);
         }
-
         $validated = $validator->validated();
 
         DB::beginTransaction();
