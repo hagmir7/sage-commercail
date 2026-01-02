@@ -403,6 +403,69 @@ class PaletteController extends Controller
 
 
 
+    public function stockConfirm(Request $request, $piece)
+    {
+        return DB::transaction(function () use ($piece) {
+
+            $document = Document::with(['lines.docligne', 'companies'])
+                ->where('piece', $piece)
+                ->firstOrFail();
+
+            $user = auth()->user();
+            $companyId = $user->company_id ?? 1;
+
+            $palette = Palette::create([
+                'code'             => $this->generatePaletteCode(),
+                'type'             => 'Livraison',
+                'document_id'      => $document->id,
+                'company_id'       => $companyId,
+                'user_id'          => $user->id,
+                'first_company_id' => $companyId,
+            ]);
+
+            $roleIds = $user->roles->pluck('id');
+
+            $lines = $document->lines->whereIn('role_id', $roleIds);
+
+            foreach ($lines as $line) {
+                $docligne = $line->docligne;
+
+                if (!$docligne) {
+                    continue;
+                }
+
+                $line->palettes()->attach($palette->id, [
+                    'quantity' => floatval($docligne->DL_Qte)
+                ]);
+
+                $docligne->increment('DL_QteBL', floatval($docligne->DL_Qte));
+
+                $line->update(['status_id' => 8]);
+            }
+
+            // Document status (only once)
+            $documentStatus = $document->validation() ? 8 : 7;
+
+            if ($document->status_id !== $documentStatus) {
+                $document->update(['status_id' => $documentStatus]);
+            }
+
+            // Company pivot status
+            $companyStatus = $this->validationCompany($companyId, $document->id) ? 8 : 7;
+
+            $document->companies()->updateExistingPivot($companyId, [
+                'status_id'  => $companyStatus,
+                'updated_at' => now(),
+            ]);
+
+            return response()->json([
+                'palette'  => $palette->fresh(),
+                'document' => $document->fresh(),
+            ]);
+        });
+    }
+
+
     public function confirm(Request $request)
     {
         $validator = Validator::make($request->all(), [

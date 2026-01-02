@@ -189,6 +189,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('scan', 'scanLine');
         Route::get('scan/{code}', 'scanPalette');
         Route::post('confirm', 'confirm');
+        Route::get('stock/confirm/{piece}', 'stockConfirm');
         Route::post('confirm/{code}/{piece}', 'confirmPalette');
         Route::put('reset/{code}', 'resetPalette');
         Route::post('detach', 'detach');
