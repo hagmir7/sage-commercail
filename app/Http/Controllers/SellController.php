@@ -29,7 +29,7 @@ class SellController extends Controller
         $lastPiece = Docentete::where('DO_Type', self::DO_TYPE)
             ->where('DO_Piece', 'LIKE', '%BLX%')
             ->orderByDesc('DO_Piece')
-            ->value('DO_Piece') ?? '25BLX000000';
+            ->value('DO_Piece') ?? '26BLX000000';
 
         preg_match('/^([A-Z0-9]+)(\d{6})$/i', $lastPiece, $matches);
 
@@ -37,7 +37,7 @@ class SellController extends Controller
             return $matches[1] . str_pad((int)$matches[2] + 1, 6, '0', STR_PAD_LEFT);
         }
 
-        return '25BLX000001';
+        return '26BLX000001';
     }
 
 

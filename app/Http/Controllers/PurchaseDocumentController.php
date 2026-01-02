@@ -521,7 +521,7 @@ public function createDocentete(string $DO_Piece, string $DO_Tiers, string $DO_R
             'DO_Coord03'            => '',
             'DO_Coord04'            => '',
             'DO_Souche'             => $DO_Souche,
-            'DO_DateLivr'           => '2025-11-11 00:00:00.000',
+            'DO_DateLivr'           => '2026-11-11 00:00:00.000',
             'DO_Condition'          => 1,
             'DO_Tarif'              => 1,
             'DO_Colisage'           => 1,

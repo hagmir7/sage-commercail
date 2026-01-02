@@ -1162,14 +1162,14 @@ class DocenteteController extends Controller
                 throw new \Exception("Impossible de modifier ce document '$piece' and et '$souche'");
             }
             $result = DB::selectOne("SELECT TOP 1 * FROM F_DOCCURRENTPIECE WHERE cbMarq = ?", [$cbMarq]);
-            $currentPiece = $result?->DC_Piece ?? '25FA000000';
+            $currentPiece = $result?->DC_Piece ?? '26FA000000';
             if (preg_match('/^([A-Z0-9]+?)(\d+)$/', $currentPiece, $matches)) {
                 $prefix = $matches[1];
                 $number = (int)$matches[2];
                 $nextNumber = $number + 1;
                 $newPiece = $prefix . str_pad($nextNumber, strlen($matches[2]), '0', STR_PAD_LEFT);
             } else {
-                $newPiece = '25FA000001';
+                $newPiece = '26FA000001';
             }
             DB::update("UPDATE F_DOCCURRENTPIECE SET DC_Piece = ? WHERE cbMarq = ?", [$newPiece, $cbMarq]);
             return $currentPiece;
@@ -1305,7 +1305,7 @@ class DocenteteController extends Controller
     }
 
 
-public function delete($piece = '25FA002095', $type = 6)
+public function delete($piece = '26FA002095', $type = 6)
 {
     try {
         // Execute the stored procedure
