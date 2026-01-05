@@ -685,6 +685,87 @@ class PaletteController extends Controller
     }
 
 
+    public function controlAll($code)
+    {
+        $user_company = auth()->user()->company_id;
+
+        $palette = Palette::with([
+            'lines',
+            'document.lines',
+            'document.palettes.lines',
+            'document.companies'
+        ])
+            ->where('code', $code)
+            ->firstOrFail();
+
+        DB::transaction(function () use ($palette, $user_company) {
+
+            // 1️⃣ Update ALL pivot rows (line_palettes)
+            DB::table('line_palettes')
+                ->where('palette_id', $palette->id)
+                ->update([
+                    'controlled_at' => now(),
+                ]);
+
+            // 2️⃣ Update ALL lines status_id = 10 (this palette only)
+            $palette->lines()->update([
+                'status_id' => 10
+            ]);
+
+            // 3️⃣ Check if ALL palettes of this company are controlled
+            $allControlledCompany = $palette->document->palettes
+                ->where('company_id', $user_company)
+                ->every(function ($docPalette) {
+                    return !$docPalette->lines()
+                        ->wherePivotNull('controlled_at')
+                        ->exists();
+                });
+
+            // 4️⃣ Update palette itself
+            $palette->update([
+                'controlled'     => true,
+                'controlled_by'  => auth()->id(),
+                'controlled_at'  => now(),
+            ]);
+
+            // 5️⃣ Update document ↔ company pivot + document lines
+            if ($allControlledCompany) {
+
+                // Document-company pivot
+                $palette->document->companies()->updateExistingPivot($user_company, [
+                    'status_id'     => 10,
+                    'controlled_by' => auth()->id(),
+                    'controlled_at' => now(),
+                ]);
+
+                // All document lines for this company
+                $palette->document->lines()
+                    ->where('company_id', $user_company)
+                    ->update([
+                        'status_id' => 10,
+                    ]);
+
+                // Optional: document global status
+                $palette->document->update([
+                    'status_id' => 10
+                ]);
+
+            } else {
+
+                $palette->document->companies()->updateExistingPivot($user_company, [
+                    'status_id'     => 9,
+                    'controlled_at' => now(),
+                ]);
+            }
+        });
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Toutes les lignes ont été contrôlées avec succès'
+        ]);
+    }
+
+
     public function controller($code, $lineId)
     {
         return DB::transaction(function () use ($code, $lineId) {
@@ -709,13 +790,9 @@ class PaletteController extends Controller
             }
 
             $palette->load('lines');
-
-
             $user_company = auth()->user()->company_id;
 
-            auth()->user()->lines()->syncWithoutDetaching([
-                $lineId => ['action_name' => 'Contrôle']
-            ]);
+      
 
 
 

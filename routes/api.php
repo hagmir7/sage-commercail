@@ -201,6 +201,7 @@ Route::middleware('auth:sanctum')->group(function () {
 
         Route::get('{code}', 'show');
         Route::get('{code}/line/{lineId}', 'controller');
+        Route::get('{code}/controlle-all', 'controlAll');
         Route::get('document/{piece}', 'documentPalettes');
         Route::delete('{palette:code}', 'destroy');
         Route::post('import', 'import')->name('palettes.import');
