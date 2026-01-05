@@ -403,10 +403,12 @@ class PaletteController extends Controller
 
 
 
+
     public function stockConfirm(Request $request, $piece)
     {
         return DB::transaction(function () use ($piece) {
 
+            // Load document with related lines and companies
             $document = Document::with(['lines.docligne', 'companies'])
                 ->where('piece', $piece)
                 ->firstOrFail();
@@ -414,6 +416,24 @@ class PaletteController extends Controller
             $user = auth()->user();
             $companyId = $user->company_id ?? 1;
 
+            $roleIds = $user->roles->pluck('id');
+
+            // Filter lines based on user roles
+            $lines = $document->lines->whereIn('role_id', $roleIds);
+
+            // Check if at least one line has status_id < 8
+            $linesToProcess = $lines->filter(fn($line) => $line->status_id < 8 && $line->docligne);
+
+            if ($linesToProcess->isEmpty()) {
+                // No lines to process, return message
+                return response()->json([
+                    'message' => 'No lines available for stock confirmation.',
+                    'palette' => null,
+                    'document' => $document->fresh(),
+                ]);
+            }
+
+            // Create a new palette only if there is at least one line to process
             $palette = Palette::create([
                 'code'             => $this->generatePaletteCode(),
                 'type'             => 'Livraison',
@@ -423,36 +443,30 @@ class PaletteController extends Controller
                 'first_company_id' => $companyId,
             ]);
 
-            $roleIds = $user->roles->pluck('id');
-
-            $lines = $document->lines->whereIn('role_id', $roleIds);
-
-            foreach ($lines as $line) {
+            foreach ($linesToProcess as $line) {
                 $docligne = $line->docligne;
+                $lineQuantity = floatval($docligne->DL_Qte);
 
-                if (!$docligne) {
-                    continue;
-                }
-
+                // Attach line to palette
                 $line->palettes()->attach($palette->id, [
-                    'quantity' => floatval($docligne->DL_Qte)
+                    'quantity' => $lineQuantity
                 ]);
 
-                $docligne->increment('DL_QteBL', floatval($docligne->DL_Qte));
+                // Increment delivered quantity on docligne
+                $docligne->increment('DL_QteBL', $lineQuantity);
 
+                // Update line status to 8
                 $line->update(['status_id' => 8]);
             }
 
-            // Document status (only once)
+            // Update document status
             $documentStatus = $document->validation() ? 8 : 7;
-
             if ($document->status_id !== $documentStatus) {
                 $document->update(['status_id' => $documentStatus]);
             }
 
-            // Company pivot status
+            // Update company pivot status
             $companyStatus = $this->validationCompany($companyId, $document->id) ? 8 : 7;
-
             $document->companies()->updateExistingPivot($companyId, [
                 'status_id'  => $companyStatus,
                 'updated_at' => now(),
@@ -464,6 +478,7 @@ class PaletteController extends Controller
             ]);
         });
     }
+
 
 
     public function confirm(Request $request)
