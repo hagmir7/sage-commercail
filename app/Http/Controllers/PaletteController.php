@@ -404,11 +404,10 @@ class PaletteController extends Controller
 
 
 
-    public function stockConfirm(Request $request, $piece)
+    public function confirmAll(Request $request, $piece)
     {
         return DB::transaction(function () use ($piece) {
 
-            // Load document with related lines and companies
             $document = Document::with(['lines.docligne', 'companies'])
                 ->where('piece', $piece)
                 ->firstOrFail();
@@ -418,14 +417,12 @@ class PaletteController extends Controller
 
             $roleIds = $user->roles->pluck('id');
 
-            // Filter lines based on user roles
             $lines = $document->lines->whereIn('role_id', $roleIds);
 
             // Check if at least one line has status_id < 8
             $linesToProcess = $lines->filter(fn($line) => $line->status_id < 8 && $line->docligne);
 
             if ($linesToProcess->isEmpty()) {
-                // No lines to process, return message
                 return response()->json([
                     'message' => 'No lines available for stock confirmation.',
                     'palette' => null,

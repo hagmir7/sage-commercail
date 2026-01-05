@@ -8,7 +8,7 @@ use App\Models\ArticleStock;
 use App\Models\Docligne;
 use App\Models\Emplacement;
 use Illuminate\Http\Request;
-
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
 use Maatwebsite\Excel\Facades\Excel;
 
@@ -315,36 +315,44 @@ class ArticleStockController extends Controller
     }
 
 
-    public function emplacements($code)
+    public function emplacements(string $code)
     {
-        $article = ArticleStock::with('companies')->where('code', $code)
-            ->orWhere('code_supplier', $code)
-            ->orWhere('code_supplier_2', $code)
-            ->orWhere('qr_code', $code)
+        $article = ArticleStock::with('companies')
+            ->where(function ($q) use ($code) {
+                $q->where('code', $code)
+                ->orWhere('code_supplier', $code)
+                ->orWhere('code_supplier_2', $code)
+                ->orWhere('qr_code', $code);
+            })
             ->first();
 
         if (!$article) {
             return response()->json(['message' => 'Article introuvable.'], 404);
         }
 
-
-        $emplacements = Emplacement::whereHas('palettes.articles', function ($query) use ($article) {
-            $query->where('article_stocks.id', $article->id);
-        })
+        $emplacements = Emplacement::whereHas('palettes.articles', function ($q) use ($article) {
+                $q->where('article_stocks.id', $article->id);
+            })
             ->with([
                 'depot.company',
+
                 'palettes' => function ($q) use ($article) {
-                    $q->whereHas('articles', fn($a) => $a->where('article_stocks.id', $article->id))
-                        ->whereIn('type', ['Stock'])
-                        ->with([
-                            'articles' => fn($a) => $a->where('article_stocks.id', $article->id)
-                        ]);
+                    $q->where('type', 'Stock')
+                    ->whereHas('articles', fn ($a) =>
+                        $a->where('article_stocks.id', $article->id)
+                    )
+                    ->with([
+                        'articles' => fn ($a) =>
+                            $a->where('article_stocks.id', $article->id)
+                                ->withPivot('quantity')
+                    ]);
                 }
             ])
             ->get();
 
         return response()->json($emplacements);
     }
+
 
 
 
@@ -421,4 +429,88 @@ class ArticleStockController extends Controller
 
         return response()->json($articles);
     }
+
+
+
+    public function stock(Request $request)
+    {
+        $search       = $request->input('search');
+        $depotCode    = $request->input('depot_code');
+        $category     = $request->input('category'); // STRING
+
+        $query = DB::table('emplacements as e')
+            ->join('palettes as p', 'p.emplacement_id', '=', 'e.id')
+            ->join('article_palette as ap', 'ap.palette_id', '=', 'p.id')
+            ->join('article_stocks as a', 'a.id', '=', 'ap.article_stock_id')
+            ->join('depots as d', 'd.id', '=', 'e.depot_id')
+            ->select([
+                'e.id as emplacement_id',
+                'e.code as emplacement_code',
+
+                'a.id as article_stock_id',
+                'a.code as article_code',
+                'a.code_supplier',
+                'a.category', // STRING
+                'a.name',
+                'a.description',
+                'a.width',
+                'a.height',
+                'a.depth',
+                'a.thickness',
+
+                DB::raw('SUM(ap.quantity) as total_quantity')
+            ])
+            ->groupBy(
+                'e.id',
+                'e.code',
+                'a.id',
+                'a.code',
+                'a.code_supplier',
+                'a.category',
+                'a.name',
+                'a.description',
+                'a.width',
+                'a.height',
+                'a.depth',
+                'a.thickness'
+            );
+
+        /* =======================
+        SEARCH
+        ======================= */
+        if (!empty($search)) {
+            $query->where(function ($q) use ($search) {
+                $q->where('a.code', 'like', "%{$search}%")
+                    ->orWhere('a.code_supplier', 'like', "%{$search}%")
+                    ->orWhere('a.name', 'like', "%{$search}%")
+                    ->orWhere('a.description', 'like', "%{$search}%")
+                    ->orWhere('e.code', 'like', "%{$search}%");
+            });
+        }
+
+        /* =======================
+        FILTER BY DEPOT
+        ======================= */
+        if (!empty($depotCode)) {
+            $query->where('d.code', $depotCode);
+        }
+
+        /* =======================
+        FILTER BY CATEGORY (STRING)
+        ======================= */
+        if (!empty($category)) {
+            $query->where('a.category', $category);
+            // or use like if needed:
+            // $query->where('a.category', 'like', "%{$category}%");
+        }
+
+        /* =======================
+        ORDER & PAGINATION
+        ======================= */
+        return $query
+            ->orderBy('e.code')
+            ->orderBy('a.code')
+            ->paginate(100);
+    }
+
 }

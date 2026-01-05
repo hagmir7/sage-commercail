@@ -60,4 +60,9 @@ class ArticleStock extends Model
     public function inventoryMovements(){
         return $this->hasMany(InventoryMovement::class, 'code_article', 'code');
     }
+
+     public function articlePalettes()
+    {
+        return $this->hasMany(ArticlePalette::class, 'article_stock_id');
+    }
 }

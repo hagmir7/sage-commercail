@@ -189,7 +189,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('scan', 'scanLine');
         Route::get('scan/{code}', 'scanPalette');
         Route::post('confirm', 'confirm');
-        Route::get('stock/confirm/{piece}', 'stockConfirm');
+        Route::get('stock/confirm/{piece}', 'confirmAll');
         Route::post('confirm/{code}/{piece}', 'confirmPalette');
         Route::put('reset/{code}', 'resetPalette');
         Route::post('detach', 'detach');
@@ -272,10 +272,12 @@ Route::middleware('auth:sanctum')->group(function () {
 
 
     Route::prefix('articles')->controller(ArticleStockController::class)->group(function () {
+        Route::get('stock', 'stock');
         Route::get('{article_stock:code}', 'show');
+      
         Route::get('emplacements/{piece}', 'emplacements');
         Route::get('', 'index');
-        Route::post('store', 'store');
+        Route::get('store', 'store');
         Route::put('update/{article_stock:code}', 'update');
 
         Route::get('update/{article:code}', 'update');

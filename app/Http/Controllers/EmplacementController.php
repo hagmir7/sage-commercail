@@ -50,14 +50,23 @@ class EmplacementController extends Controller
         return response()->json(['message' => "Added successfully"]);
     }
 
-    public function articles($code)
+    public function articles(string $code)
     {
         return Emplacement::where('code', $code)
             ->with([
-                'palettes' => function ($q) {
-                    $q->select('id', 'code', 'emplacement_id',)
-                        // ->whereIn('type', ['Stock', 'Inventaire'])
-                        ->with('articles:id,code,description,name,color,quantity,thickness,height,width,depth');
+                'palettes:id,code,emplacement_id',
+                'palettes.articles' => function ($q) {
+                    $q->select(
+                        'article_stocks.id',
+                        'article_stocks.code',
+                        'article_stocks.name',
+                        'article_stocks.description',
+                        'article_stocks.color',
+                        'article_stocks.thickness',
+                        'article_stocks.height',
+                        'article_stocks.width',
+                        'article_stocks.depth'
+                    )->withPivot('quantity');
                 }
             ])
             ->firstOrFail();

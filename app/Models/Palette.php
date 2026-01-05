@@ -43,7 +43,12 @@ class Palette extends Model
 
     public function articles()
     {
-        return $this->belongsToMany(ArticleStock::class, 'article_palette')->withPivot('quantity')->withTimestamps();
+        return $this->belongsToMany(
+            ArticleStock::class,
+            'article_palette',
+            'palette_id',
+            'article_stock_id'
+        )->withPivot('quantity');
     }
 
     public function inventoryArticles(){
@@ -68,6 +73,13 @@ class Palette extends Model
     {
         return $this->belongsTo(Emplacement::class);
     }
+
+     public function articlePalettes()
+    {
+        return $this->hasMany(ArticlePalette::class, 'palette_id');
+    }
+
+    
 
     
 }
