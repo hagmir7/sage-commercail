@@ -314,7 +314,7 @@ class DocenteteController extends Controller
             });
         }
 
-        $documents = $query->orderBy('created_at', 'desc')->paginate(20);
+        $documents = $query->orderBy('status_id', 'desc')->paginate(20);
 
         return response()->json($documents);
     }

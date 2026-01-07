@@ -369,7 +369,7 @@ class DocumentController extends Controller
 
         $query->whereHas('docentete')->whereNull('piece_fa')->whereNull('piece_bl');
 
-        $documents = $query->orderBy('id', 'desc')->paginate(20);
+        $documents = $query->orderBy('status_id', 'asc')->paginate(20);
         return response()->json($documents);
     }
 
