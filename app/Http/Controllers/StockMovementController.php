@@ -9,15 +9,26 @@ use App\Models\CompanyStock;
 use App\Models\Emplacement;
 use App\Models\Palette;
 use App\Models\StockMovement;
+use App\Services\StockMovementService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Validator;
 use Maatwebsite\Excel\Facades\Excel;
+use RuntimeException;
 
 
 class StockMovementController extends Controller
 {
+
+    protected StockMovementService $stockService;
+
+    public function __construct(StockMovementService $stockService)
+    {
+        $this->stockService = $stockService;
+    }
+
+
 
     public function list(Request $request, Company $company)
     {
@@ -167,9 +178,6 @@ class StockMovementController extends Controller
     }
 
 
-
-
-
     public function generatePaletteCode()
     {
         $lastCode = DB::table('palettes')
@@ -240,87 +248,14 @@ class StockMovementController extends Controller
                     'movement_date'    => now(),
                 ]);
 
-
-
-                // ✅ Calculate QTE
-                if ($request->type_colis === "Palette" || $request->type_colis === "Carton") {
-                    $qte_value = $request->palettes * $conditionMultiplier;
-                } else {
-                    $qte_value = $request->quantity;
-                }
-
-                // ✅ Update company stock
-                $company_stock = CompanyStock::where('code_article', $request->code_article)
-                    ->where('company_id', $companyId)
-                    ->first();
-
-                if ($company_stock) {
-                    $company_stock->quantity += $qte_value;
-                    $company_stock->save();
-                } else {
-                    CompanyStock::create([
-                        'code_article' => $request->code_article,
-                        'designation'  => $article->description,
-                        'company_id'   => $companyId,
-                        'quantity'     => $qte_value
-                    ]);
-                }
-
-                // ✅ Update emplacement pivot safely
-                $existing = $emplacement->articles()->find($article->id);
-
-                if ($existing) {
-                    $emplacement->articles()->updateExistingPivot($article->id, [
-                        'quantity' => DB::raw('quantity + ' . $qte_value)
-                    ]);
-                } else {
-                    $emplacement->articles()->attach($article->id, ['quantity' => $qte_value]);
-                }
-
-                // ✅ Handle palettes
-                if ($request->type_colis === "Palette") {
-
-                    for ($i = 1; $i <= intval($request->quantity); $i++) {
-
-                        $palette = Palette::create([
-                            "code"           => $this->generatePaletteCode(),
-                            "emplacement_id" => $emplacement->id,
-                            "company_id"     => $companyId,
-                            "user_id"        => auth()->id(),
-                            "type"           => "Stock",
-                        ]);
-
-                        // attach article to new palette
-                        $palette->articles()->attach($article->id, [
-                            'quantity' => floatval($conditionMultiplier)
-                        ]);
-                    }
-                } else {
-
-                    // Find or create ONE palette for this emplacement
-                    $palette = Palette::firstOrCreate(
-                        ["emplacement_id" => $emplacement->id, "type" => "Stock"],
-                        [
-                            "code"       => $this->generatePaletteCode(),
-                            "company_id" => $companyId,
-                            "user_id"    => auth()->id()
-                        ]
-                    );
-
-                    // check article exist inside palette
-                    $existing = $palette->articles()->where('article_stock_id', $article->id)->first();
-
-                    if ($existing) {
-                        // UPDATE correctly
-                        $palette->articles()->updateExistingPivot(
-                            $article->id,
-                            ['quantity' => DB::raw('quantity + ' . $qte_value)]
-                        );
-                    } else {
-                        // INSERT normally
-                        $palette->articles()->attach($article->id, ['quantity' => $qte_value]);
-                    }
-                }
+                $this->stockService->stockInsert(
+                    $emplacement,
+                    $article,
+                    $request->quantity,
+                    $conditionMultiplier,
+                    $request->type_colis,
+                    intval($request->quantity),
+                );
             });
 
             return response()->json(['message' => 'Stock successfully inserted or updated.']);
@@ -626,24 +561,109 @@ class StockMovementController extends Controller
         }
     }
 
+
+    public function stockTransfer($sourceEmplacement, $destinationEmplacement, $article, float $quantity)
+    {
+        DB::transaction(function () use (
+            $sourceEmplacement,
+            $destinationEmplacement,
+            $article,
+            $quantity
+        ) {
+            $this->stockOut($sourceEmplacement, $article, $quantity);
+
+            $this->stockInsert(
+                $destinationEmplacement,
+                $article,
+                $quantity,
+                'Piece',
+                null,
+                null
+            );
+        });
+    }
+
     public function deleteMovement(StockMovement $stock_movement)
     {
         try {
             DB::transaction(function () use ($stock_movement) {
+                // Validate emplacement exists
                 $emplacement = Emplacement::find($stock_movement->emplacement_id);
-                $article = ArticleStock::find($stock_movement->article_stock_id);
-                if ($stock_movement) {
-                    if($stock_movement->movement_type == "IN"){
-                        $this->stockOut($emplacement, $article, $stock_movement->quantity);
-                    }elseif($stock_movement->movement_type == "OUT"){
-                        $this->stockInsert($emplacement, $article, $stock_movement->quantity, false, false, 0);
-                    }elseif($stock_movement->movement_type == "RETURN"){
-                        $this->stockOut($emplacement, $article, $stock_movement->quantity);
-                    }
-                    $stock_movement->delete();
-                } else {
-                    throw new \Exception('Article introuvable en stock : ' . $stock_movement->code_article);
+                if (!$emplacement) {
+                    throw new RuntimeException(
+                        "Emplacement introuvable avec l'ID : {$stock_movement->emplacement_id}"
+                    );
                 }
+
+                // Validate article exists
+                $article = ArticleStock::find($stock_movement->article_stock_id);
+                if (!$article) {
+                    throw new RuntimeException(
+                        "Article introuvable avec l'ID : {$stock_movement->article_stock_id}"
+                    );
+                }
+
+                // Validate quantity
+                if ($stock_movement->quantity <= 0) {
+                    throw new RuntimeException(
+                        "Quantité invalide : {$stock_movement->quantity}"
+                    );
+                }
+
+                // Rollback the movement based on type
+                switch ($stock_movement->movement_type) {
+                    case 'IN':
+                        $this->stockService->rollbackStockInsert(
+                            $emplacement,
+                            $article,
+                            $stock_movement->quantity
+                        );
+                        break;
+
+                    case 'OUT':
+                        $this->stockService->rollbackStockOut(
+                            $emplacement,
+                            $article,
+                            $stock_movement->quantity
+                        );
+                        break;
+
+                    case 'RETURN':
+                        $this->stockService->rollbackStockInsert(
+                            $emplacement,
+                            $article,
+                            $stock_movement->quantity
+                        );
+                        break;
+
+                    case 'TRANSFER':
+                        if ($stock_movement->to_emplacement_id) {
+                            $destinationEmplacement = Emplacement::find(
+                                $stock_movement->to_emplacement_id
+                            );
+                            if (!$destinationEmplacement) {
+                                throw new RuntimeException(
+                                    "Emplacement de destination introuvable"
+                                );
+                            }
+                            $this->stockService->rollbackTransfer(
+                                $emplacement,
+                                $destinationEmplacement,
+                                $article,
+                                $stock_movement->quantity
+                            );
+                        } else {
+                            throw new RuntimeException(
+                                "Impossible d'annuler le transfert : destination manquante"
+                            );
+                        }
+                        break;
+                    default:
+                        throw new RuntimeException(
+                            "Type de mouvement inconnu : {$stock_movement->movement_type}"
+                        );
+                }
+                $stock_movement->delete();
             });
 
             return response()->json([
@@ -651,15 +671,32 @@ class StockMovementController extends Controller
                 'message' => 'Mouvement supprimé avec succès',
                 'data' => [
                     'movement_id' => $stock_movement->id,
-                    'code_article' => $stock_movement->code_article
+                    'movement_type' => $stock_movement->movement_type,
+                    'code_article' => $stock_movement->code_article ?? $stock_movement->article_stock_id,
+                    'quantity' => $stock_movement->quantity,
+                    'emplacement' => $stock_movement->emplacement->code ?? null
                 ]
             ], 200);
-        } catch (\Exception $e) {
+        } catch (RuntimeException $e) {
+            \Log::alert($e->getMessage());
             return response()->json([
                 'success' => false,
                 'message' => $e->getMessage(),
                 'error' => $e->getMessage()
             ], 400);
+        } catch (\Exception $e) {
+            // Log the error for debugging
+            \Log::error('Error deleting stock movement', [
+                'movement_id' => $stock_movement->id ?? null,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Une erreur inattendue s\'est produite',
+                'error' => $e->getMessage()
+            ], 500);
         }
     }
 

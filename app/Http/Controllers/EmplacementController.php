@@ -6,12 +6,21 @@ use App\Imports\EmplacementImport;
 use App\Models\Depot;
 use App\Models\Emplacement;
 use App\Models\Inventory;
+use App\Services\StockMovementService;
 use Illuminate\Http\Request;
 use Maatwebsite\Excel\Facades\Excel;
 use Illuminate\Support\Facades\Validator;
 
 class EmplacementController extends Controller
 {
+    protected StockMovementService $stockService;
+
+    public function __construct(StockMovementService $stockService)
+    {
+        $this->stockService = $stockService;
+    }
+
+
     public function show(Emplacement $emplacement)
     {
         if(!$emplacement){
@@ -54,7 +63,10 @@ class EmplacementController extends Controller
     {
         return Emplacement::where('code', $code)
             ->with([
-                'palettes:id,code,emplacement_id',
+                'palettes' => function ($q) {
+                    $q->where('type', 'Stock')
+                        ->select('id', 'code', 'emplacement_id', 'type');
+                },
                 'palettes.articles' => function ($q) {
                     $q->select(
                         'article_stocks.id',
@@ -71,6 +83,7 @@ class EmplacementController extends Controller
             ])
             ->firstOrFail();
     }
+
 
     public function delete(Emplacement $emplacement)
     {
@@ -92,31 +105,31 @@ class EmplacementController extends Controller
     }
 
     public function import(Request $request, Depot $depot)
-        {
-            $request->validate([
-                'file' => 'required|file|mimes:xlsx,xls,csv',
-            ]);
+    {
+        $request->validate([
+            'file' => 'required|file|mimes:xlsx,xls,csv',
+        ]);
 
-            try {
-                ini_set('max_execution_time', 7200); // 2 hours
-                ini_set('memory_limit', '4G');
+        try {
+            ini_set('max_execution_time', 7200); // 2 hours
+            ini_set('memory_limit', '4G');
 
-                Excel::import(new EmplacementImport($depot->id), $request->file('file'));
+            Excel::import(new EmplacementImport($depot->id), $request->file('file'));
 
-                return response()->json([
-                    'message' => "Fichier importé avec succès"
-                ], 200);
-            } catch (\Maatwebsite\Excel\Validators\ValidationException $e) {
-                return response()->json([
-                    'message' => 'Erreur de validation',
-                    'errors' => $e->failures()
-                ], 422);
-            } catch (\Exception $e) {
-                \Log::error('Import failed: ' . $e->getMessage());
+            return response()->json([
+                'message' => "Fichier importé avec succès"
+            ], 200);
+        } catch (\Maatwebsite\Excel\Validators\ValidationException $e) {
+            return response()->json([
+                'message' => 'Erreur de validation',
+                'errors' => $e->failures()
+            ], 422);
+        } catch (\Exception $e) {
+            \Log::error('Import failed: ' . $e->getMessage());
 
-                return response()->json([
-                    'message' => 'Erreur lors de l\'importation du fichier'
-                ], 500);
-            }
+            return response()->json([
+                'message' => 'Erreur lors de l\'importation du fichier'
+            ], 500);
         }
+    }
 }

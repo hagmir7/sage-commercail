@@ -13,6 +13,7 @@ use App\Models\Line;
 use App\Models\Palette;
 use App\Models\StockMovement;
 use App\Models\UserLine;
+use App\Services\StockMovementService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -21,6 +22,15 @@ use Maatwebsite\Excel\Facades\Excel;
 
 class PaletteController extends Controller
 {
+
+
+    protected StockMovementService $stockService;
+
+    public function __construct(StockMovementService $stockService)
+    {
+        $this->stockService = $stockService;
+    }
+
     /**
      * Display a listing of the resource.
      *
@@ -403,6 +413,70 @@ class PaletteController extends Controller
 
 
 
+    public function stockMovement(string $ref, float $qte)
+    {
+        $article = ArticleStock::where('code', $ref)->first();
+
+        if (!$article) {
+            return response()->json(['message' => 'Article introuvable.'], 404);
+        }
+
+        $destinationCode = auth()->user()->company_id == 1 ? 'K-4P' : 'K-4SP';
+
+        $destination = Emplacement::where('code', $destinationCode)->first();
+        if (!$destination) {
+            return response()->json(['message' => 'Emplacement destination introuvable.'], 404);
+        }
+
+        $source = Emplacement::where('depot_id', 10)
+            ->whereNotIn('code', ['K-3P', 'K-4P'])
+            ->whereHas(
+                'palettes.articles',
+                fn($q) =>
+                $q->where('article_stocks.id', $article->id)
+                    ->where('article_palette.quantity', '>', 0)
+            )
+            ->first();
+
+        if (!$source) {
+            return response()->json([
+                'message' => 'Aucun emplacement source trouvé.'
+            ], 422);
+        }
+
+        // ✅ Call service from controller
+        try {
+            $this->stockService->transfer(
+                $source,
+                $destination,
+                $article,
+                $qte
+            );
+            StockMovement::create([
+                'code_article'     => $article->code,
+                'designation'      => $article->description ?? '',
+                'emplacement_id'   => $source?->id,
+                'movement_type'    => "TRANSFER",
+                'article_stock_id' => $article->id,
+                'quantity'         => floatval($qte),
+                'moved_by'         => auth()->id(),
+                'company_id'       => auth()->user()->company_id,
+                'to_company_id'    => null,
+                'movement_date'    => now(),
+                'to_emplacement_id' => $destination->id
+            ]);
+        } catch (\Throwable $th) {
+            //throw $th;
+        }
+
+
+        return response()->noContent();
+    }
+
+
+
+
+
 
     public function confirmAll(Request $request, $piece)
     {
@@ -454,6 +528,8 @@ class PaletteController extends Controller
 
                 // Update line status to 8
                 $line->update(['status_id' => 8]);
+                // Stock movement
+                $this->stockMovement($line->ref, $docligne->DL_Qte);
             }
 
             // Update document status

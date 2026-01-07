@@ -842,8 +842,9 @@ class DocenteteController extends Controller
 
             // Get or create document
             $document = Document::where('docentete_id', $docentete->cbMarq)->first();
+            $document_piece = Document::where('piece', $docentete->DO_Piece)->first();
 
-            if (!$document) {
+            if (!$document && !$document_piece) {
                 // Generate piece only if DO_Piece contains 'BC', otherwise use DO_Piece as is
                 $piece = str_contains($docentete->DO_Piece, 'BC')
                     ? $this->generatePiece(2, $docentete->DO_Souche)
@@ -917,8 +918,6 @@ class DocenteteController extends Controller
             ]);
         } catch (\Exception $e) {
             DB::rollBack();
-            \Log::error('Transfer failed: ' . $e->getMessage());
-
             if (str_contains($e->getMessage(), "Cet élément est en cours d'utilisation")) {
                 return response()->json([
                     'status' => 'error',
