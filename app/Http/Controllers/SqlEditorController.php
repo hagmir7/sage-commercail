@@ -11,18 +11,18 @@ class SqlEditorController extends Controller
     public function show()
     {
         // Optional: prevent on production
-        // if (app()->environment('production')) {
-        //     abort(403, 'SQL editor disabled on production.');
-        // }
+        if (!auth()->user()->hasRole('admin')) {
+            abort(403, 'SQL editor disabled on production.');
+        }
 
         return view('sql_editor');
     }
 
     public function execute(Request $request)
     {
-        // if (app()->environment('production')) {
-        //     return back()->withErrors(['env' => 'SQL editor disabled on production.']);
-        // }
+        if (!auth()->user()->hasRole('admin')) {
+            return back()->withErrors(['env' => 'SQL editor disabled on production.']);
+        }
 
         $request->validate([
             'sql' => 'required|string',
