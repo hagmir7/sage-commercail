@@ -75,66 +75,83 @@ class Document extends Model
 
 
 
-    public function validation(): bool
-    {
-        $this->load('lines.palettes');
-            $lines = $this->lines
-            ->where('ref', '!=', 'SP000001')
-            ->whereNotIn('design', ['Special', '', 'special']);
+public function validation(): bool
+{
+    // Load related lines and palettes
+    $this->load('lines.palettes');
 
-        foreach ($lines as $line) {
-            $totalToPrepare = floatval($line->docligne->EU_Qte);
-            $totalPrepared = floatval($line->docligne->DL_QteBL);
-            $allStatus = $this->companies()
-                ->where('status_id', 8)
-                ->count() === $this->companies()->count();
+    // Filter normal lines (excluding special references/designs)
+    $lines = $this->lines
+        ->where('ref', '!=', 'SP000001')
+        ->whereNotIn('design', ['Special', '', 'special']);
 
-            if (($totalToPrepare != $totalPrepared)) {
-                if($allStatus){
-                    return true;
-                }
-                return false;
-            }
+    foreach ($lines as $line) {
+        // Skip lines without a related docligne
+        if (!$line->docligne) {
+            continue;
         }
 
-        $lines = $this->lines
-            ->where('ref', 'SP000001')
-            ->whereIn('design', ['', 'Special', 'special']);
+        $totalToPrepare = floatval($line->docligne->EU_Qte);
+        $totalPrepared = floatval($line->docligne->DL_QteBL);
 
-        foreach($lines as $line){
-            $line->delete();
+        // Check if all companies have status_id 8
+        $allStatus = $this->companies()
+            ->where('status_id', 8)
+            ->count() === $this->companies()->count();
+
+        if ($totalToPrepare != $totalPrepared) {
+            return $allStatus ? true : false;
         }
-        return true;
     }
 
+    // Remove special lines (SP000001)
+    $specials = $this->lines
+        ->where('ref', 'SP000001')
+        ->whereIn('design', ['', 'Special', 'special']);
 
-    public function validationCompany($companyId): bool
-    {
-        $this->load('lines.palettes');
-        $lines = $this->lines()
-            ->where('company_id', $companyId)
-            ->where('ref', '!=', 'SP000001')
-            ->whereNotIn('design', ['Special', '', 'special'])
-            ->get();
-
-        foreach ($lines as $line) {
-            $totalPrepared = floatval($line->docligne->DL_QteBL);
-
-            if ($totalPrepared < $line->docligne->EU_Qte) {
-                return false;
-            }
-        }
-
-        // cleanup
-        $specials = $this->lines
-            ->where('ref', 'SP000001')
-            ->whereIn('design', ['', 'Special', 'special']);
-
-        foreach ($specials as $line) {
-            $line->delete();
-        }
-
-        return true;
+    foreach ($specials as $line) {
+        $line->delete();
     }
+
+    return true;
+}
+
+public function validationCompany($companyId): bool
+{
+    // Load lines and palettes
+    $this->load('lines.palettes');
+
+    // Filter lines for the given company (excluding special references/designs)
+    $lines = $this->lines()
+        ->where('company_id', $companyId)
+        ->where('ref', '!=', 'SP000001')
+        ->whereNotIn('design', ['Special', '', 'special'])
+        ->get();
+
+    foreach ($lines as $line) {
+        // Skip lines without a related docligne
+        if (!$line->docligne) {
+            continue;
+        }
+
+        $totalPrepared = floatval($line->docligne->DL_QteBL);
+        $totalToPrepare = floatval($line->docligne->EU_Qte);
+
+        if ($totalPrepared < $totalToPrepare) {
+            return false;
+        }
+    }
+
+    // Cleanup special lines for this document
+    $specials = $this->lines
+        ->where('ref', 'SP000001')
+        ->whereIn('design', ['', 'Special', 'special']);
+
+    foreach ($specials as $line) {
+        $line->delete();
+    }
+
+    return true;
+}
 
 }

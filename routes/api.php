@@ -343,6 +343,8 @@ Route::middleware('auth:sanctum')->group(function () {
     // Historiques
     Route::apiResource('purchase-document-histories', PurchaseDocumentHistoryController::class);
     Route::apiResource('services', ServiceController::class);
+
+    Route::get('status-notification', [DocumentController::class, 'statusNotification']);
 });
 
 Route::apiResource('units', UnitController::class);
@@ -362,6 +364,10 @@ Route::post('/user/update/{id}', [UserController::class, 'update']);
 
 Route::get('/webhook', [WhatsappController::class, 'verify']);
 Route::post('/webhook', [WhatsAppController::class, 'receive']);
+
+
+
+
 
 
 

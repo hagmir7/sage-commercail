@@ -676,4 +676,26 @@ class DocumentController extends Controller
 
         return response()->json($documents, 200, [], JSON_UNESCAPED_UNICODE);
     }
+
+    public function statusNotification()
+    {
+        $companyId = auth()->user()->company_id;
+
+        $statuses = Document::whereHas('companies', function ($query) use ($companyId) {
+            $query->where('companies.id', $companyId); // specify the table
+        })
+            ->whereIn('status_id', [1, 7, 3, 4, 8, 10])
+            ->select('status_id', DB::raw('count(*) as total'))
+            ->groupBy('status_id')
+            ->pluck('total', 'status_id');
+
+        return [
+            'pending' => $statuses[1] ?? 0,
+            'preparation' => $statuses[7] ?? 0,
+            'fabrication' => $statuses[3] ?? 0,
+            'montage'     => $statuses[4] ?? 0,
+            'controlle'   => $statuses[8] ?? 0,
+            'validation'  => $statuses[10] ?? 0,
+        ];
+    }
 }
