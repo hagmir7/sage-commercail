@@ -29,7 +29,7 @@ class Document extends Model
 
     // const CREATED_AT = 'created_at';
     // const UPDATED_AT = 'updated_at';
-     public $timestamps = true;
+    public $timestamps = true;
 
 
     // Relations
@@ -72,76 +72,81 @@ class Document extends Model
             ->withTimestamps();
     }
 
+    public function validation(): bool
+    {
+        // Filter normal lines WITH eager loading
+        $lines = $this->lines()
+            ->with('docligne', 'palettes')
+            ->where('ref', '!=', 'SP000001')
+            ->whereNotIn('design', ['Special', '', 'special'])
+            ->get();
 
+        // Move company status check outside loop (avoid N+1 queries)
+        $totalCompanies = $this->companies()->count();
+        $companiesWithStatus8 = $this->companies()->where('status_id', 8)->count();
+        $allStatus = ($totalCompanies > 0 && $totalCompanies === $companiesWithStatus8);
 
-public function validation(): bool
-{
-    // Filter normal lines WITH eager loading
-    $lines = $this->lines()
-        ->with('docligne', 'palettes')
-        ->where('ref', '!=', 'SP000001')
-        ->whereNotIn('design', ['Special', '', 'special'])
-        ->get();
+        foreach ($lines as $line) {
+            // Safely check if docligne exists AND has the required properties
+            if (
+                !$line->docligne ||
+                !isset($line->docligne->EU_Qte) ||
+                !isset($line->docligne->DL_QteBL)
+            ) {
+                continue;
+            }
 
-    // Move company status check outside loop
-    $allStatus = $this->companies()
-        ->where('status_id', 8)
-        ->count() === $this->companies()->count();
+            $totalToPrepare = floatval($line->docligne->EU_Qte);
+            $totalPrepared = floatval($line->docligne->DL_QteBL);
 
-    foreach ($lines as $line) {
-        // Safely check if docligne exists
-        if (!$line->docligne) {
-            continue;
+            if ($totalToPrepare != $totalPrepared) {
+                return $allStatus;
+            }
         }
 
-        $totalToPrepare = floatval($line->docligne->EU_Qte ?? 0);
-        $totalPrepared = floatval($line->docligne->DL_QteBL ?? 0);
+        // Remove special lines using bulk delete
+        $this->lines()
+            ->where('ref', 'SP000001')
+            ->whereIn('design', ['', 'Special', 'special'])
+            ->delete();
 
-        if ($totalToPrepare != $totalPrepared) {
-            return $allStatus;
-        }
+        return true;
     }
 
-    // Remove special lines
-    $this->lines()
-        ->where('ref', 'SP000001')
-        ->whereIn('design', ['', 'Special', 'special'])
-        ->delete();
+    public function validationCompany($companyId): bool
+    {
+        // Filter lines for the company WITH eager loading
+        $lines = $this->lines()
+            ->with('docligne', 'palettes')
+            ->where('company_id', $companyId)
+            ->where('ref', '!=', 'SP000001')
+            ->whereNotIn('design', ['Special', '', 'special'])
+            ->get();
 
-    return true;
-}
+        foreach ($lines as $line) {
+            // Safely check if docligne exists AND has the required properties
+            if (
+                !$line->docligne ||
+                !isset($line->docligne->EU_Qte) ||
+                !isset($line->docligne->DL_QteBL)
+            ) {
+                continue;
+            }
 
-public function validationCompany($companyId): bool
-{
-    // Filter lines WITH eager loading
-    $lines = $this->lines()
-        ->with('docligne', 'palettes')
-        ->where('company_id', $companyId)
-        ->where('ref', '!=', 'SP000001')
-        ->whereNotIn('design', ['Special', '', 'special'])
-        ->get();
+            $totalPrepared = floatval($line->docligne->DL_QteBL);
+            $totalToPrepare = floatval($line->docligne->EU_Qte);
 
-    foreach ($lines as $line) {
-        // Safely check if docligne exists
-        if (!$line->docligne) {
-            continue;
+            if ($totalPrepared < $totalToPrepare) {
+                return false;
+            }
         }
 
-        $totalPrepared = floatval($line->docligne->DL_QteBL ?? 0);
-        $totalToPrepare = floatval($line->docligne->EU_Qte ?? 0);
+        // Cleanup special lines using bulk delete
+        $this->lines()
+            ->where('ref', 'SP000001')
+            ->whereIn('design', ['', 'Special', 'special'])
+            ->delete();
 
-        if ($totalPrepared < $totalToPrepare) {
-            return false;
-        }
+        return true;
     }
-
-    // Cleanup special lines
-    $this->lines()
-        ->where('ref', 'SP000001')
-        ->whereIn('design', ['', 'Special', 'special'])
-        ->delete();
-
-    return true;
-}
-
 }
