@@ -690,7 +690,7 @@ class DocumentController extends Controller
             ->pluck('total', 'status_id');
 
         return [
-            'pending' => $statuses[1] ?? 0,
+            'pinding' => $statuses[1] ?? 0,
             'preparation' => $statuses[7] ?? 0,
             'fabrication' => $statuses[3] ?? 0,
             'montage'     => $statuses[4] ?? 0,

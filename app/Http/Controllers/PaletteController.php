@@ -634,10 +634,7 @@ class PaletteController extends Controller
                         'to_emplacement_id' => $new_emplacement->id
                     ]);
 
-
-                    $stock_movement = new StockMovementController();
-                    $stock_movement->stockOut($emplacement, $article_stock, $request->quantity);
-                    $stock_movement->stockInsert($new_emplacement, $article_stock, $request->quantity, 'Piece', null, null);
+                    $this->stockService->transfer($emplacement, $new_emplacement, $article_stock, $request->quantity);
                 }else{
                     try {
                         // new ArticleStockController()->decrementQuantity($line->ref, $request->emplacement);
