@@ -18,9 +18,17 @@ use App\Models\Compte;
 use App\Models\Emplacement;
 use App\Models\Palette;
 use App\Models\StockMovement;
+use App\Services\StockMovementService;
 
 class DocenteteController extends Controller
 {
+
+     protected StockMovementService $stockService;
+
+    public function __construct(StockMovementService $stockService)
+    {
+        $this->stockService = $stockService;
+    }
 
     public function preparation(Request $request)
     {
@@ -149,12 +157,9 @@ class DocenteteController extends Controller
                 'movement_date'    => now(),
             ]);
 
-            $stockService = new StockMovementController();
-            $stockService->stockInsert($emplacement, $article, $qte);
-
+            $this->stockService->stockInsert($emplacement, $article, $qte);
             DB::commit();
             return true;
-
         } catch (\Throwable $th) {
             DB::rollBack();
             \Log::alert($th->getMessage());

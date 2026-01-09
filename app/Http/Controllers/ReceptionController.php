@@ -12,6 +12,7 @@ use App\Models\Line;
 use App\Models\Palette;
 use App\Models\StockMovement;
 use App\Models\User;
+use App\Services\StockMovementService;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -19,6 +20,13 @@ use Illuminate\Support\Facades\Validator;
 
 class ReceptionController extends Controller
 {
+
+     protected StockMovementService $stockService;
+
+    public function __construct(StockMovementService $stockService)
+    {
+        $this->stockService = $stockService;
+    }
     public function index(Request $request)
     {
         $query = Docentete::on($request->company)
@@ -403,10 +411,7 @@ class ReceptionController extends Controller
                     $qte_value = $request->quantity;
                 }
 
-
-                $stock_insert = new StockMovementController();
-                $stock_insert->stockInsert($emplacement, $article, $request->quantity, $conditionMultiplier, $request->type_colis, $qte_value);
-
+                $this->stockService->stockInsert($emplacement, $article, $request->quantity, $conditionMultiplier, $request->type_colis, $qte_value);
             });
 
             return response()->json(['message' => 'Stock successfully inserted or updated.']);

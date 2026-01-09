@@ -300,11 +300,12 @@ class PaletteController extends Controller
         }
     }
 
-    // use Illuminate\Support\Facades\DB;
+
+
 
     public function confirmPalette($code, $piece)
     {
-        DB::beginTransaction(); 
+        DB::beginTransaction();
 
         try {
             $document = Document::with('palettes')->where('piece_fa', $piece)->first()
@@ -330,14 +331,15 @@ class PaletteController extends Controller
             // Update delivered date
             $palette->update(['delivered_at' => now()]);
 
-            $emplacement = Emplacement::find('7373');
-            $stockService = new StockMovementController();
+            $emplac_code = intval(auth()->user()->company_id) == 1 ? "K-3P" : "K-3SP";
+            $emplacement = Emplacement::where('code', $emplac_code)->first();
+
 
             foreach ($palette->lines as $line) {
                 StockMovement::create([
                     'code_article'     => $line->article_stock->code,
                     'designation'      => $line->article_stock->description,
-                    'emplacement_id'   => '7373',
+                    'emplacement_id'   => $emplacement->id,
                     'movement_type'    => "OUT",
                     'article_stock_id' => $line->article_stock->id,
                     'quantity'         => $line->docligne->DL_Qte,
@@ -347,7 +349,7 @@ class PaletteController extends Controller
                 ]);
 
                 // Stock Out
-                $stockService->stockOut(
+                $this->stockService->stockOut(
                     $emplacement,
                     $line->article_stock,
                     $line->docligne->DL_Qte,
@@ -367,9 +369,7 @@ class PaletteController extends Controller
 
             return response()->json($palette);
         } catch (\Throwable $e) {
-
             DB::rollBack();
-
             return response()->json([
                 'error' => 'An error occurred while processing the scan.',
                 'message' => $e->getMessage()
@@ -578,7 +578,7 @@ class PaletteController extends Controller
 
         try {
             DB::transaction(function () use ($document, $request, $line, $palette) {
-        
+
                 $docligne = $line?->docligne;
 
                 $ctValue = $docligne?->article?->conditions->where('EC_Enumere', $docligne?->EU_Enumere)->first()?->EC_Quantite;
@@ -599,7 +599,7 @@ class PaletteController extends Controller
 
                 $line->update(['status_id' => 8]);
 
-             
+
 
                 $emplac_code = auth()->user()->company_id == 1 ? "K-4P" : "K-4SP";
                 $new_emplacement = Emplacement::where('code', $emplac_code)->first();
@@ -610,14 +610,14 @@ class PaletteController extends Controller
                     'emplacement_id' => $new_emplacement->id
                 ]);
 
-               
+
 
                 // ✅ Decrement stock if emplacement is specified
                 if ($request->emplacement) {
                     $article_stock = ArticleStock::where('code', $line->ref)->first();
-                     $emplacement = Emplacement::where("code", $request->emplacement)->first();
+                    $emplacement = Emplacement::where("code", $request->emplacement)->first();
 
-                   
+
 
                     // ✅ Create stock OUT movement
                     StockMovement::create([
@@ -635,17 +635,17 @@ class PaletteController extends Controller
                     ]);
 
                     $this->stockService->transfer($emplacement, $new_emplacement, $article_stock, $request->quantity);
-                }else{
+                } else {
                     try {
                         // new ArticleStockController()->decrementQuantity($line->ref, $request->emplacement);
                     } catch (\Throwable $th) {
                         //throw $th;
-                    }   
+                    }
                 }
 
                 // ✅ Update doc line
-                
-               $multiplier = floatval($ctValue ?: 1); 
+
+                $multiplier = floatval($ctValue ?: 1);
 
                 $docligne = Docligne::where('cbMarq', $line->docligne_id);
 
@@ -675,7 +675,6 @@ class PaletteController extends Controller
                 'line'      => $line->fresh(['palettes', 'docligne']),
                 'document'  => $document->fresh(),
             ]);
-
         } catch (\Exception $e) {
             return response()->json([
                 'message' => $e->getMessage()
