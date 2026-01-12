@@ -288,6 +288,11 @@ class DocenteteController extends Controller
             });
         }
 
+
+        if ($request->filled('type')) {
+            $query->where('Type', $request->type);
+        }
+
         // Faster pagination without total counts
         $results = $query->simplePaginate(30);
 

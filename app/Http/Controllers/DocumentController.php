@@ -239,7 +239,7 @@ class DocumentController extends Controller
                     ->whereIn('DO_Type', [1, 2]);
             })
             ->whereHas('lines', function ($q) use ($user_roles) {
-                $q->where('company_id', auth()->user()->company_id);
+                $q->where('company_id', strval(auth()->user()->company_id));
 
                 $common = array_intersect(
                     $user_roles->toArray(),
@@ -261,7 +261,7 @@ class DocumentController extends Controller
                 $q->whereIn('document_companies.status_id', [1, 2, 3, 4, 5, 6, 7]);
             });
 
-        // 🔍 Search
+        //  Search
         if ($request->filled('search')) {
             $search = $request->search;
 
@@ -274,7 +274,7 @@ class DocumentController extends Controller
                 });
         }
 
-        // 📅 Date range on docentete.cbCreation
+        //  Date range on docentete.cbCreation
         if ($request->filled('date')) {
 
             $dates = explode(',', $request->date);
@@ -286,6 +286,17 @@ class DocumentController extends Controller
                 $q->whereBetween('DO_Date', [$start, $end]);
             });
         }
+        
+
+        if ($request->filled('type')) {
+            
+            $query->whereHas('docentete', function ($q) use ($request) {
+                $q->where('Type', $request->type);
+            });
+        }
+
+
+        
 
         $documents = $query->orderByDesc('id')->paginate(40);
 
@@ -368,6 +379,14 @@ class DocumentController extends Controller
         }
 
         $query->whereHas('docentete')->whereNull('piece_fa')->whereNull('piece_bl');
+
+        if ($request->filled('type')) {
+
+            $query->whereHas('docentete', function ($q) use ($request) {
+                $q->where('Type', $request->type);
+            });
+        }
+
 
         $documents = $query->orderBy('status_id', 'asc')->paginate(40);
         return response()->json($documents);
