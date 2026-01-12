@@ -88,11 +88,16 @@ class Document extends Model
         $allStatus = ($totalCompanies > 0 && $totalCompanies === $companiesWithStatus8);
 
         foreach ($lines as $line) {
-            $totalToPrepare = floatval($line->docligne->EU_Qte ?? 0);
-            $totalPrepared = floatval($line->docligne->DL_QteBL ?? 0);
+            if ($line?->docligne?->EU_Qte) {
+                $totalToPrepare = floatval($line->docligne->EU_Qte ?? 0);
+                $totalPrepared = floatval($line->docligne->DL_QteBL ?? 0);
 
-            if ($totalToPrepare != $totalPrepared) {
-                return $allStatus;
+                if ($totalToPrepare != $totalPrepared) {
+                    return $allStatus;
+                }
+            }else{
+                $line->delete();
+                return true;
             }
         }
 
@@ -110,18 +115,23 @@ class Document extends Model
         // Filter lines that HAVE docligne relationship
         $lines = $this->lines()
             ->with('docligne', 'palettes')
-            ->whereHas('docligne') // Only lines with docligne
+            ->whereHas('docligne')
             ->where('company_id', $companyId)
             ->where('ref', '!=', 'SP000001')
             ->whereNotIn('design', ['Special', '', 'special'])
             ->get();
 
         foreach ($lines as $line) {
-            $totalPrepared = floatval($line->docligne->DL_QteBL ?? 0);
-            $totalToPrepare = floatval($line->docligne->EU_Qte ?? 0);
+            if ($line?->docligne?->EU_Qte) {
+                $totalPrepared = floatval($line->docligne->DL_QteBL ?? 0);
+                $totalToPrepare = floatval($line->docligne->EU_Qte ?? 0);
 
-            if ($totalPrepared < $totalToPrepare) {
-                return false;
+                if ($totalPrepared < $totalToPrepare) {
+                    return false;
+                }
+            } else {
+                $line->delete();
+                return true;
             }
         }
 

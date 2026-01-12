@@ -394,7 +394,11 @@ class PaletteController extends Controller
 
         foreach ($lines as $line) {
 
-            if (floatval($line->docligne->DL_QteBL) < floatval($line->docligne->EU_Qte)) {
+            if(!$line->docligne){
+                $line->delete();
+            }
+
+            if (floatval($line?->docligne?->DL_QteBL) < floatval($line?->docligne?->EU_Qte)) {
                 return false;
             }
         }
@@ -515,21 +519,23 @@ class PaletteController extends Controller
             ]);
 
             foreach ($linesToProcess as $line) {
-                $docligne = $line->docligne;
-                $lineQuantity = floatval($docligne->DL_Qte);
+                if ($line->docligne->DL_Qte) {
+                    $docligne = $line->docligne;
+                    $lineQuantity = floatval($docligne->DL_Qte);
 
-                // Attach line to palette
-                $line->palettes()->attach($palette->id, [
-                    'quantity' => $lineQuantity
-                ]);
+                    // Attach line to palette
+                    $line->palettes()->attach($palette->id, [
+                        'quantity' => $lineQuantity
+                    ]);
 
-                // Increment delivered quantity on docligne
-                $docligne->increment('DL_QteBL', $lineQuantity);
+                    // Increment delivered quantity on docligne
+                    $docligne->increment('DL_QteBL', $lineQuantity);
 
-                // Update line status to 8
-                $line->update(['status_id' => 8]);
-                // Stock movement
-                $this->stockMovement($line->ref, $docligne->DL_Qte);
+                    // Update line status to 8
+                    $line->update(['status_id' => 8]);
+                    // Stock movement
+                    $this->stockMovement($line->ref, $docligne->DL_Qte);
+                }
             }
 
             // Update document status
