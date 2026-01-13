@@ -370,10 +370,13 @@ class PurchaseDocumentController extends Controller
     {
         $validator = Validator::make($request->all(), [
             'souche' => 'required|integer|in:0,1,2',
-            'reference' => 'required|string|max:50',
+            'reference' => 'required|string|max:17',
             'supplier' => 'required|string|max:10',
-            'company_db' => 'required|string|max:30'
+            'company_db' => 'required|string|max:30',
+            'lines' => 'required|array|min:1',
         ]);
+
+        
 
         if ($validator->fails()) {
             return response()->json([
@@ -413,8 +416,19 @@ class PurchaseDocumentController extends Controller
                 ], 404);
             }
 
-            foreach ($purchaseDocument->lines as $line) {
-                $this->createDocligne($request->company_db, $piece, $request->reference, $request->supplier, 1, 10, $line->code, $line->description, $line->quantity, $line->unit);
+            foreach ($request->lines as $line) {
+                $this->createDocligne(
+                    $request->company_db,
+                    $piece,
+                    $request->reference,
+                    $request->supplier,
+                    1,
+                    10,
+                    $line['code'] ?? '',
+                    $line['description'],
+                    $line['quantity'],
+                    $line['unit'] ?? ''
+                );
             }
 
             $lastDRNo = DB::connection($request->company_db)

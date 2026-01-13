@@ -21,7 +21,8 @@ class AuthController extends Controller
             'full_name' => 'required|string|max:255',
             'phone' => 'nullable|string|max:255',
             'email' => 'required|string|email|max:255|unique:users',
-            'company_id' => 'nullable|numeric|exists:companies,id'
+            'company_id' => 'nullable|numeric|exists:companies,id',
+            'service_id' => 'nullable|numeric|exists:services,id'
         ]);
 
         if ($validator->fails()) {
@@ -38,7 +39,7 @@ class AuthController extends Controller
             'phone' => $request->phone ?? null,
             'password' => Hash::make($request->password),
             "api_token" => Str::random(60),
-            "company_id" => $request->company_id ?? null
+            "service_id" => $request->service_id ?? null
         ]);
 
 

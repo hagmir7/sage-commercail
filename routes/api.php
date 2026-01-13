@@ -306,12 +306,11 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('print/{document}', 'print');
         Route::get('reset-print/{document}', 'resetPrint');
 
-        // More specific routes first
+
         Route::get('{piece}/palettes', 'documentPalettes');
         Route::get('{piece}/delivered-palettes', 'deliveredPalettes');
 
-        // Then generic show/check routes
-        Route::get('{document:piece}', 'show'); // If using route model binding
+        Route::get('{document:piece}', 'show');
         Route::get('{piece}', 'checkControlled');
     });
 

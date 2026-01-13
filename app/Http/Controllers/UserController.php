@@ -19,7 +19,8 @@ class UserController extends Controller
             'full_name' => 'required|string|max:255',
             'phone' => 'nullable|string|max:255',
             'email' => 'required|string|email|max:255|unique:users,email,' . $id,
-            'company_id' => 'nullable|numeric|exists:companies,id'
+            'company_id' => 'nullable|numeric|exists:companies,id',
+            'service_id' => 'nullable|numeric|exists:services,id'
         ]);
 
         if ($validator->fails()) {
@@ -46,7 +47,8 @@ class UserController extends Controller
             'full_name' => $request->full_name,
             'email' => $request->email,
             'phone' => $request->phone ?? null,
-            'company_id' => $request->company_id ?? null
+            'company_id' => $request->company_id ?? null,
+            'service_id' => $request->service_id ?? null
         ]);
 
         $token = $user->createToken('auth_token')->plainTextToken;
