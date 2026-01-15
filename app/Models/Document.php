@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Http\Controllers\ReceptionController;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
@@ -29,7 +30,7 @@ class Document extends Model
 
     // const CREATED_AT = 'created_at';
     // const UPDATED_AT = 'updated_at';
-    public $timestamps = true;
+    public $timestamps = false;
 
 
     // Relations
@@ -70,6 +71,13 @@ class Document extends Model
     {
         return $this->belongsToMany(User::class, 'user_document_printer', 'document_id', 'user_id')
             ->withTimestamps();
+    }
+
+
+
+    public function receptions()
+    {
+        return $this->hasMany(DocumentReception::class);
     }
 
     public function validation(): bool

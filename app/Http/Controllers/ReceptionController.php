@@ -3,13 +3,12 @@
 namespace App\Http\Controllers;
 
 use App\Models\ArticleStock;
-use App\Models\CompanyStock;
 use App\Models\Docentete;
 use App\Models\Docligne;
 use App\Models\Document;
+use App\Models\DocumentReception;
 use App\Models\Emplacement;
 use App\Models\Line;
-use App\Models\Palette;
 use App\Models\StockMovement;
 use App\Models\User;
 use App\Services\StockMovementService;
@@ -17,16 +16,19 @@ use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
+use Symfony\Component\HttpKernel\Exception\HttpException;
 
 class ReceptionController extends Controller
 {
 
-     protected StockMovementService $stockService;
+    protected $stockService;
 
+    // Add constructor to inject StockService
     public function __construct(StockMovementService $stockService)
     {
         $this->stockService = $stockService;
     }
+
     public function index(Request $request)
     {
         $query = Docentete::on($request->company)
@@ -163,8 +165,8 @@ class ReceptionController extends Controller
                     'ref' => (string) $docentete->DO_Ref,
                     'client_id' => (string) $docentete->DO_Tiers,
                     'expedition' => (string) $docentete->DO_Expedit,
-                    'created_at' => now()->format('Y-m-d H:i:s'),
-                    'updated_at' => now()->format('Y-m-d H:i:s')
+                    // 'created_at' => now()->format('Y-m-d H:i:s'),
+                    // 'updated_at' => now()->format('Y-m-d H:i:s')
                 ]
             );
 
@@ -295,13 +297,13 @@ class ReceptionController extends Controller
             return response()->json(['error' => "Document does not exist"], 404);
         }
 
-       
+
 
         if (!auth()->user()->hasRole("commercial")) {
             return response()->json(['error' => "Unauthorized"], 403);
         }
 
-         foreach ($document->lines as $line) {
+        foreach ($document->lines as $line) {
             $line->delete();
         }
 
@@ -314,24 +316,105 @@ class ReceptionController extends Controller
 
     public function validation(Request $request, $piece)
     {
-        // $document = Document::on($request->company_db)->where("piece", $piece)->first();
-        $document = \App\Models\Document::on($request->company_db)->where('piece', $piece)->first();
-        if (!$document) {
-            return response()->json(['message' => "Le document n'existe pas $piece"], 404);
+        if (!auth()->user()->hasRole('admin')) {
+            return response()->json(['message' => 'Unauthorized'], 403);
         }
 
+        try {
+            // Start transaction on the correct connection
+            DB::connection($request->company_db)->beginTransaction();
 
+            $document = Document::on($request->company_db)
+                ->with([
+                    'receptions' => function ($query) {
+                        $query->with(['article', 'emplacement']);
+                    }
+                ])
+                ->where('piece', $piece)
+                ->first();
 
-        if (!auth()->user()->hasRole("admin")) {
-            return response()->json(['message' => "Unauthorized"], 403);
-        }
+            if (!$document) {
+                return response()->json([
+                    'message' => "Le document n'existe pas : $piece"
+                ], 404);
+            }
 
-        $document->status_id = 3;
-        $document->save();
+            // Update document status
+            $document->status_id = 3;
+            $document->save();
 
-        return response()->json(['message' => "Réinitialisé avec succès"], 200);
+foreach ($document->receptions as $reception) {
+
+    // ✅ Use DEFAULT database (no ->on() needed)
+    $article = ArticleStock::where('code', $reception->article_code)
+        ->first();
+
+    if (!$article) {
+        throw new \Exception("Article non trouvé avec le code: {$reception->article_code}");
     }
 
+    // ✅ Use DEFAULT database (no ->on() needed)
+    $emplacement = Emplacement::where('code', $reception->emplacement_code)
+        ->first();
+
+    if (!$emplacement) {
+        throw new \Exception("Emplacement non trouvé avec le code: {$reception->emplacement_code}");
+    }
+
+    // ✅ Use DEFAULT database (no ->on() needed)
+    $user = User::where('name', $reception->username)
+        ->first();
+
+    if (!$user) {
+        throw new \Exception("Utilisateur non trouvé: {$reception->username}");
+    }
+
+    // ✅ Use DEFAULT database for StockMovement
+    StockMovement::create([
+        'code_article'     => $article->code,
+        'designation'      => $article->description ?? 'N/A',
+        'emplacement_id'   => $emplacement->id,
+        'movement_type'    => 'IN',
+        'article_stock_id' => $article->id,
+        'quantity'         => $reception->quantity,
+        'moved_by'         => $user->id,
+        'company_id'       => $reception->company,
+        'movement_date'    => now(),
+    ]);
+
+    // ✅ Pass the model objects
+    $this->stockService->stockInsert(
+        $emplacement,                       // Emplacement object
+        $article,                           // ArticleStock object
+        $reception->quantity,
+        $reception->colis_quantity ?? 0,
+        $reception->colis_type ?? 'Piece',
+        $reception->quantity
+    );
+}
+
+            DB::connection($request->company_db)->commit();
+
+            return response()->json([
+                'message' => 'Validation effectuée avec succès'
+            ], 200);
+        } catch (\Throwable $e) {
+            DB::connection($request->company_db)->rollBack();
+
+            \Log::error('Validation error', [
+                'piece' => $piece,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+                'line' => $e->getLine(),
+                'file' => $e->getFile()
+            ]);
+
+            return response()->json([
+                'message' => 'Erreur lors de la validation',
+                'error'   => $e->getMessage()
+            ], 500);
+        }
+    }
 
     public function movement(Request $request, $piece)
     {
@@ -343,7 +426,8 @@ class ReceptionController extends Controller
                 'condition'        => 'nullable|numeric|min:1',
                 'type_colis'       => 'nullable|in:Piece,Palette,Carton',
                 'palettes'         => 'required_if:type_colis,Palette,Carton|numeric|min:1',
-                'company'          => 'required|numeric'
+                'company'          => 'required|numeric',
+                'piece'            => 'required'
             ]);
 
             if ($validator->fails()) {
@@ -357,20 +441,26 @@ class ReceptionController extends Controller
             $companyId   = intval($request->company ?? 1);
             $article     = ArticleStock::where('code', $request->code_article)->first();
             $emplacement = Emplacement::where("code", $request->emplacement_code)->first();
+            $document = Document::on($request->company_db)->where('piece', $request->piece)->first();
 
             if (!$article) {
                 return response()->json([
-                    'errors' => ['article' => 'Article non trouvé']
+                    'message' => 'Article non trouvé'
+                ], 404);
+            }
+
+            if (!$document) {
+                return response()->json([
+                    'message' => 'Document non trouvé'
                 ], 404);
             }
 
             if (!$emplacement) {
                 return response()->json([
-                    'errors' => ['emplacement' => 'Emplacement non trouvé']
+                    'message' => 'Emplacement non trouvé'
                 ], 404);
             }
 
-            $conditionMultiplier = $request->condition ? (float) $request->condition : 1.0;
 
             $docentete = Docentete::on($request->company_db)->find($piece);
 
@@ -382,37 +472,79 @@ class ReceptionController extends Controller
             }
 
 
-            DB::transaction(function () use ($article, $request, $conditionMultiplier, $emplacement, $companyId, $docligne, $docentete) {
-                StockMovement::create([
-                    'code_article'     => $request->code_article,
-                    'designation'      => $article->description,
-                    'emplacement_id'   => $emplacement->id,
-                    'movement_type'    => "IN",
-                    'article_stock_id' => $article->id,
+            DB::connection($request->company_db)->transaction(function () use ($request, $piece) {
+
+                $article = ArticleStock::lockForUpdate()
+                    ->where('code', $request->code_article)
+                    ->first();
+
+                if (!$article) {
+                    throw new HttpException(404, 'Article non trouvé');
+                }
+
+                $emplacement = Emplacement::lockForUpdate()
+                    ->where('code', $request->emplacement_code)
+                    ->first();
+
+                if (!$emplacement) {
+                    throw new HttpException(404, 'Emplacement non trouvé');
+                }
+
+                /** 👇 IMPORTANT FIX HERE */
+                $document = Document::on($request->company_db)
+                    ->where('piece', $request->piece)
+                    ->lockForUpdate()
+                    ->first();
+
+                if (!$document) {
+                    throw new HttpException(404, 'Document non trouvé');
+                }
+
+                $docentete = Docentete::on($request->company_db)
+                    ->lockForUpdate()
+                    ->findOrFail($piece);
+
+                $docligne = $docentete->doclignes()
+                    ->where('AR_Ref', $request->code_article)
+                    ->lockForUpdate()
+                    ->first();
+
+                if (!$docligne) {
+                    throw new HttpException(404, 'Ligne document introuvable');
+                }
+
+                if ($docligne->DL_Qte < ($request->quantity + $docligne->DL_QteBL)) {
+                    throw new HttpException(422, 'Quantité insuffisante');
+                }
+
+                $user = auth()->user();
+                if (!$user) {
+                    return response()->json(['error' => 'User not authenticated'], 401);
+                }
+
+                DocumentReception::on($request->company_db)->create([
+                    'article_code'     => $request->code_article,
+                    'emplacement_code' => $request->emplacement_code,
                     'quantity'         => $request->quantity,
-                    'moved_by'         => auth()->id(),
-                    'company_id'       => $companyId,
-                    'movement_date'    => now(),
+                    'document_id'      => $document->id,
+                    'username'         => $user->name, // <- must exist
+                    'company'          => (int) $request->company,
+                    'colis_type'       => $request->type_colis,
+                    'colis_quantity'   => $request->condition
                 ]);
 
                 $docligne->update([
-                    'DL_QteBL' => ($docligne->DL_QteBL + floatval($request->quantity))
+                    'DL_QteBL' => $docligne->DL_QteBL + (float) $request->quantity
                 ]);
 
-                if ($docentete->doclignes->sum('DL_QteBL') == $docentete->doclignes->sum('DL_Qte')) {
+                if ($docentete->doclignes()->sum('DL_QteBL') === $docentete->doclignes()->sum('DL_Qte')) {
                     $docentete->document()->update([
                         'status_id' => 2
                     ]);
                 }
-
-                if ($request->type_colis === "Palette" || $request->type_colis === "Carton") {
-                    $qte_value = $request->palettes * $conditionMultiplier;
-                } else {
-                    $qte_value = $request->quantity;
-                }
-
-                $this->stockService->stockInsert($emplacement, $article, $request->quantity, $conditionMultiplier, $request->type_colis, $qte_value);
             });
+
+
 
             return response()->json(['message' => 'Stock successfully inserted or updated.']);
         } catch (\Illuminate\Database\QueryException $e) {
