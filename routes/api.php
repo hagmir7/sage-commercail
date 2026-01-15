@@ -80,7 +80,7 @@ Route::get("client/{client}", [ClientController::class, 'show']);
 
 
 Route::get("article/{article}", [ArticleController::class, 'show']);
-Route::get("articles/search", [ArticleController::class, 'search']);
+
 
 
 
@@ -270,6 +270,8 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get("{inventory}", 'show');
     });
 
+   
+
 
     Route::prefix('articles')->controller(ArticleStockController::class)->group(function () {
         Route::get('stock', 'stock');
@@ -277,7 +279,7 @@ Route::middleware('auth:sanctum')->group(function () {
       
         Route::get('emplacements/{piece}', 'emplacements');
         Route::get('', 'index');
-        Route::get('store', 'store');
+        Route::post('store', 'store');
         Route::put('update/{article_stock:code}', 'update');
 
         Route::get('update/{article:code}', 'update');
@@ -285,6 +287,9 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('stock/search', 'search');
        
     });
+
+    Route::post('articles/update-ref', [ArticleController::class, 'updateRef']);
+    Route::get("articles/search", [ArticleController::class, 'search']);
 
 
     Route::prefix('companies')->controller(CompanyController::class)->group(function () {
@@ -325,7 +330,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('validation/{piece}', 'validation');
     });
 
-    Route::post('articles/update-ref', [ArticleController::class, 'updateRef']);
+    
 
 
     Route::apiResource('purchase-documents', PurchaseDocumentController::class);
