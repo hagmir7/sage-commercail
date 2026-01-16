@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Article;
+use App\Models\ArticleSupplier;
 use App\Models\CurrentPiece;
 use App\Models\PurchaseDocument;
 use App\Models\PurchaseLine;
@@ -374,6 +375,7 @@ class PurchaseDocumentController extends Controller
             'supplier' => 'required|string|max:10',
             'company_db' => 'required|string|max:30',
             'lines' => 'required|array|min:1',
+            'devise' => 'required|integer',
         ]);
 
         
@@ -396,7 +398,9 @@ class PurchaseDocumentController extends Controller
                 $request->supplier,
                 $request->reference,
                 $request->souche,
-                $request->company_db
+                $request->devise,
+                $request->company_db,
+
             );
 
             $documentArticles = $purchaseDocument->lines->pluck('code');
@@ -417,6 +421,8 @@ class PurchaseDocumentController extends Controller
             }
 
             foreach ($request->lines as $line) {
+
+                
                 $this->createDocligne(
                     $request->company_db,
                     $piece,
@@ -427,7 +433,8 @@ class PurchaseDocumentController extends Controller
                     $line['code'] ?? '',
                     $line['description'],
                     $line['quantity'],
-                    $line['unit'] ?? ''
+                    $line['unit'] ?? '',
+
                 );
             }
 
@@ -490,7 +497,7 @@ class PurchaseDocumentController extends Controller
         }
     }
 
-public function createDocentete(string $DO_Piece, string $DO_Tiers, string $DO_Ref, $DO_Souche, $company_db): string
+public function createDocentete(string $DO_Piece, string $DO_Tiers, string $DO_Ref, $DO_Souche, $DO_Devise, $company_db): string
 {
     try {
         
@@ -516,7 +523,7 @@ public function createDocentete(string $DO_Piece, string $DO_Tiers, string $DO_R
             'CO_No'                 => 0,
             'cbCO_No'               => null,  // MISSING COLUMN
             'DO_Period'             => 1,
-            'DO_Devise'             => 1,
+            'DO_Devise'             => $DO_Devise,
             'DO_Cours'              => 1.000000,
             'DE_No'                 => 1,
             'cbDE_No'               => 1,     // MISSING COLUMN
@@ -646,6 +653,9 @@ public function createDocentete(string $DO_Piece, string $DO_Tiers, string $DO_R
             $currentDateTime = date('Y-d-m H:i:s.000');
         }
 
+        $article_supplier = ArticleSupplier::on($company_db)->where('AR_Ref', $AR_Ref)->where('CT_Num', $CT_Num)->first();
+
+
         $nextDLNo = DB::connection($company_db)
             ->table('F_DOCLIGNE')
             ->max('DL_No') + 1;
@@ -657,6 +667,7 @@ public function createDocentete(string $DO_Piece, string $DO_Tiers, string $DO_R
             'DO_Date' => $DO_Date,
             'DL_DateBC' => '1753-01-01 00:00:00',
             'DL_DateBL' => '1753-01-01 00:00:00',
+            'AF_RefFourniss' => $article_supplier?->AF_RefFourniss,
             'DL_Ligne' => 1000,
             'DO_Ref' => $DO_Ref,
             'DL_TNomencl' => 0,

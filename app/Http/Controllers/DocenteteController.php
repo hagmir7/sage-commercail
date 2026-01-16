@@ -619,6 +619,7 @@ class DocenteteController extends Controller
             },
             'line.palettes',
             'line.status',
+            'line.role',
             'line.roleQuantity',
             'stock' => function ($query) {
                 $query->select('code', 'qte_inter', 'qte_serie', 'code_supplier');

@@ -8,6 +8,7 @@ use App\Http\Controllers\ArticleController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\ClientController;
 use App\Http\Controllers\DepotController;
+use App\Http\Controllers\DeviseController;
 use App\Http\Controllers\DocenteteController;
 use App\Http\Controllers\DocumentController;
 use App\Http\Controllers\EmplacementController;
@@ -44,6 +45,10 @@ use Carbon\Carbon;
 Route::get('/user', function (Request $request) {
     return $request->user();
 })->middleware('auth:sanctum');
+
+Route::get('login', function(){
+    return [];
+})->name('login');
 
 
 
@@ -328,6 +333,11 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('reset/{piece}', 'reset');
         Route::post('movement/{piece}', 'movement');
         Route::get('validation/{piece}', 'validation');
+    });
+
+
+     Route::prefix('devise')->controller(DeviseController::class)->group(function () {
+        Route::get('', 'index');
     });
 
     
