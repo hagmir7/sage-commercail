@@ -415,7 +415,7 @@ class PurchaseDocumentController extends Controller
             if ($missing->isNotEmpty()) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'Some article are missing in the database.' . $missing->values(),
+                    'message' => 'Certains articles sont manquants dans la base de données.' . $missing->values(),
                     'missing_codes' => $missing->values(),
                 ], 404);
             }

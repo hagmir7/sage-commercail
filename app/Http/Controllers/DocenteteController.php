@@ -23,7 +23,7 @@ use App\Services\StockMovementService;
 class DocenteteController extends Controller
 {
 
-     protected StockMovementService $stockService;
+    protected StockMovementService $stockService;
 
     public function __construct(StockMovementService $stockService)
     {
@@ -235,14 +235,14 @@ class DocenteteController extends Controller
             ->orderByDesc('cbCreation')
             ->where('DO_Domaine', 0)
             ->where('DO_Statut', 1)
-            ->where(function($q) {
+            ->where(function ($q) {
                 // Type 1 is always included
                 $q->where('DO_Type', 1)
-                // Type 2 only if it has a document
-                ->orWhere(function($sub) {
-                    $sub->where('DO_Type', 2)
-                        ->whereHas('document'); // ensures related document exists
-                });
+                    // Type 2 only if it has a document
+                    ->orWhere(function ($sub) {
+                        $sub->where('DO_Type', 2)
+                            ->whereHas('document'); // ensures related document exists
+                    });
             });
 
         $query->with('document.status');
@@ -632,7 +632,7 @@ class DocenteteController extends Controller
 
 
         // Reliqa rest
-       DB::transaction(function () use ($docentete, $docligneQuery) {
+        DB::transaction(function () use ($docentete, $docligneQuery) {
             if ($docentete->DO_Reliquat == "1") {
                 foreach ($docligneQuery->get() as $docligne) {
                     $prepared = (float) ($docligne->line->quantity_prepare ?? 0);
@@ -928,6 +928,7 @@ class DocenteteController extends Controller
                 'message' => 'Document transferred successfully',
             ]);
         } catch (\Exception $e) {
+            \Log::error($e);
             DB::rollBack();
             if (str_contains($e->getMessage(), "Cet élément est en cours d'utilisation")) {
                 return response()->json([
@@ -936,7 +937,7 @@ class DocenteteController extends Controller
                 ], 409);
             }
 
-            return response()->json(['status' => 'error', 'message' => 'Transfer failed'], 500);
+            return response()->json(['status' => 'error', 'message' => $e->getMessage()], 500);
         }
     }
 
@@ -963,7 +964,6 @@ class DocenteteController extends Controller
                 }
 
                 return $this->transferCompany($request);
-
             } else {
 
                 $validator = Validator::make($request->all(), [
@@ -980,10 +980,9 @@ class DocenteteController extends Controller
 
                 return $this->roleTransfer($request);
             }
-
         } catch (\Illuminate\Database\QueryException $e) {
 
-           if (str_contains($e->getMessage(), "Cet élément est en cours d'utilisation")) {
+            if (str_contains($e->getMessage(), "Cet élément est en cours d'utilisation")) {
 
                 return response()->json([
                     'status' => 'error',
@@ -1215,7 +1214,7 @@ class DocenteteController extends Controller
                 [$newPiece, $type, $souche]
             );
 
-    
+
             return $newPiece;
         });
     }
@@ -1237,17 +1236,17 @@ class DocenteteController extends Controller
                 ], 400);
             }
 
-                $client = Compte::where('CT_Num', $request->client)->exists();
+            $client = Compte::where('CT_Num', $request->client)->exists();
 
-                if (!$client && !empty($request->client)) {
-                    return response()->json([
-                        'status' => 'error',
-                        'message' => "Le client n'existe pas : {$request->client}"
-                    ], 400);
-                }
+            if (!$client && !empty($request->client)) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => "Le client n'existe pas : {$request->client}"
+                ], 400);
+            }
 
 
-  
+
             $new_piece = $this->generatePieceForDuplication($piece, $souche);
 
             $docentete->update([
@@ -1256,7 +1255,7 @@ class DocenteteController extends Controller
                 'DO_Souche' => $souche
             ]);
 
- 
+
             Docligne::where("DO_Piece", $piece)->update([
                 'DO_Piece' => $new_piece
             ]);
@@ -1315,34 +1314,33 @@ class DocenteteController extends Controller
     }
 
 
-public function delete($piece = '26FA002095', $type = 6)
-{
-    try {
-        // Execute the stored procedure
-        DB::statement("EXEC sp_DeleteDocument @DO_Piece = ?, @DO_Type = ?", [$piece, $type]);
+    public function delete($piece = '26FA002095', $type = 6)
+    {
+        try {
+            // Execute the stored procedure
+            DB::statement("EXEC sp_DeleteDocument @DO_Piece = ?, @DO_Type = ?", [$piece, $type]);
 
-        return response()->json([
-            'success' => true,
-            'message' => "Suppression terminée pour le document $piece."
-        ]);
-
-    } catch (\Illuminate\Database\QueryException $e) {
-        if (str_contains($e->getMessage(), '82176')) {
-            \Log::info("Trigger warning 82176 ignored during deletion of $piece");
             return response()->json([
                 'success' => true,
-                'message' => "Suppression terminée (trigger warning 82176 ignoré) pour le document $piece."
+                'message' => "Suppression terminée pour le document $piece."
             ]);
+        } catch (\Illuminate\Database\QueryException $e) {
+            if (str_contains($e->getMessage(), '82176')) {
+                \Log::info("Trigger warning 82176 ignored during deletion of $piece");
+                return response()->json([
+                    'success' => true,
+                    'message' => "Suppression terminée (trigger warning 82176 ignoré) pour le document $piece."
+                ]);
+            }
+
+
+            \Log::error('Erreur suppression document: ' . $e->getMessage());
+
+            return response()->json([
+                'success' => false,
+                'message' => "Erreur lors de la suppression du document $piece.",
+                'error' => $e->getMessage()
+            ], 500);
         }
-
-
-        \Log::error('Erreur suppression document: ' . $e->getMessage());
-
-        return response()->json([
-            'success' => false,
-            'message' => "Erreur lors de la suppression du document $piece.",
-            'error' => $e->getMessage()
-        ], 500);
     }
-}
 }
