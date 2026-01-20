@@ -24,9 +24,9 @@ class SupplierInterviewController extends Controller
     public function store(Request $request)
     {
         $validator = Validator::make($request->all(), [
-            'client_id'   => 'required|exists:clients,id',
-            'date'        => 'required|date',
-            'description' => 'nullable|string',
+            'CT_Num' => 'required|exists:sqlsrv_inter.F_COMPTET,CT_Num',
+            'date'          => 'required|date',
+            'description'   => 'nullable|string',
         ]);
 
         if ($validator->fails()) {
@@ -35,16 +35,16 @@ class SupplierInterviewController extends Controller
             ], 422);
         }
 
-        $supplierInterview = SupplierInterview::create(
-            array_merge(
-                $validator->validated(),
-                ['user_id' => auth()->id()]
-            )
-        );
-
+        $supplierInterview = SupplierInterview::create([
+            'CT_Num' => $request->CT_Num,
+            'date'          => $request->date,
+            'description'   => $request->description,
+            'user_id'       => auth()->id(),
+        ]);
 
         return response()->json($supplierInterview, 201);
     }
+
 
     /**
      * Display the specified resource.
@@ -60,7 +60,7 @@ class SupplierInterviewController extends Controller
     public function update(Request $request, SupplierInterview $supplierInterview)
     {
         $validator = Validator::make($request->all(), [
-            'client_id'   => 'required|exists:clients,id',
+            'CT_Num'   => 'required|exists:clients,CT_Num',
             'date'        => 'required|date',
             'description' => 'nullable|string',
             'note'        => 'nullable|integer',

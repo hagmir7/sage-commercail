@@ -27,6 +27,7 @@ use App\Http\Controllers\RoleController;
 use App\Http\Controllers\SellController;
 use App\Http\Controllers\ServiceController;
 use App\Http\Controllers\StockMovementController;
+use App\Http\Controllers\SupplierInterviewController;
 use App\Http\Controllers\TransferController;
 use App\Http\Controllers\UnitController;
 use App\Http\Controllers\UserController;
@@ -219,6 +220,8 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::delete('{palette:code}', 'destroy');
         Route::post('import', 'import')->name('palettes.import');
     });
+
+    Route::apiResource('supplier-interviews', SupplierInterviewController::class);
 
 
     Route::prefix('lines')->controller(LineController::class)->group(function () {

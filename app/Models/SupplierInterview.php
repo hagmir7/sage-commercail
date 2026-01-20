@@ -6,5 +6,26 @@ use Illuminate\Database\Eloquent\Model;
 
 class SupplierInterview extends Model
 {
-    //
+
+    protected $fillable = [
+        'CT_Num',
+        'date',
+        'description',
+        'user_id',
+    ];
+
+    protected $casts = [
+        'date' => 'date',
+    ];
+
+
+    public function user()
+    {
+        return $this->belongsTo(User::class);
+    }
+
+    public function client()
+    {
+        return $this->belongsTo(Client::class, 'CT_Num');
+    }
 }
