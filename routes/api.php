@@ -80,8 +80,16 @@ Route::get('logi', function () {
 
 Route::post("duplicate/{piece}", [DocenteteController::class, 'duplicate']);
 Route::get("change/{piece}", [DocenteteController::class, 'change']);
-Route::get("client/suppliers", [ClientController::class, 'suppliers']);
-Route::get("client/{client}", [ClientController::class, 'show']);
+
+
+Route::prefix('client')->group(function () {
+    Route::get("suppliers", [ClientController::class, 'suppliers']);
+    Route::get("suppliers/{code}", [ClientController::class, 'showSupplier']);
+    Route::get("{client}", [ClientController::class, 'show']);
+    Route::put("{client}", [ClientController::class, 'update']);
+   
+});
+
 
 
 Route::get("article/{article}", [ArticleController::class, 'show']);

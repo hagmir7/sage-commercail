@@ -13,6 +13,9 @@ class Client extends Model
 
     protected $dateFormat = 'Y-d-m H:i:s.v';
 
+    public $timestamps = false;
+
+    protected $guarded = [];
 
     public function docentete()
     {
