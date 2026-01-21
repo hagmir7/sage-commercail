@@ -280,13 +280,18 @@ class DocenteteController extends Controller
 
         if ($request->filled('search')) {
             $search = $request->search;
+
             $query->where(function ($q) use ($search) {
-                $q->where('DO_Ref', 'like', "%$search%")
-                    ->orWhere('DO_Piece', 'like', "%$search%")
-                    ->orWhere('DO_Tiers', 'like', "%$search%")
-                    ->orWhere('DO_Reliquat', 'like', "%$search%");
+                $q->where('DO_Ref', 'like', "%{$search}%")
+                    ->orWhere('DO_Piece', 'like', "%{$search}%")
+                    ->orWhere('DO_Tiers', 'like', "%{$search}%")
+                    ->orWhereHas('doclignes', function ($query) use ($search) {
+                        $query->where('DL_PieceBC', 'like', "%{$search}%");
+                    })
+                    ->orWhere('DO_Reliquat', 'like', "%{$search}%");
             });
         }
+
 
 
         if ($request->filled('type')) {
