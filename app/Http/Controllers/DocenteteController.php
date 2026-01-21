@@ -236,12 +236,10 @@ class DocenteteController extends Controller
             ->where('DO_Domaine', 0)
             ->where('DO_Statut', 1)
             ->where(function ($q) {
-                // Type 1 is always included
                 $q->where('DO_Type', 1)
-                    // Type 2 only if it has a document
                     ->orWhere(function ($sub) {
                         $sub->where('DO_Type', 2)
-                            ->whereHas('document'); // ensures related document exists
+                            ->whereHas('document');
                     });
             });
 
@@ -285,9 +283,9 @@ class DocenteteController extends Controller
                 $q->where('DO_Ref', 'like', "%{$search}%")
                     ->orWhere('DO_Piece', 'like', "%{$search}%")
                     ->orWhere('DO_Tiers', 'like', "%{$search}%")
-                    ->orWhereHas('doclignes', function ($query) use ($search) {
-                        $query->where('DL_PieceBC', 'like', "%{$search}%");
-                    })
+                    // ->orWhereHas('doclignes', function ($query) use ($search) {
+                    //     $query->where('DL_PieceBC', 'like', "%{$search}%");
+                    // })
                     ->orWhere('DO_Reliquat', 'like', "%{$search}%");
             });
         }
