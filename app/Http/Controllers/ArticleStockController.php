@@ -60,6 +60,23 @@ class ArticleStockController extends Controller
     }
 
 
+    public function list(Request $request)
+    {
+        $query = ArticleStock::query();
+
+        if ($request->filled('search')) {
+            $search = $request->search;
+
+            $query->where(function ($q) use ($search) {
+                $q->where('description', 'like', "%{$search}%")
+                ->orWhere('code', 'like', "%{$search}%");
+            });
+        }
+
+        return $query->paginate(50);
+    }
+
+
 
     public function calculateStock($ref_article, $company_id = null)
     {

@@ -394,7 +394,7 @@ class PaletteController extends Controller
 
         foreach ($lines as $line) {
 
-            if(!$line->docligne){
+            if (!$line->docligne) {
                 $line->delete();
             }
 
@@ -839,7 +839,6 @@ class PaletteController extends Controller
                 $palette->document->update([
                     'status_id' => 10
                 ]);
-
             } else {
 
                 $palette->document->companies()->updateExistingPivot($user_company, [
@@ -882,7 +881,7 @@ class PaletteController extends Controller
             $palette->load('lines');
             $user_company = auth()->user()->company_id;
 
-      
+
 
 
 
@@ -1064,47 +1063,32 @@ class PaletteController extends Controller
 
 
     // Article Palette function
-    public function detachArticle($code, $article_id)
+    public function deleteArticle(Request $request, $code)
     {
-        try {
-            $palette = Palette::where('code', $code)->firstOrFail();
-            $result = DB::selectOne(
-                "SELECT quantity FROM article_palette WHERE article_stock_id = ? AND palette_id = ?",
-                [$article_id, $palette->id]
-            );
-            if (!$result) {
-                throw new \Exception("Article not found in this palette");
-            }
+        $request->validate([
+            'article_stock_id' => ['required', 'exists:article_stocks,id'],
+        ]);
 
-            $quantity = $result->quantity;
-            $article = ArticleStock::find($article_id);
-            $inventoryStock = InventoryStock::where('code_article', $article->code)->first();
+        $palette = Palette::where('code', $code)->first();
 
-            if ($inventoryStock->quantity < $quantity) {
-                throw new \Exception("Insufficient inventory quantity");
-            }
-
-            DB::transaction(function () use ($inventoryStock, $quantity, $palette, $article_id) {
-                $inventoryStock->update([
-                    'quantity' => $inventoryStock->quantity - $quantity
-                ]);
-                $palette->articles()->detach($article_id);
-            });
-            return [
-                'success' => true,
-                'message' => 'Article detached successfully',
-                'detached_quantity' => $quantity
-            ];
-        } catch (\Exception $e) {
-            Log::error('Error detaching article: ' . $e->getMessage(), [
-                'code' => $code,
-                'article_id' => $article_id
-            ]);
-            return [
-                'success' => false,
-                'message' => 'Failed to detach article: ' . $e->getMessage()
-            ];
+        if (!$palette) {
+            return response()->json([
+                'message' => "Palette $code introuvable"
+            ], 404);
         }
+
+        // Check if article exists in this palette
+        if (!$palette->articles()->where('article_stocks.id', $request->article_stock_id)->exists()) {
+            return response()->json([
+                'message' => 'Article non trouvé dans cette palette'
+            ], 404);
+        }
+
+        $palette->articles()->detach($request->article_stock_id);
+
+        return response()->json([
+            'message' => 'Article retiré avec succès'
+        ]);
     }
 
 
@@ -1139,23 +1123,10 @@ class PaletteController extends Controller
                 ], 404);
             }
 
-            $oldQuantity = $currentPivotData->quantity;
-            $quantityDifference = $newQuantity - $oldQuantity;
 
             $article = ArticleStock::find($article_id);
-            $inventoryStock = InventoryStock::where('code_article', $article->code)->first();
 
-            DB::transaction(function () use ($inventoryStock, $quantityDifference, $palette, $article_id, $newQuantity) {
-                if ($quantityDifference > 0) {
-
-                    $inventoryStock->update([
-                        'quantity' => $inventoryStock->quantity + $quantityDifference
-                    ]);
-                } elseif ($quantityDifference < 0) {
-                    $inventoryStock->update([
-                        'quantity' => $inventoryStock->quantity - abs($quantityDifference)
-                    ]);
-                }
+            DB::transaction(function () use ($palette, $article_id, $newQuantity) {
 
                 $palette->articles()->updateExistingPivot($article_id, [
                     'quantity' => $newQuantity
@@ -1164,13 +1135,7 @@ class PaletteController extends Controller
 
             return response()->json([
                 'success' => true,
-                'message' => 'Quantité mise à jour avec succès',
-                'data' => [
-                    'old_quantity' => $oldQuantity,
-                    'new_quantity' => $newQuantity,
-                    'quantity_difference' => $quantityDifference,
-                    'inventory_updated' => $quantityDifference !== 0
-                ]
+                'message' => 'Quantité mise à jour avec succès'
             ], 200);
         } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
             Log::error('Model not found in updateArticleQuantity: ' . $e->getMessage(), [
@@ -1242,19 +1207,46 @@ class PaletteController extends Controller
 
 
 
-      public function import(Request $request)
-        {
-            $request->validate([
-                'file' => 'required|mimes:xlsx,csv,xls',
-            ]);
+    public function import(Request $request)
+    {
+        $request->validate([
+            'file' => 'required|mimes:xlsx,csv,xls',
+        ]);
 
-            Excel::import(new PalettesImport, $request->file('file'));
+        Excel::import(new PalettesImport, $request->file('file'));
 
+        return response()->json([
+            'success' => true,
+            'message' => 'Import terminé avec succès !'
+        ]);
+    }
+
+
+    public function addArticle(Request $request, $code)
+    {
+        $request->validate([
+            'article_stock_id' => ['required', 'exists:article_stocks,id'],
+        ]);
+
+        $palette = Palette::where('code', $code)->first();
+
+        if (!$palette) {
             return response()->json([
-                'success' => true,
-                'message' => 'Import terminé avec succès !'
-            ]);
+                'message' => "Palette $code introuvable"
+            ], 404);
         }
 
+        // Prevent duplicates
+        if ($palette->articles()->where('article_stocks.id', $request->article_stock_id)->exists()) {
+            return response()->json([
+                'message' => 'Article déjà ajouté à cette palette'
+            ], 409);
+        }
 
+        $palette->articles()->attach($request->article_stock_id, ['quantity' => 1]);
+
+        return response()->json([
+            'message' => 'Article ajouté avec succès'
+        ]);
+    }
 }

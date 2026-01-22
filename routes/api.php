@@ -210,10 +210,12 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('create', 'create');
 
         Route::delete('{code}/article/{article_id}/inventory/delete', 'detachArticleForInvenotry');
-        Route::delete('{code}/article/{article_id}/delete', 'detachArticle');
+       
         Route::put('{code}/article/{article_id}/update', 'updateArticleQuantity');
 
         Route::get('{code}', 'show');
+        Route::delete('{code}/delete-article', 'deleteArticle');
+        Route::post('{code}/add-article', 'addArticle');
         Route::get('{code}/line/{lineId}', 'controller');
         Route::get('{code}/controlle-all', 'controlAll');
         Route::get('document/{piece}', 'documentPalettes');
@@ -291,6 +293,7 @@ Route::middleware('auth:sanctum')->group(function () {
 
     Route::prefix('articles')->controller(ArticleStockController::class)->group(function () {
         Route::get('stock', 'stock');
+        Route::get('list', 'list');
         Route::get('{article_stock:code}', 'show');
       
         Route::get('emplacements/{piece}', 'emplacements');

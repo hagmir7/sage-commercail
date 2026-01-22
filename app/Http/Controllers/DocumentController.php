@@ -227,19 +227,26 @@ class DocumentController extends Controller
 
     public function preparationList(Request $request)
     {
-        $user_roles = auth()->user()->roles()->pluck('name', 'id');
+        $user = auth()->user();
+        $user_roles = $user->roles()->pluck('name', 'id');
 
-        $query = Document::with([
-            'companies',
-            'docentete:cbMarq,DO_Date,DO_DateLivr,DO_Reliquat,DO_Piece,cbCreation'
-        ])
-            ->whereHas('docentete', function ($query) {
-                $query->where('DO_Domaine', 0)
+        $query = Document::query()
+            ->with([
+                'companies',
+                'docentete:cbMarq,DO_Date,DO_DateLivr,DO_Reliquat,DO_Piece,cbCreation'
+            ])
+            ->join('document_companies as dc', function ($join) use ($user) {
+                $join->on('documents.id', '=', 'dc.document_id')
+                    ->where('dc.company_id', $user->company_id)
+                    ->whereIn('dc.status_id', [1, 2, 3, 4, 5, 6, 7]);
+            })
+            ->whereHas('docentete', function ($q) {
+                $q->where('DO_Domaine', 0)
                     ->where('DO_Statut', 1)
                     ->whereIn('DO_Type', [1, 2]);
             })
-            ->whereHas('lines', function ($q) use ($user_roles) {
-                $q->where('company_id', strval(auth()->user()->company_id));
+            ->whereHas('lines', function ($q) use ($user_roles, $user) {
+                $q->where('company_id', (string) $user->company_id);
 
                 $common = array_intersect(
                     $user_roles->toArray(),
@@ -255,29 +262,25 @@ class DocumentController extends Controller
                 'has_user_printer' => \DB::table('user_document_printer')
                     ->selectRaw('CASE WHEN COUNT(*) > 0 THEN 1 ELSE 0 END')
                     ->whereColumn('user_document_printer.document_id', 'documents.id')
-                    ->where('user_document_printer.user_id', auth()->id())
-            ])
-            ->whereHas('companies', function ($q) {
-                $q->whereIn('document_companies.status_id', [1, 2, 3, 4, 5, 6, 7]);
-            });
+                    ->where('user_document_printer.user_id', $user->id)
+            ]);
 
-        //  Search
+        // 🔍 Search
         if ($request->filled('search')) {
             $search = $request->search;
 
             $query->where(function ($q) use ($search) {
-                $q->where('ref', 'like', "%{$search}%")
-                    ->orWhere('piece', 'like', "%{$search}%")
-                    ->orWhere('piece_bc', 'like', "%{$search}%");
+                $q->where('documents.ref', 'like', "%{$search}%")
+                    ->orWhere('documents.piece', 'like', "%{$search}%")
+                    ->orWhere('documents.piece_bc', 'like', "%{$search}%");
             })
                 ->orWhereHas('companies', function ($q) use ($search) {
                     $q->where('client_id', 'like', "%{$search}%");
                 });
         }
 
-        //  Date range on docentete.cbCreation
+        // 📅 Date range
         if ($request->filled('date')) {
-
             $dates = explode(',', $request->date);
 
             $start = Carbon::parse(urldecode($dates[0]))->startOfDay();
@@ -287,22 +290,21 @@ class DocumentController extends Controller
                 $q->whereBetween('DO_Date', [$start, $end]);
             });
         }
-        
 
         if ($request->filled('type')) {
-            
             $query->whereHas('docentete', function ($q) use ($request) {
                 $q->where('Type', $request->type);
             });
         }
 
-
-        
-
-        $documents = $query->orderByDesc('id')->paginate(40);
+        $documents = $query
+            ->select('documents.*')
+            ->orderByDesc('documents.id')
+            ->paginate(40);
 
         return response()->json($documents);
     }
+
 
     /**
      * Show single document with progress
@@ -358,40 +360,70 @@ class DocumentController extends Controller
 
     public function validationControllerList(Request $request)
     {
-        $query = Document::with(['companies', 'lines', 'docentete:DO_Piece,cbMarq,DO_DateLivr,DO_Date']);
+        $user = auth()->user();
 
-        if (auth()->user()->hasRole('commercial')) {
-            $query = $query->whereIn('status_id', [8, 9, 10, 11]);
-        } else {
-            $query->whereHas('lines', function ($query) {
-                $query->where('company_id', auth()->user()->company_id);
-            })->whereHas('companies', function ($query) {
-                $query->whereIn('document_companies.status_id', [8, 9, 10, 11]);
+        $query = Document::query()
+            ->with(['companies', 'lines', 'docentete:DO_Piece,cbMarq,DO_DateLivr,DO_Date']);
+
+        /* 🔗 COMPANY-SCOPED LOGIC */
+        if (!empty($user->company_id)) {
+
+            $query->join('document_companies as dc', function ($join) use ($user) {
+                $join->on('documents.id', '=', 'dc.document_id')
+                    ->where('dc.company_id', $user->company_id)
+                    ->whereIn('dc.status_id', [8, 9, 10, 11]);
             });
+
+            if (!$user->hasRole('commercial')) {
+                $query->whereHas('lines', function ($q) use ($user) {
+                    $q->where('company_id', $user->company_id);
+                });
+            }
+
+            // ✅ Order by pivot status
+            $query->orderBy('dc.status_id', 'asc');
+        } else {
+
+            // 🔵 NO COMPANY → fallback to document status
+            $query->whereIn('documents.status_id', [8, 9, 10, 11])
+                ->orderBy('documents.status_id', 'asc');
         }
 
+        /* 🧑‍💼 COMMERCIAL ROLE */
+        if ($user->hasRole('commercial')) {
+            $query->whereIn('documents.status_id', [8, 9, 10, 11]);
+        }
+
+        /* 🔍 SEARCH */
         if ($request->filled('search')) {
             $search = $request->search;
+
             $query->where(function ($q) use ($search) {
-                $q->where('ref', 'like', "%$search%")
-                    ->orWhere('piece', 'like', "%$search%")
-                    ->orWhere('client_id', 'like', "%$search%");
+                $q->where('documents.ref', 'like', "%{$search}%")
+                    ->orWhere('documents.piece', 'like', "%{$search}%")
+                    ->orWhere('documents.client_id', 'like', "%{$search}%");
             });
         }
 
-        $query->whereHas('docentete')->whereNull('piece_fa')->whereNull('piece_bl');
+        /* 📄 DOCUMENT FILTERS */
+        $query->whereHas('docentete')
+            ->whereNull('piece_fa')
+            ->whereNull('piece_bl');
 
         if ($request->filled('type')) {
-
             $query->whereHas('docentete', function ($q) use ($request) {
                 $q->where('Type', $request->type);
             });
         }
 
+        $documents = $query
+            ->select('documents.*')
+            ->paginate(40);
 
-        $documents = $query->orderBy('status_id', 'asc')->paginate(40);
         return response()->json($documents);
     }
+
+
 
     public function getDocumentsBL($piece)
     {

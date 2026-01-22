@@ -307,6 +307,10 @@ class ReceptionController extends Controller
             $line->delete();
         }
 
+        foreach($document->receptions as $reception){
+            $reception->delete();
+        }
+
 
         $document->delete();
 
@@ -343,55 +347,52 @@ class ReceptionController extends Controller
             $document->status_id = 3;
             $document->save();
 
-foreach ($document->receptions as $reception) {
+            foreach ($document->receptions as $reception) {
 
-    // ✅ Use DEFAULT database (no ->on() needed)
-    $article = ArticleStock::where('code', $reception->article_code)
-        ->first();
+                $article = ArticleStock::where('code', $reception->article_code)
+                    ->first();
 
-    if (!$article) {
-        throw new \Exception("Article non trouvé avec le code: {$reception->article_code}");
-    }
+                if (!$article) {
+                    throw new \Exception("Article non trouvé avec le code: {$reception->article_code}");
+                }
 
-    // ✅ Use DEFAULT database (no ->on() needed)
-    $emplacement = Emplacement::where('code', $reception->emplacement_code)
-        ->first();
+                $emplacement = Emplacement::where('code', $reception->emplacement_code)
+                    ->first();
 
-    if (!$emplacement) {
-        throw new \Exception("Emplacement non trouvé avec le code: {$reception->emplacement_code}");
-    }
+                if (!$emplacement) {
+                    throw new \Exception("Emplacement non trouvé avec le code: {$reception->emplacement_code}");
+                }
 
-    // ✅ Use DEFAULT database (no ->on() needed)
-    $user = User::where('name', $reception->username)
-        ->first();
+                $user = User::where('name', $reception->username)
+                    ->first();
 
-    if (!$user) {
-        throw new \Exception("Utilisateur non trouvé: {$reception->username}");
-    }
+                if (!$user) {
+                    throw new \Exception("Utilisateur non trouvé: {$reception->username}");
+                }
 
-    // ✅ Use DEFAULT database for StockMovement
-    StockMovement::create([
-        'code_article'     => $article->code,
-        'designation'      => $article->description ?? 'N/A',
-        'emplacement_id'   => $emplacement->id,
-        'movement_type'    => 'IN',
-        'article_stock_id' => $article->id,
-        'quantity'         => $reception->quantity,
-        'moved_by'         => $user->id,
-        'company_id'       => $reception->company,
-        'movement_date'    => now(),
-    ]);
 
-    // ✅ Pass the model objects
-    $this->stockService->stockInsert(
-        $emplacement,                       // Emplacement object
-        $article,                           // ArticleStock object
-        $reception->quantity,
-        $reception->colis_quantity ?? 0,
-        $reception->colis_type ?? 'Piece',
-        $reception->quantity
-    );
-}
+                StockMovement::create([
+                    'code_article'     => $article->code,
+                    'designation'      => $article->description ?? 'N/A',
+                    'emplacement_id'   => $emplacement->id,
+                    'movement_type'    => 'IN',
+                    'article_stock_id' => $article->id,
+                    'quantity'         => $reception->quantity,
+                    'moved_by'         => $user->id,
+                    'company_id'       => $reception->company,
+                    'movement_date'    => now(),
+                ]);
+
+                // ✅ Pass the model objects
+                $this->stockService->stockInsert(
+                    $emplacement,                       // Emplacement object
+                    $article,                           // ArticleStock object
+                    $reception->quantity,
+                    $reception->colis_quantity ?? 0,
+                    $reception->colis_type ?? 'Piece',
+                    $reception->quantity
+                );
+            }
 
             DB::connection($request->company_db)->commit();
 
@@ -430,6 +431,9 @@ foreach ($document->receptions as $reception) {
                 'piece'            => 'required'
             ]);
 
+            $condition =  $request->condition ? intval($request->condition) : 1;
+
+
             if ($validator->fails()) {
                 return response()->json([
                     'message' => $validator->errors()->first(),
@@ -442,6 +446,9 @@ foreach ($document->receptions as $reception) {
             $article     = ArticleStock::where('code', $request->code_article)->first();
             $emplacement = Emplacement::where("code", $request->emplacement_code)->first();
             $document = Document::on($request->company_db)->where('piece', $request->piece)->first();
+
+
+            
 
             if (!$article) {
                 return response()->json([
@@ -472,7 +479,7 @@ foreach ($document->receptions as $reception) {
             }
 
 
-            DB::connection($request->company_db)->transaction(function () use ($request, $piece) {
+            DB::connection($request->company_db)->transaction(function () use ($request, $piece, $condition) {
 
                 $article = ArticleStock::lockForUpdate()
                     ->where('code', $request->code_article)
@@ -506,11 +513,12 @@ foreach ($document->receptions as $reception) {
 
                 $docligne = $docentete->doclignes()
                     ->where('AR_Ref', $request->code_article)
+                    ->whereColumn('DL_Qte', '>', 'DL_QteBL')
                     ->lockForUpdate()
                     ->first();
 
                 if (!$docligne) {
-                    throw new HttpException(404, 'Ligne document introuvable');
+                    throw new HttpException(404, 'Ligne document introuvable ou Quantité insuffisante');
                 }
 
                 if ($docligne->DL_Qte < ($request->quantity + $docligne->DL_QteBL)) {
@@ -525,16 +533,16 @@ foreach ($document->receptions as $reception) {
                 DocumentReception::on($request->company_db)->create([
                     'article_code'     => $request->code_article,
                     'emplacement_code' => $request->emplacement_code,
-                    'quantity'         => $request->quantity,
+                    'quantity'         => floatval($request->quantity) * floatval($condition),
                     'document_id'      => $document->id,
-                    'username'         => $user->name, // <- must exist
+                    'username'         => $user->name,
                     'company'          => (int) $request->company,
                     'colis_type'       => $request->type_colis,
                     'colis_quantity'   => $request->condition
                 ]);
 
                 $docligne->update([
-                    'DL_QteBL' => $docligne->DL_QteBL + (float) $request->quantity
+                    'DL_QteBL' => $docligne->DL_QteBL + (float) (floatval($request->quantity) * floatval($condition))
                 ]);
 
                 if ($docentete->doclignes()->sum('DL_QteBL') === $docentete->doclignes()->sum('DL_Qte')) {
