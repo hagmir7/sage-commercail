@@ -225,85 +225,84 @@ class DocumentController extends Controller
         return strval($docligne->docentete->cbMarq);
     }
 
-    public function preparationList(Request $request)
-    {
-        $user = auth()->user();
-        $user_roles = $user->roles()->pluck('name', 'id');
+public function preparationList(Request $request)
+{
+    $user = auth()->user();
+    $user_roles = $user->roles()->pluck('name', 'id');
 
-        $query = Document::query()
-            ->with([
-                'companies',
-                'docentete:cbMarq,DO_Date,DO_DateLivr,DO_Reliquat,DO_Piece,cbCreation'
-            ])
-            ->join('document_companies as dc', function ($join) use ($user) {
-                $join->on('documents.id', '=', 'dc.document_id')
-                    ->where('dc.company_id', $user->company_id)
-                    ->whereIn('dc.status_id', [1, 2, 3, 4, 5, 6, 7]);
-            })
-            ->whereHas('docentete', function ($q) {
-                $q->where('DO_Domaine', 0)
-                    ->where('DO_Statut', 1)
-                    ->whereIn('DO_Type', [1, 2]);
-            })
-            ->whereHas('lines', function ($q) use ($user_roles, $user) {
-                $q->where('company_id', (string) $user->company_id);
+    $query = Document::query()
+        ->with([
+            'companies',
+            'docentete:cbMarq,DO_Date,DO_DateLivr,DO_Reliquat,DO_Piece,cbCreation'
+        ])
+        ->join('document_companies as dc', function ($join) use ($user) {
+            $join->on('documents.id', '=', 'dc.document_id')
+                ->where('dc.company_id', $user->company_id)
+                ->whereIn('dc.status_id', [1, 2, 3, 4, 5, 6, 7]);
+        })
+        ->whereHas('docentete', function ($q) {
+            $q->where('DO_Domaine', 0)
+                ->where('DO_Statut', 1)
+                ->whereIn('DO_Type', [1, 2]);
+        })
+        ->whereHas('lines', function ($q) use ($user_roles, $user) {
+            $q->where('company_id', (string) $user->company_id);
 
-                $common = array_intersect(
-                    $user_roles->toArray(),
-                    ['fabrication', 'montage', 'preparation_cuisine', 'preparation_trailer', 'magasinier']
-                );
+            $common = array_intersect(
+                $user_roles->toArray(),
+                ['fabrication', 'montage', 'preparation_cuisine', 'preparation_trailer', 'magasinier']
+            );
 
-                if (!empty($common)) {
-                    $q->whereIn('role_id', $user_roles->keys());
-                }
-            })
-            ->addSelect([
-                'documents.*',
-                'has_user_printer' => \DB::table('user_document_printer')
-                    ->selectRaw('CASE WHEN COUNT(*) > 0 THEN 1 ELSE 0 END')
-                    ->whereColumn('user_document_printer.document_id', 'documents.id')
-                    ->where('user_document_printer.user_id', $user->id)
-            ]);
+            if (!empty($common)) {
+                $q->whereIn('role_id', $user_roles->keys());
+            }
+        })
+        ->addSelect([
+            'documents.*',
+            'has_user_printer' => \DB::table('user_document_printer')
+                ->selectRaw('CASE WHEN COUNT(*) > 0 THEN 1 ELSE 0 END')
+                ->whereColumn('user_document_printer.document_id', 'documents.id')
+                ->where('user_document_printer.user_id', $user->id)
+        ]);
 
-        // 🔍 Search
-        if ($request->filled('search')) {
-            $search = $request->search;
+    // 🔍 Search
+    if ($request->filled('search')) {
+        $search = $request->search;
 
-            $query->where(function ($q) use ($search) {
-                $q->where('documents.ref', 'like', "%{$search}%")
-                    ->orWhere('documents.piece', 'like', "%{$search}%")
-                    ->orWhere('documents.piece_bc', 'like', "%{$search}%");
-            })
-                ->orWhereHas('companies', function ($q) use ($search) {
-                    $q->where('client_id', 'like', "%{$search}%");
-                });
-        }
-
-        // 📅 Date range
-        if ($request->filled('date')) {
-            $dates = explode(',', $request->date);
-
-            $start = Carbon::parse(urldecode($dates[0]))->startOfDay();
-            $end   = Carbon::parse(urldecode($dates[1] ?? $dates[0]))->endOfDay();
-
-            $query->whereHas('docentete', function ($q) use ($start, $end) {
-                $q->whereBetween('DO_Date', [$start, $end]);
+        $query->where(function ($q) use ($search) {
+            $q->where('documents.ref', 'like', "%{$search}%")
+                ->orWhere('documents.piece', 'like', "%{$search}%")
+                ->orWhere('documents.piece_bc', 'like', "%{$search}%");
+        })
+            ->orWhereHas('companies', function ($q) use ($search) {
+                $q->where('client_id', 'like', "%{$search}%");
             });
-        }
-
-        if ($request->filled('type')) {
-            $query->whereHas('docentete', function ($q) use ($request) {
-                $q->where('Type', $request->type);
-            });
-        }
-
-        $documents = $query
-            ->select('documents.*')
-            ->orderByDesc('documents.id')
-            ->paginate(40);
-
-        return response()->json($documents);
     }
+
+    // 📅 Date range
+    if ($request->filled('date')) {
+        $dates = explode(',', $request->date);
+
+        $start = Carbon::parse(urldecode($dates[0]))->startOfDay();
+        $end   = Carbon::parse(urldecode($dates[1] ?? $dates[0]))->endOfDay();
+
+        $query->whereHas('docentete', function ($q) use ($start, $end) {
+            $q->whereBetween('DO_Date', [$start, $end]);
+        });
+    }
+
+    if ($request->filled('type')) {
+        $query->whereHas('docentete', function ($q) use ($request) {
+            $q->where('Type', $request->type);
+        });
+    }
+
+    $documents = $query
+        ->orderByDesc('documents.id')
+        ->paginate(40);
+
+    return response()->json($documents);
+}
 
 
     /**

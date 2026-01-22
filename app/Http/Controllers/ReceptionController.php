@@ -263,7 +263,7 @@ class ReceptionController extends Controller
                 $allDocentetes = $allDocentetes->merge($query);
             } catch (\Throwable $e) {
                 \Log::error("❌ Failed fetching data from {$company}: " . $e->getMessage());
-                continue; // Skip failed connection
+                continue;
             }
         }
 
@@ -307,7 +307,7 @@ class ReceptionController extends Controller
             $line->delete();
         }
 
-        foreach($document->receptions as $reception){
+        foreach ($document->receptions as $reception) {
             $reception->delete();
         }
 
@@ -441,14 +441,11 @@ class ReceptionController extends Controller
                 ], 422);
             }
 
-
-            $companyId   = intval($request->company ?? 1);
             $article     = ArticleStock::where('code', $request->code_article)->first();
             $emplacement = Emplacement::where("code", $request->emplacement_code)->first();
             $document = Document::on($request->company_db)->where('piece', $request->piece)->first();
 
 
-            
 
             if (!$article) {
                 return response()->json([
@@ -469,35 +466,32 @@ class ReceptionController extends Controller
             }
 
 
-            $docentete = Docentete::on($request->company_db)->find($piece);
+            $docentete = Docentete::on($request->company_db)
+                ->lockForUpdate()
+                ->findOrFail($piece);
 
 
-            $docligne = $docentete->doclignes()->where("AR_Ref", $request->code_article)->first();
+            $docligne = $docentete->doclignes()
+                ->where('AR_Ref', $request->code_article)
+                ->whereRaw('CAST(DL_Qte AS INT) > CAST(DL_QteBL AS INT)')
+                ->lockForUpdate()
+                ->first();
 
             if (!$docligne || $docligne->DL_Qte < ($request->quantity + $docligne->DL_QteBL)) {
-                return response()->json(['message' => "Quantité insuffisante"], 422);
+                return response()->json(['message' => "Ligne document introuvable ou Quantité insuffisante"], 422);
             }
 
 
-            DB::connection($request->company_db)->transaction(function () use ($request, $piece, $condition) {
+            $emplacement = Emplacement::lockForUpdate()
+                ->where('code', $request->emplacement_code)
+                ->first();
 
-                $article = ArticleStock::lockForUpdate()
-                    ->where('code', $request->code_article)
-                    ->first();
+            if (!$emplacement) {
+                throw new HttpException(404, 'Emplacement non trouvé');
+            }
 
-                if (!$article) {
-                    throw new HttpException(404, 'Article non trouvé');
-                }
+            DB::connection($request->company_db)->transaction(function () use ($request, $condition, $docligne, $docentete) {
 
-                $emplacement = Emplacement::lockForUpdate()
-                    ->where('code', $request->emplacement_code)
-                    ->first();
-
-                if (!$emplacement) {
-                    throw new HttpException(404, 'Emplacement non trouvé');
-                }
-
-                /** 👇 IMPORTANT FIX HERE */
                 $document = Document::on($request->company_db)
                     ->where('piece', $request->piece)
                     ->lockForUpdate()
@@ -507,23 +501,7 @@ class ReceptionController extends Controller
                     throw new HttpException(404, 'Document non trouvé');
                 }
 
-                $docentete = Docentete::on($request->company_db)
-                    ->lockForUpdate()
-                    ->findOrFail($piece);
 
-                $docligne = $docentete->doclignes()
-                    ->where('AR_Ref', $request->code_article)
-                    ->whereRaw('CAST(DL_Qte AS INT) > CAST(DL_QteBL AS INT)')
-                    ->lockForUpdate()
-                    ->first();
-
-                if (!$docligne) {
-                    throw new HttpException(404, 'Ligne document introuvable ou Quantité insuffisante');
-                }
-
-                if ($docligne->DL_Qte < ($request->quantity + $docligne->DL_QteBL)) {
-                    throw new HttpException(422, 'Quantité insuffisante');
-                }
 
                 $user = auth()->user();
                 if (!$user) {
@@ -551,8 +529,6 @@ class ReceptionController extends Controller
                     ]);
                 }
             });
-
-
 
             return response()->json(['message' => 'Stock successfully inserted or updated.']);
         } catch (\Illuminate\Database\QueryException $e) {
