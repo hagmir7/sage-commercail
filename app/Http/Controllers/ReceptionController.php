@@ -513,7 +513,7 @@ class ReceptionController extends Controller
 
                 $docligne = $docentete->doclignes()
                     ->where('AR_Ref', $request->code_article)
-                    ->whereColumn('DL_Qte', '>', 'DL_QteBL')
+                    ->whereRaw('CAST(DL_Qte AS INT) > CAST(DL_QteBL AS INT)')
                     ->lockForUpdate()
                     ->first();
 
