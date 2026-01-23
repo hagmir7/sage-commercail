@@ -297,7 +297,7 @@ class DocenteteController extends Controller
         }
 
         // Faster pagination without total counts
-        $results = $query->simplePaginate(30);
+        $results = $query->simplePaginate(100);
 
         return response()->json($results);
     }
@@ -873,6 +873,7 @@ class DocenteteController extends Controller
                     'ref' => $docentete->DO_Ref,
                     'client_id' => $docentete->DO_Tiers,
                     'expedition' => $docentete->DO_Expedit,
+                    'urgent' => $request->urgent,
                 ]);
             }
 
