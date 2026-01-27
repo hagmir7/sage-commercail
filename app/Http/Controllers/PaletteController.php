@@ -230,10 +230,19 @@ class PaletteController extends Controller
                 ->where('company_id', auth()->user()->company_id)
                 ->where("document_id", $document->id)
                 ->whereIn('status_id', [7, 8])
-                ->whereIn('role_id', auth()->user()->roles()->pluck('id')->toArray())
-                ->whereHas('docligne', function ($query) {
+                ->whereIn('role_id', auth()->user()->roles()->pluck('id')->toArray());
+
+            if ($document->urgent) {
+                $line->where(function ($q) {
+                    $q->whereColumn('quantity', '>', 'quantity_prepare')
+                        ->orWhereNull('quantity_prepare');
+                });
+            } else {
+                $line->whereHas('docligne', function ($query) {
                     $query->whereColumn('EU_Qte', '>', 'DL_QteBL');
                 });
+            }
+                
 
             if (!$request->has('all') || $request->all !== 'true') {
                 $line->whereHas('article_stock', function ($query) use ($lineIdentifier) {
@@ -529,23 +538,28 @@ class PaletteController extends Controller
                     ]);
 
                     // Increment delivered quantity on docligne
-                    $docligne->increment('DL_QteBL', $lineQuantity);
-
+                    if(!$document->urgent){
+                        $docligne->increment('DL_QteBL', $lineQuantity);
+                    }else{
+                        $line->increment('quantity_prepare', $lineQuantity);
+                    }
+                   
+                    $status_id =  $document->urgent ? 11 : 8;
                     // Update line status to 8
-                    $line->update(['status_id' => 8]);
+                    $line->update(['status_id' => $status_id]);
                     // Stock movement
                     $this->stockMovement($line->ref, $docligne->DL_Qte);
                 }
             }
 
             // Update document status
-            $documentStatus = $document->validation() ? 8 : 7;
+            $documentStatus = $document->validation() ? $status_id : 7;
             if ($document->status_id !== $documentStatus) {
                 $document->update(['status_id' => $documentStatus]);
             }
 
             // Update company pivot status
-            $companyStatus = $this->validationCompany($companyId, $document->id) ? 8 : 7;
+            $companyStatus = $this->validationCompany($companyId, $document->id) ? $status_id : 7;
             $document->companies()->updateExistingPivot($companyId, [
                 'status_id'  => $companyStatus,
                 'updated_at' => now(),
@@ -592,7 +606,7 @@ class PaletteController extends Controller
                 $maxQty = (float) $docligne?->EU_Qte * ($ctValue || 1);
                 $currentQty = (float) $docligne?->DL_QteBL + (float) $request->quantity;
 
-                if ($maxQty < $currentQty) {
+                if ($maxQty < $currentQty & !$document->urgent) {
                     throw new \Exception("La quantité n'est pas valide", 422);
                 }
 
@@ -603,7 +617,13 @@ class PaletteController extends Controller
                 // ✅ Attach palette to line
                 $line->palettes()->attach($palette->id, ['quantity' => $request->quantity]);
 
-                $line->update(['status_id' => 8]);
+                if($document->urgent){
+                    $line->update(['status_id' => 11]);
+                }else{
+                    $line->update(['status_id' => 8]);
+                }
+                
+            
 
 
 
@@ -630,17 +650,22 @@ class PaletteController extends Controller
                         'code_article'     => $line->ref,
                         'designation'      => $article_stock->description ?? '',
                         'emplacement_id'   => $emplacement?->id,
-                        'movement_type'    => "TRANSFER",
+                        'movement_type'    => $document->urgent ? "OUT" : "TRANSFER",
                         'article_stock_id' => $article_stock->id,
                         'quantity'         => floatval($request->quantity),
                         'moved_by'         => auth()->id(),
                         'company_id'       => auth()->user()->company_id,
                         'to_company_id'    => null,
                         'movement_date'    => now(),
-                        'to_emplacement_id' => $new_emplacement->id
+                        'to_emplacement_id' => $document->urgent ? null : $new_emplacement->id
                     ]);
 
-                    $this->stockService->transfer($emplacement, $new_emplacement, $article_stock, $request->quantity);
+                    if($document->urgent){
+                        $this->stockService->stockOut($emplacement, $article_stock, $request->quantity);
+                    }else{
+                        $this->stockService->transfer($emplacement, $new_emplacement, $article_stock, $request->quantity);
+                    }
+                   
                 } else {
                     try {
                         // new ArticleStockController()->decrementQuantity($line->ref, $request->emplacement);
@@ -655,16 +680,27 @@ class PaletteController extends Controller
 
                 $docligne = Docligne::where('cbMarq', $line->docligne_id);
 
-                $docligne->increment('DL_QteBL', floatval($request->quantity) * $multiplier);
+                if(!$document->urgent){
+                    $docligne->increment('DL_QteBL', floatval($request->quantity) * $multiplier);
+                }else{
+                    $line->update([
+                        'quantity_prepare' => $line->quantity_prepare + $request->quantity
+                    ]);
+                }
+                
+
+                $status_id = $document->urgent ? 11 : 8;
 
                 // ✅ Document status
                 if ($document->validation()) {
-                    $document->update(['status_id' => 8]);
+                    $document->update(['status_id' => $status_id]);
+                    
                 } elseif ($document->status_id != 7) {
                     $document->update(['status_id' => 7]);
                 }
 
-                $status = $this->validationCompany(auth()->user()->company_id, $document->id) ? 8 : 7;
+               
+                $status = $this->validationCompany(auth()->user()->company_id, $document->id) ? $status_id : 7;
 
                 $document->companies()->updateExistingPivot(auth()->user()->company_id, [
                     'status_id' => $status,

@@ -6,6 +6,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use App\Models\Docentete;
 use App\Models\Docligne;
+use App\Models\Document;
 use DateTime;
 use Exception;
 
@@ -77,6 +78,7 @@ class SellController extends Controller
                 return $doc->line?->article_stock?->company_code ?? 'FR001';
             });
 
+
             foreach ($grouped as $companyCode => $companyLines) {
 
                 $DO_Piece = $this->generatePiece();
@@ -86,7 +88,7 @@ class SellController extends Controller
                 $DO_Date = $this->createDocumentFromTemplate($sourcePiece, $DO_Piece, $total, $companyCode);
 
                 foreach ($companyLines as $line) {
-                    // \Log::alert($line->AR_Ref);
+
                     if ($line->AR_Ref != 'TF') {
                         $newDL_No = $this->createDocumentLineFromTemplate(
                             $line->DL_No,
@@ -244,7 +246,7 @@ class SellController extends Controller
                 DL_PieceOFProd, DL_PieceDE, DL_DateDE, DL_QteDE, DL_Operation,
                 CA_No, DO_DocType, cbProt,
                 Nom, Hauteur, Largeur, Profondeur, Langeur,
-                Couleur, Chant, Episseur, TRANSMIS, Poignée, Description, Rotation
+                Couleur, Chant, Episseur, TRANSMIS, Poignée, Description, Rotation, DL_NoColis
             )
             SELECT
                 1,  -- DO_Domaine
@@ -348,7 +350,8 @@ class SellController extends Controller
                 LEFT(s.TRANSMIS, 50),
                 LEFT(s.Poignée, 35),
                 LEFT(s.Description, 35),
-                LEFT(s.Rotation, 69)
+                LEFT(s.Rotation, 69),
+                s.DL_NoColis
             FROM F_DOCLIGNE s
             WHERE s.DL_No = ?
             ";

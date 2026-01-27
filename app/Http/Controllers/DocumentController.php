@@ -242,7 +242,7 @@ class DocumentController extends Controller
             })
             ->whereHas('docentete', function ($q) {
                 $q->where('DO_Domaine', 0)
-                    ->where('DO_Statut', 1)
+                    // ->where('DO_Statut', 1)
                     ->whereIn('DO_Type', [1, 2]);
             })
             ->whereHas('lines', function ($q) use ($user_roles, $user) {

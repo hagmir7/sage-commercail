@@ -19,16 +19,24 @@ use App\Models\Emplacement;
 use App\Models\Palette;
 use App\Models\StockMovement;
 use App\Services\StockMovementService;
+use App\Services\StockService;
 
 class DocenteteController extends Controller
 {
 
-    protected StockMovementService $stockService;
+    protected StockMovementService $stockMovementService;
+    protected StockService $stockService;
 
-    public function __construct(StockMovementService $stockService)
-    {
+
+    public function __construct(
+        StockMovementService $stockMovementService,
+        StockService $stockService
+    ) {
+        $this->stockMovementService = $stockMovementService;
         $this->stockService = $stockService;
     }
+
+
 
     public function preparation(Request $request)
     {
@@ -157,7 +165,7 @@ class DocenteteController extends Controller
                 'movement_date'    => now(),
             ]);
 
-            $this->stockService->stockInsert($emplacement, $article, $qte);
+            $this->stockMovementService->stockInsert($emplacement, $article, $qte);
             DB::commit();
             return true;
         } catch (\Throwable $th) {
@@ -858,6 +866,9 @@ class DocenteteController extends Controller
             $document = Document::where('docentete_id', $docentete->cbMarq)->first();
             $document_piece = Document::where('piece', $docentete->DO_Piece)->first();
 
+
+
+
             if (!$document && !$document_piece) {
                 // Generate piece only if DO_Piece contains 'BC', otherwise use DO_Piece as is
                 $piece = str_contains($docentete->DO_Piece, 'BC')
@@ -874,6 +885,7 @@ class DocenteteController extends Controller
                     'client_id' => $docentete->DO_Tiers,
                     'expedition' => $docentete->DO_Expedit,
                     'urgent' => $request->urgent,
+                    'created_at' => now()
                 ]);
             }
 
@@ -894,9 +906,27 @@ class DocenteteController extends Controller
             foreach ($doclignes as $line) {
                 $line->update(['DL_QteBL' => 0]);
 
-                if (!$line->AR_Ref) continue;
+                if (! $line->AR_Ref) {
+                    continue;
+                }
 
                 $article = $articles->get($line->AR_Ref);
+
+                if ($request->urgent) {
+                    $availableStock = $this->stockService->calculateStock(
+                        $line->AR_Ref,
+                        $document->company_id
+                    );
+
+                    if ($availableStock < (int) $line->EU_Qte) {
+                        return response()->json([
+                           'message' => "L’article {$line->AR_Ref} ne dispose pas d’un stock suffisant. Quantité disponible : {$availableStock}"
+                        ], 422);
+                    }
+                }
+
+                $urgant_articles = ['AC002001', 'AC002002', 'AC002003', 'AC002004'];
+
 
                 Line::firstOrCreate(
                     ['docligne_id' => $line->cbMarq],
@@ -914,14 +944,32 @@ class DocenteteController extends Controller
                         'company_id' => $request->company,
                         'first_company_id' => $request->company,
                         'document_id' => $document->id,
-                        'company_code' => $article?->company_code
+                        'company_code' => $article?->company_code,
+                        // 'status_id' => in_array($article->code, $urgant_articles) ? 11 : 1
                     ]
                 );
             }
 
+
             // Update piece only if document was just created AND DO_Piece contains 'BC'
             if ($document->wasRecentlyCreated && str_contains($docentete->DO_Piece, 'BC')) {
                 DB::statement('EXEC Update_DO_Piece ?, ?, ?', [$docentete->DO_Piece, $document->piece, 2]);
+            }
+
+            if ($request->urgent) {
+                $new_docentete = Docentete::where('DO_Piece', $document->piece)->first();
+                foreach ($new_docentete->doclignes as $docligne) {
+                    $docligne->update([
+                        "DL_QteBL" => $docligne->DL_Qte,
+                    ]);
+                }
+
+                $sellController = new SellController();
+                $sellController->calculator($new_docentete->DO_Piece);
+
+                $new_docentete->update([
+                    'DO_Statut' => 2
+                ]);
             }
 
             DB::commit();
