@@ -38,7 +38,6 @@ class PurchaseDocument extends Model
             $nextId = (self::max('id') ?? 0) + 1;
             $record->code = 'DA' . str_pad($nextId, 6, '0', STR_PAD_LEFT);
             $record->user_id = auth()->id();
-            $record->service_id = auth()->user()?->service_id;
         });
     }
 

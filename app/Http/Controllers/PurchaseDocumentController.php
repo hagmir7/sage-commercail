@@ -22,25 +22,49 @@ class PurchaseDocumentController extends Controller
     public function index(Request $request)
     {
         $user = auth()->user();
-        $query = PurchaseDocument::with(['user', 'service'])->withCount('lines');
 
+        $query = PurchaseDocument::with(['user', 'service'])
+            ->withCount('lines');
+
+        /* ---------------- Role-based visibility ---------------- */
         if ($user->hasRole(['admin', 'supper_admin'])) {
-            // Admins see all
-        } elseif ($user->hasRole(['chef_service'])) {
-            $query->whereHas('service')->where('service_id', $user->service_id)
-                ->orWhere('user_id', $user->id);
+            // See all
+        } elseif ($user->hasRole('chef_service')) {
+            $query->where(function ($q) use ($user) {
+                $q->where('service_id', $user->service_id)
+                    ->orWhere('user_id', $user->id);
+            });
         } else {
             $query->where('user_id', $user->id);
         }
 
-        $query->when($request->filled('status'), fn($q) => $q->where('status', $request->status))
-            ->when($request->filled('date'), function ($q) use ($request) {
-                $date = Carbon::parse($request->interview_date)->toDateString();
-                $q->whereDate('created_at', $date);
-            });
+        /* ---------------- Filters ---------------- */
+        $query->when($request->filled('status'), function ($q) use ($request) {
+            $q->where('status', $request->status);
+        });
 
-        $documents = $query->latest()->paginate(40);
-        return response()->json($documents);
+        $query->when($request->filled('service'), function ($q) use ($request) {
+            $q->where('service_id', $request->service);
+        });
+
+        $query->when($request->filled('user'), function ($q) use ($request) {
+            $q->where('user_id', $request->user);
+        });
+
+        $query->when(
+            is_array($request->date_filter) && count($request->date_filter) === 2,
+            function ($q) use ($request) {
+                $q->whereBetween('created_at', [
+                    Carbon::parse($request->date_filter[0])->startOfDay(),
+                    Carbon::parse($request->date_filter[1])->endOfDay(),
+                ]);
+            }
+        );
+
+        /* ---------------- Result ---------------- */
+        return response()->json(
+            $query->latest()->paginate(40)
+        );
     }
 
     public function store(Request $request)
@@ -51,9 +75,9 @@ class PurchaseDocumentController extends Controller
             'note' => 'nullable|string',
             'urgent' => 'boolean',
             'reference' => 'required|string',
-            'status' => 'nullable|integer|min:1|max:8',  // ✅ ADD THIS
-            'service_id' => 'nullable|exists:services,id',  // ✅ ADD THIS
-            'user_id' => 'nullable|exists:users,id',  // ✅ ADD THIS
+            'status' => 'nullable|integer|min:1|max:8',
+            'service_id' => 'nullable|exists:services,id',
+            'user_id' => 'nullable|exists:users,id',
 
             // --- Lines array ---
             'lines' => 'required|array|min:1',
@@ -75,58 +99,61 @@ class PurchaseDocumentController extends Controller
             ], 422);
         }
 
-    $validated = $validator->validated();
+        $validated = $validator->validated();
 
-    DB::beginTransaction();
+            $validated['service_id'] = $validated['service_id']
+                ?? auth()->user()?->service_id;
 
-    try {
-        // 1️⃣ Create Purchase Document
-        $document = PurchaseDocument::create([
-            'piece' => $validated['piece'] ?? null,
-            'note' => $validated['note'] ?? null,
-            'urgent' => $validated['urgent'] ?? false,
-            'reference' => $validated['reference'],
-            'status' => $validated['status'] ?? 1,  // ✅ ADD THIS
-            'service_id' => $validated['service_id'] ?? null,  // ✅ ADD THIS
-            'user_id' => $validated['user_id'] ?? null,  // ✅ ADD THIS
-        ]);
+        DB::beginTransaction();
 
-        // 2️⃣ Loop through lines and create them
-        foreach ($validated['lines'] as $lineData) {
-            $files = $lineData['files'] ?? [];
-            unset($lineData['files']); // Remove files before creating the line
+        try {
+            // 1️⃣ Create Purchase Document
+            $document = PurchaseDocument::create([
+                'piece' => $validated['piece'] ?? null,
+                'note' => $validated['note'] ?? null,
+                'urgent' => $validated['urgent'] ?? false,
+                'reference' => $validated['reference'],
+                'status' => $validated['status'] ?? 1,
+                'service_id' => $validated['service_id'] ?? null,
+                'user_id' => $validated['user_id'] ?? null,
+            ]);
 
-            $lineData['purchase_document_id'] = $document->id;
-            $line = PurchaseLine::create($lineData);
+            // 2️⃣ Loop through lines and create them
+            foreach ($validated['lines'] as $lineData) {
+                $files = $lineData['files'] ?? [];
+                unset($lineData['files']); 
 
-            // 3️⃣ Handle files for this line
-            foreach ($files as $file) {
-                $path = $file->store('purchase_files', 'public');
+                $lineData['purchase_document_id'] = $document->id;
+                $line = PurchaseLine::create($lineData);
 
-                PurchaseLineFile::create([
-                    'purchase_line_id' => $line->id,
-                    'file_path' => $path,
-                    'original_name' => $file->getClientOriginalName(),
-                ]);
+                // 3️⃣ Handle files for this line
+                foreach ($files as $file) {
+                    $path = $file->store('purchase_files', 'public');
+
+                    PurchaseLineFile::create([
+                        'purchase_line_id' => $line->id,
+                        'file_path' => $path,
+                        'original_name' => $file->getClientOriginalName(),
+                    ]);
+                }
             }
+
+            DB::commit();
+
+            $document->load('lines.files');
+
+            return response()->json([
+                'message' => 'Document, lines, and files created successfully.',
+                'document' => $document,
+            ], 201);
+        } catch (\Throwable $e) {
+            DB::rollBack();
+            return response()->json([
+                'message' => 'An error occurred during saving.',
+                'error' => $e->getMessage(),
+            ], 500);
         }
-
-        DB::commit();
-
-        $document->load('lines.files');
-
-        return response()->json([
-            'message' => 'Document, lines, and files created successfully.',
-            'document' => $document,
-        ], 201);
-    } catch (\Throwable $e) {
-        DB::rollBack();
-        return response()->json([
-            'message' => 'An error occurred during saving.',
-            'error' => $e->getMessage(),
-        ], 500);
     }
-}
 
     public function show(PurchaseDocument $purchaseDocument)
     {
@@ -154,6 +181,7 @@ class PurchaseDocumentController extends Controller
             'lines.*.quantity' => 'required|numeric|min:0',
             'lines.*.unit' => 'nullable|string|max:50',
             'lines.*.estimated_price' => 'nullable|numeric|min:0',
+            'service_id' => 'nullable|exists:services,id',
 
             // --- Files per line ---
             'lines.*.files.*' => 'nullable|file|max:100240|mimes:pdf,doc,docx,xls,xlsx,jpg,jpeg,png,gif,ods',
@@ -181,8 +209,8 @@ class PurchaseDocumentController extends Controller
                 'note' => $validated['note'] ?? $document->note,
                 'urgent' => $validated['urgent'] ?? false,
                 'reference' => $validated['reference'] ??  $document->reference,
-                'status' => $validated['status'] ?? $document->status
-
+                'status' => $validated['status'] ?? $document->status,
+                'service_id' => $validated['service_id'] ?? $document->status
             ]);
 
             $updatedLineIds = [];
@@ -319,7 +347,8 @@ class PurchaseDocumentController extends Controller
         return PurchaseDocument::where('status', $status)->count();
     }
 
-    public function checkArticles($company_db, $document_id){
+    public function checkArticles($company_db, $document_id)
+    {
         $purchaseDocument = PurchaseDocument::find($document_id);
 
         $articleCodes = $purchaseDocument->lines->pluck('code')->filter()->unique();
@@ -340,7 +369,6 @@ class PurchaseDocumentController extends Controller
                 'missing_codes' => $missingCodes->values(),
             ], 400);
         }
-
     }
 
 
@@ -378,7 +406,7 @@ class PurchaseDocumentController extends Controller
             'devise' => 'required|integer',
         ]);
 
-        
+
 
         if ($validator->fails()) {
             return response()->json([
@@ -388,10 +416,10 @@ class PurchaseDocumentController extends Controller
         }
 
         try {
-             $purchaseDocument = PurchaseDocument::find($request->document_id);
-             $piece = $this->generatePiece($request->souche);
+            $purchaseDocument = PurchaseDocument::find($request->document_id);
+            $piece = $this->generatePiece($request->souche);
 
-             $this->checkArticles($request->company_db, $request->document_id);
+            $this->checkArticles($request->company_db, $request->document_id);
 
             $DO_Date = $this->createDocentete(
                 $piece,
@@ -422,7 +450,7 @@ class PurchaseDocumentController extends Controller
 
             foreach ($request->lines as $line) {
 
-                
+
                 $this->createDocligne(
                     $request->company_db,
                     $piece,
@@ -477,7 +505,7 @@ class PurchaseDocumentController extends Controller
                     'status' => 4,
                 ]);
             }
-           
+
             return response()->json([
                 'message' => 'Transfer successful',
                 'piece' => $piece
@@ -497,143 +525,143 @@ class PurchaseDocumentController extends Controller
         }
     }
 
-public function createDocentete(string $DO_Piece, string $DO_Tiers, string $DO_Ref, $DO_Souche, $DO_Devise, $company_db): string
-{
-    try {
-        
-        if($company_db == 'sqlsrv'){
-             $DO_Date  = date('Y-m-d') . ' 00:00:00.000';
-             $currentDateTime = date('Y-m-d H:i:s.000');
-        }else{  
-            $DO_Date  = date('Y-d-m') . ' 00:00:00.000';
-            $currentDateTime = date('Y-d-m H:i:s.000');
+    public function createDocentete(string $DO_Piece, string $DO_Tiers, string $DO_Ref, $DO_Souche, $DO_Devise, $company_db): string
+    {
+        try {
+
+            if ($company_db == 'sqlsrv') {
+                $DO_Date  = date('Y-m-d') . ' 00:00:00.000';
+                $currentDateTime = date('Y-m-d H:i:s.000');
+            } else {
+                $DO_Date  = date('Y-d-m') . ' 00:00:00.000';
+                $currentDateTime = date('Y-d-m H:i:s.000');
+            }
+
+
+            $DO_Heure = $this->generateHeure();
+
+
+            DB::connection($company_db)->table('F_DOCENTETE')->insert([
+                'DO_Domaine'            => 1,
+                'DO_Type'               => 10,
+                'DO_Piece'              => $DO_Piece,
+                'DO_Date'               => $DO_Date,
+                'DO_Ref'                => $DO_Ref,
+                'DO_Tiers'              => $DO_Tiers,
+                'CO_No'                 => 0,
+                'cbCO_No'               => null,  // MISSING COLUMN
+                'DO_Period'             => 1,
+                'DO_Devise'             => $DO_Devise,
+                'DO_Cours'              => 1.000000,
+                'DE_No'                 => 1,
+                'cbDE_No'               => 1,     // MISSING COLUMN
+                'LI_No'                 => 0,
+                'cbLI_No'               => null,  // MISSING COLUMN
+                'CT_NumPayeur'          => $DO_Tiers,
+                'DO_Expedit'            => 1,
+                'DO_NbFacture'          => 1,
+                'DO_BLFact'             => 0,
+                'DO_TxEscompte'         => 0.000000,
+                'DO_Reliquat'           => 0,
+                'DO_Imprim'             => 0,
+                'CA_Num'                => '',
+                'DO_Coord01'            => '',
+                'DO_Coord02'            => '',
+                'DO_Coord03'            => '',
+                'DO_Coord04'            => '',
+                'DO_Souche'             => $DO_Souche,
+                'DO_DateLivr'           => '2026-11-11 00:00:00.000',
+                'DO_Condition'          => 1,
+                'DO_Tarif'              => 1,
+                'DO_Colisage'           => 1,
+                'DO_TypeColis'          => 1,
+                'DO_Transaction'        => 11,
+                'DO_Langue'             => 0,
+                'DO_Ecart'              => 0.000000,
+                'DO_Regime'             => 11,
+                'N_CatCompta'           => 5,
+                'DO_Ventile'            => 0,
+                'AB_No'                 => 0,
+                'DO_DebutAbo'           => '1753-01-01 00:00:00.000',
+                'DO_FinAbo'             => '1753-01-01 00:00:00.000',
+                'DO_DebutPeriod'        => '1753-01-01 00:00:00.000',
+                'DO_FinPeriod'          => '1753-01-01 00:00:00.000',
+                'CG_Num'                => '44110000',
+                'DO_Statut'             => 0,
+                'DO_Heure'              => $DO_Heure,
+                'CA_No'                 => 0,
+                'CO_NoCaissier'         => 0,
+                'DO_Transfere'          => 0,
+                'DO_Cloture'            => 0,
+                'DO_NoWeb'              => '',
+                'DO_Attente'            => 0,
+                'DO_Provenance'         => 0,
+                'CA_NumIFRS'            => '',
+                'MR_No'                 => 0,
+                'DO_TypeFrais'          => 0,
+                'DO_ValFrais'           => 0.000000,
+                'DO_TypeLigneFrais'     => 0,
+                'DO_TypeFranco'         => 0,
+                'DO_ValFranco'          => 0.000000,
+                'DO_TypeLigneFranco'    => 0,
+                'DO_Taxe1'              => 0.000000,
+                'DO_TypeTaux1'          => 0,
+                'DO_TypeTaxe1'          => 0,
+                'DO_Taxe2'              => 0.000000,
+                'DO_TypeTaux2'          => 0,
+                'DO_TypeTaxe2'          => 0,
+                'DO_Taxe3'              => 0.000000,
+                'DO_TypeTaux3'          => 0,
+                'DO_TypeTaxe3'          => 0,
+                'DO_MajCpta'            => 0,
+                'DO_Motif'              => '',
+                'DO_Contact'            => '',
+                'DO_FactureElec'        => 0,
+                'DO_TypeTransac'        => 0,
+                'DO_DateLivrRealisee'   => '1753-01-01 00:00:00.000',
+                'DO_DateExpedition'     => '1753-01-01 00:00:00.000',
+                'DO_FactureFrs'         => '',
+                'DO_PieceOrig'          => '',
+                'DO_EStatut'            => 0,
+                'DO_DemandeRegul'       => 0,
+                'ET_No'                 => 0,
+                'DO_Valide'             => 0,
+                'DO_Coffre'             => 0,
+                'DO_TotalHT'            => 0.000000,
+                'DO_StatutBAP'          => 0,
+                'DO_Escompte'           => 0,
+                'DO_DocType'            => 10,
+                'DO_TypeCalcul'         => 0,
+                'DO_FactureFile'        => null,
+                'DO_TotalHTNet'         => 0.000000,
+                'DO_TotalTTC'           => 0.000000,
+                'DO_NetAPayer'          => 0.000000,
+                'DO_MontantRegle'       => 0.000000,
+                'DO_RefPaiement'        => null,
+                'DO_AdressePaiement'    => '',
+                'DO_PaiementLigne'      => 0,
+                'DO_MotifDevis'         => 0,
+                'DO_Conversion'         => 0,
+                'cbProt'                => 0,
+                'cbCreateur'            => 'ERP1',
+                'cbModification'        => $currentDateTime,
+                'cbReplication'         => 0,
+                'cbFlag'                => 0,
+                'cbCreation'            => $currentDateTime,
+                'cbCreationUser'        => '77384016-921F-472F-B56D-1D563B7DDF3C',
+                'cbHash'                => null,
+                'cbHashVersion'         => 1,
+                'cbHashDate'            => null,
+                'cbHashOrder'           => null,
+
+            ]);
+
+            return $DO_Date;
+        } catch (Exception $e) {
+            \Log::error('Docentete creation failed: ' . $e->getMessage());
+            throw $e;
         }
-       
-
-        $DO_Heure = $this->generateHeure();
-
-
-        DB::connection($company_db)->table('F_DOCENTETE')->insert([
-            'DO_Domaine'            => 1,
-            'DO_Type'               => 10,
-            'DO_Piece'              => $DO_Piece,
-            'DO_Date'               => $DO_Date,
-            'DO_Ref'                => $DO_Ref,
-            'DO_Tiers'              => $DO_Tiers,
-            'CO_No'                 => 0,
-            'cbCO_No'               => null,  // MISSING COLUMN
-            'DO_Period'             => 1,
-            'DO_Devise'             => $DO_Devise,
-            'DO_Cours'              => 1.000000,
-            'DE_No'                 => 1,
-            'cbDE_No'               => 1,     // MISSING COLUMN
-            'LI_No'                 => 0,
-            'cbLI_No'               => null,  // MISSING COLUMN
-            'CT_NumPayeur'          => $DO_Tiers,
-            'DO_Expedit'            => 1,
-            'DO_NbFacture'          => 1,
-            'DO_BLFact'             => 0,
-            'DO_TxEscompte'         => 0.000000,
-            'DO_Reliquat'           => 0,
-            'DO_Imprim'             => 0,
-            'CA_Num'                => '',
-            'DO_Coord01'            => '',
-            'DO_Coord02'            => '',
-            'DO_Coord03'            => '',
-            'DO_Coord04'            => '',
-            'DO_Souche'             => $DO_Souche,
-            'DO_DateLivr'           => '2026-11-11 00:00:00.000',
-            'DO_Condition'          => 1,
-            'DO_Tarif'              => 1,
-            'DO_Colisage'           => 1,
-            'DO_TypeColis'          => 1,
-            'DO_Transaction'        => 11,
-            'DO_Langue'             => 0,
-            'DO_Ecart'              => 0.000000,
-            'DO_Regime'             => 11,
-            'N_CatCompta'           => 5,
-            'DO_Ventile'            => 0,
-            'AB_No'                 => 0,
-            'DO_DebutAbo'           => '1753-01-01 00:00:00.000',
-            'DO_FinAbo'             => '1753-01-01 00:00:00.000',
-            'DO_DebutPeriod'        => '1753-01-01 00:00:00.000',
-            'DO_FinPeriod'          => '1753-01-01 00:00:00.000',
-            'CG_Num'                => '44110000',
-            'DO_Statut'             => 0,
-            'DO_Heure'              => $DO_Heure,
-            'CA_No'                 => 0,
-            'CO_NoCaissier'         => 0,
-            'DO_Transfere'          => 0,
-            'DO_Cloture'            => 0,
-            'DO_NoWeb'              => '',
-            'DO_Attente'            => 0,
-            'DO_Provenance'         => 0,
-            'CA_NumIFRS'            => '',
-            'MR_No'                 => 0,
-            'DO_TypeFrais'          => 0,
-            'DO_ValFrais'           => 0.000000,
-            'DO_TypeLigneFrais'     => 0,
-            'DO_TypeFranco'         => 0,
-            'DO_ValFranco'          => 0.000000,
-            'DO_TypeLigneFranco'    => 0,
-            'DO_Taxe1'              => 0.000000,
-            'DO_TypeTaux1'          => 0,
-            'DO_TypeTaxe1'          => 0,
-            'DO_Taxe2'              => 0.000000,
-            'DO_TypeTaux2'          => 0,
-            'DO_TypeTaxe2'          => 0,
-            'DO_Taxe3'              => 0.000000,
-            'DO_TypeTaux3'          => 0,
-            'DO_TypeTaxe3'          => 0,
-            'DO_MajCpta'            => 0,
-            'DO_Motif'              => '',
-            'DO_Contact'            => '',
-            'DO_FactureElec'        => 0,
-            'DO_TypeTransac'        => 0,
-            'DO_DateLivrRealisee'   => '1753-01-01 00:00:00.000',
-            'DO_DateExpedition'     => '1753-01-01 00:00:00.000',
-            'DO_FactureFrs'         => '',
-            'DO_PieceOrig'          => '',
-            'DO_EStatut'            => 0,
-            'DO_DemandeRegul'       => 0,
-            'ET_No'                 => 0,
-            'DO_Valide'             => 0,
-            'DO_Coffre'             => 0,
-            'DO_TotalHT'            => 0.000000,
-            'DO_StatutBAP'          => 0,
-            'DO_Escompte'           => 0,
-            'DO_DocType'            => 10,
-            'DO_TypeCalcul'         => 0,
-            'DO_FactureFile'        => null,
-            'DO_TotalHTNet'         => 0.000000,
-            'DO_TotalTTC'           => 0.000000,
-            'DO_NetAPayer'          => 0.000000,
-            'DO_MontantRegle'       => 0.000000,
-            'DO_RefPaiement'        => null,
-            'DO_AdressePaiement'    => '',
-            'DO_PaiementLigne'      => 0,
-            'DO_MotifDevis'         => 0,
-            'DO_Conversion'         => 0,
-            'cbProt'                => 0,
-            'cbCreateur'            => 'ERP1',
-            'cbModification'        => $currentDateTime,
-            'cbReplication'         => 0,
-            'cbFlag'                => 0,
-            'cbCreation'            => $currentDateTime,
-            'cbCreationUser'        => '77384016-921F-472F-B56D-1D563B7DDF3C',
-            'cbHash'                => null,
-            'cbHashVersion'         => 1,
-            'cbHashDate'            => null,
-            'cbHashOrder'           => null,
-
-        ]);
-
-        return $DO_Date;
-    } catch (Exception $e) {
-        \Log::error('Docentete creation failed: ' . $e->getMessage());
-        throw $e;
     }
-}
 
     private function generateHeure(): string
     {
@@ -645,10 +673,10 @@ public function createDocentete(string $DO_Piece, string $DO_Tiers, string $DO_R
 
     public function createDocligne($company_db, $DO_Piece, $DO_Ref, $CT_Num, $DO_Domaine, $DO_Type, $AR_Ref, $DL_Design, $DL_Qte, $EU_Enumere)
     {
-         if($company_db == 'sqlsrv'){
-             $DO_Date  = date('Y-m-d') . ' 00:00:00.000';
-             $currentDateTime = date('Y-m-d H:i:s.000');
-        }else{  
+        if ($company_db == 'sqlsrv') {
+            $DO_Date  = date('Y-m-d') . ' 00:00:00.000';
+            $currentDateTime = date('Y-m-d H:i:s.000');
+        } else {
             $DO_Date  = date('Y-d-m') . ' 00:00:00.000';
             $currentDateTime = date('Y-d-m H:i:s.000');
         }
@@ -739,9 +767,9 @@ public function createDocentete(string $DO_Piece, string $DO_Tiers, string $DO_R
             'cbProt' => 0,
             'cbCreateur' => substr('ERP1', 0, 4),
             'cbModification' => $currentDateTime,
-            'cbReplication' => 0,   
+            'cbReplication' => 0,
             'cbFlag' => 0,
-            'cbCreation' => $currentDateTime,      
+            'cbCreation' => $currentDateTime,
             'cbCreationUser' => '77384016-921F-472F-B56D-1D563B7DDF3C',
             'PF_Num' => 0,
         ]);
@@ -763,5 +791,4 @@ public function createDocentete(string $DO_Piece, string $DO_Tiers, string $DO_R
         // Force download with original filename
         return Storage::disk('public')->download($file->file_path, $file->file_name);
     }
-
 }

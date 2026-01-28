@@ -160,7 +160,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/permissions', [PermissionController::class, 'store']);
 
     // Assign roles/permissions to users
-    Route::get('/users/role/{role}', [UserController::class, 'usersByRole']);
+    Route::get('users/role/{role}', [UserController::class, 'usersByRole']);
     Route::post('/users/{user}/roles', [UserPermissionController::class, 'assignRoles']);
     Route::post('/role/{roleName}/permissions', [UserPermissionController::class, 'assignPermissions']);
 
