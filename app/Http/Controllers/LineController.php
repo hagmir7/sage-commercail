@@ -45,6 +45,13 @@ class LineController extends Controller
         }
 
         $line = Line::find($request->line);
+
+        if (intval($line->status_id) >= 10) {
+            return response()->json([
+                'message' => "Can't change status"
+            ], 422);
+        }
+
         $document = $line->document;
 
         $line->update(['status_id' => 8]);
@@ -69,6 +76,10 @@ class LineController extends Controller
         $line->update(['palette_id' => $palette->id]);
 
         $quantity = floatval($line->docligne->EU_Qte);
+
+        $line->docligne->update([
+            "DL_QteBL" => $quantity
+        ]);
 
         if ($line->palettes->contains($palette->id)) {
             $line->palettes()->updateExistingPivot($palette->id, ['quantity' => $quantity]);

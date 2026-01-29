@@ -242,7 +242,13 @@ class DocenteteController extends Controller
             ])
             ->orderByDesc('cbCreation')
             ->where('DO_Domaine', 0)
-            ->where('DO_Statut', 1)
+            ->where(function ($q) {
+                $q->where('DO_Statut', 1)
+                    ->orWhereHas('document', function ($doc) {
+                        $doc->where('status_id', '<', 7);
+                        // or ->where('status_id', '<>', 7)
+                    });
+            })
             ->where(function ($q) {
                 $q->where('DO_Type', 1)
                     ->orWhere(function ($sub) {
@@ -250,6 +256,7 @@ class DocenteteController extends Controller
                             ->whereHas('document');
                     });
             });
+
 
         $query->with('document.status');
 

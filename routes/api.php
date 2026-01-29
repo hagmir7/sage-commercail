@@ -315,6 +315,9 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('', 'index');
     });
 
+    Route::get('documents/preparation/export', [DocumentController::class, 'exportPreparationList']);
+
+
 
     Route::prefix('documents')->controller(DocumentController::class)->group(function () {
         Route::get('archive', 'archive');

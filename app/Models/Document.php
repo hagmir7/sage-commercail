@@ -84,15 +84,13 @@ class Document extends Model
 
     public function validation(): bool
     {
-        // Filter normal lines that HAVE docligne relationship
         $lines = $this->lines()
             ->with('docligne', 'palettes')
-            ->whereHas('docligne') // Only lines with docligne
+            ->whereHas('docligne')
             ->where('ref', '!=', 'SP000001')
             ->whereNotIn('design', ['Special', '', 'special'])
             ->get();
 
-        // Check company status once (outside loop)
         $totalCompanies = $this->companies()->count();
         $companiesWithStatus8 = $this->companies()->where('status_id', 8)->count();
         $allStatus = ($totalCompanies > 0 && $totalCompanies === $companiesWithStatus8);
@@ -105,13 +103,11 @@ class Document extends Model
                 if ($totalToPrepare != $totalPrepared) {
                     return $allStatus;
                 }
-            }else{
+            } else {
                 $line->delete();
                 return true;
             }
         }
-
-        // Bulk delete special lines
         $this->lines()
             ->where('ref', 'SP000001')
             ->whereIn('design', ['', 'Special', 'special'])
@@ -122,7 +118,6 @@ class Document extends Model
 
     public function validationCompany($companyId): bool
     {
-        // Filter lines that HAVE docligne relationship
         $lines = $this->lines()
             ->with('docligne', 'palettes')
             ->whereHas('docligne')
@@ -144,9 +139,64 @@ class Document extends Model
                 return true;
             }
         }
-
-        // Bulk delete special lines
         $this->lines()
+            ->where('ref', 'SP000001')
+            ->whereIn('design', ['', 'Special', 'special'])
+            ->delete();
+
+        return true;
+    }
+
+
+
+    public function validationByStatus(): bool
+    {
+        $lines = $this->lines()
+            ->where('ref', '!=', 'SP000001')
+            ->whereNotIn('design', ['Special', '', 'special'])
+            ->get();
+
+        // If there are no lines, consider valid
+        if ($lines->isEmpty()) {
+            return true;
+        }
+
+        foreach ($lines as $line) {
+            if ((int) $line->status_id < 8) {
+                return false;
+            }
+        }
+
+        // Cleanup special lines
+        $this->lines()
+            ->where('ref', 'SP000001')
+            ->whereIn('design', ['', 'Special', 'special'])
+            ->delete();
+
+        return true;
+    }
+
+    public function validationCompanyByStatus(int $companyId): bool
+    {
+        $lines = $this->lines()
+            ->where('company_id', $companyId)
+            ->where('ref', '!=', 'SP000001')
+            ->whereNotIn('design', ['Special', '', 'special'])
+            ->get();
+
+        if ($lines->isEmpty()) {
+            return true;
+        }
+
+        foreach ($lines as $line) {
+            if ((int) $line->status_id < 8) {
+                return false;
+            }
+        }
+
+        // Cleanup special lines
+        $this->lines()
+            ->where('company_id', $companyId)
             ->where('ref', 'SP000001')
             ->whereIn('design', ['', 'Special', 'special'])
             ->delete();

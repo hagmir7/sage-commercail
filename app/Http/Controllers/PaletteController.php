@@ -390,11 +390,7 @@ class PaletteController extends Controller
     public function validationCompany($companyId, $document_id): bool
     {
         $document = Document::find($document_id);
-
-
         $document->load('lines.palettes');
-
-
         $lines = $document->lines()
             ->where('company_id', $companyId)
             ->where('ref', '!=', 'SP000001')
@@ -412,7 +408,6 @@ class PaletteController extends Controller
             }
         }
 
-        // cleanup
         $specials = $document->lines
             ->where('ref', 'SP000001')
             ->whereIn('design', ['', 'Special', 'special']);
@@ -623,10 +618,7 @@ class PaletteController extends Controller
                     $line->update(['status_id' => 8]);
                 }
                 
-            
-
-
-
+        
                 $emplac_code = auth()->user()->company_id == 1 ? "K-4P" : "K-4SP";
                 $new_emplacement = Emplacement::where('code', $emplac_code)->first();
 
@@ -691,21 +683,32 @@ class PaletteController extends Controller
 
                 $status_id = $document->urgent ? 11 : 8;
 
-                // ✅ Document status
-                if ($document->validation()) {
-                    $document->update(['status_id' => $status_id]);
-                    
-                } elseif ($document->status_id != 7) {
-                    $document->update(['status_id' => 7]);
+
+
+                if (!$document->urgent) {
+                    if ($document->validation()) {
+                        $document->update(['status_id' => 8]);
+                    }
+
+                    $status = $this->validationCompany(auth()->user()->company_id, $document->id) ? $status_id : 7;
+
+                    $document->companies()->updateExistingPivot(auth()->user()->company_id, [
+                        'status_id' => $status,
+                        'updated_at' => now(),
+                    ]);
+                } else {
+                    if ($document->validationByStatus()) {
+                        $document->update(['status_id' => 11]);
+                    }
+
+                    $status = $document->validationCompanyByStatus(auth()->user()->company_id) ? $status_id : 7;
+
+                    $document->companies()->updateExistingPivot(auth()->user()->company_id, [
+                        'status_id' => $status,
+                        'updated_at' => now(),
+                    ]);
                 }
-
                
-                $status = $this->validationCompany(auth()->user()->company_id, $document->id) ? $status_id : 7;
-
-                $document->companies()->updateExistingPivot(auth()->user()->company_id, [
-                    'status_id' => $status,
-                    'updated_at' => now(),
-                ]);
 
                 auth()->user()->lines()->syncWithoutDetaching([
                     $line->id => ['action_name' => 'Preparation']

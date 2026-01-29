@@ -8,9 +8,10 @@ use App\Models\Document;
 use App\Models\Line;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
-use DateTime;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
+use App\Exports\PreparationDocumentsExport;
+use Maatwebsite\Excel\Facades\Excel;
 
 class DocumentController extends Controller
 {
@@ -416,11 +417,6 @@ class DocumentController extends Controller
         $query = Document::query()
             ->with(['companies', 'lines', 'docentete:DO_Piece,cbMarq,DO_DateLivr,DO_Date']);
 
-        /*
-    |--------------------------------------------------------------------------
-    | COMPANY FILTER
-    |--------------------------------------------------------------------------
-    */
         if (!empty($user->company_id)) {
 
             $query->join('document_companies as dc', function ($join) use ($user) {
@@ -835,6 +831,17 @@ class DocumentController extends Controller
 
         return response()->json($documents, 200, [], JSON_UNESCAPED_UNICODE);
     }
+
+
+    public function exportPreparationList(Request $request)
+    {
+        return Excel::download(
+            new PreparationDocumentsExport($request),
+            'preparation_documents.xlsx'
+        );
+    }
+
+
 
     public function statusNotification()
     {
