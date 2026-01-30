@@ -877,7 +877,6 @@ class DocenteteController extends Controller
 
 
             if (!$document && !$document_piece) {
-                // Generate piece only if DO_Piece contains 'BC', otherwise use DO_Piece as is
                 $piece = str_contains($docentete->DO_Piece, 'BC')
                     ? $this->generatePiece(2, $docentete->DO_Souche)
                     : $docentete->DO_Piece;
@@ -891,7 +890,7 @@ class DocenteteController extends Controller
                     'ref' => $docentete->DO_Ref,
                     'client_id' => $docentete->DO_Tiers,
                     'expedition' => $docentete->DO_Expedit,
-                    'urgent' => $request->urgent,
+                    'urgent' => $request->urgent ?? 0,
                     'created_at' => now()
                 ]);
             }
