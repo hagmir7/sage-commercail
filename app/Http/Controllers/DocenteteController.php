@@ -243,10 +243,22 @@ class DocenteteController extends Controller
             ->orderByDesc('cbCreation')
             ->where('DO_Domaine', 0)
             ->where(function ($q) {
-                $q->where('DO_Statut', 1)
-                    ->orWhereHas('document', function ($doc) {
-                        $doc->where('status_id', '<', 7);
-                        // or ->where('status_id', '<>', 7)
+                $q->where(function ($sub) {
+                    // DO_Statut = 1 AND (no document OR status_id <= 7)
+                    $sub->where('DO_Statut', 1)
+                        ->where(function ($inner) {
+                            $inner->whereDoesntHave('document')
+                                ->orWhereHas('document', function ($doc) {
+                                    $doc->where('status_id', '<=', 7);
+                                });
+                        });
+                })
+                    ->orWhere(function ($sub) {
+                        // OR (DO_Statut != 1 AND has document with status_id <= 7)
+                        $sub->where('DO_Statut', '!=', 1)
+                            ->whereHas('document', function ($doc) {
+                                $doc->where('status_id', '<=', 7);
+                            });
                     });
             })
             ->where(function ($q) {
@@ -257,28 +269,28 @@ class DocenteteController extends Controller
                     });
             });
 
-
         $query->with('document.status');
 
         if (isset($request->status)) {
-
             if ($request->status == "0") {
                 $query->whereDoesntHave('document');
             } elseif ($request->status == 1) {
                 $query->whereHas('document', function ($q) {
-                    $q->where('status_id', '>=', 1);
+                    $q->where('status_id', '>=', 1)
+                        ->where('status_id', '<=', 7);
                 });
             } else if ($request->status == 2) {
                 $query->whereHas('document', function ($q) {
-                    $q->where('status_id', '>=', 2);
+                    $q->where('status_id', '>=', 2)
+                        ->where('status_id', '<=', 7);
                 });
             } else {
                 $query->whereHas('document', function ($q) use ($request) {
-                    $q->where('status_id', $request->status);
+                    $q->where('status_id', $request->status)
+                        ->where('status_id', '<=', 7);
                 });
             }
         }
-
 
         if ($request->filled('date')) {
             $dates = explode(',', $request->date, 2);
@@ -298,17 +310,12 @@ class DocenteteController extends Controller
                 $q->where('DO_Ref', 'like', "%{$search}%")
                     ->orWhere('DO_Piece', 'like', "%{$search}%")
                     ->orWhere('DO_Tiers', 'like', "%{$search}%")
-                    // ->orWhereHas('doclignes', function ($query) use ($search) {
-                    //     $query->where('DL_PieceBC', 'like', "%{$search}%");
-                    // })
                     ->orWhere('DO_Reliquat', 'like', "%{$search}%");
             });
         }
 
-
-
         if ($request->filled('type')) {
-            $query->where('Type', $request->type);
+            $query->where('DO_Type', $request->type);
         }
 
         // Faster pagination without total counts

@@ -1,8 +1,6 @@
 <?php
 
-// use App\Http\Controllers\ArticleFamilyController;
 use App\Http\Controllers\CompanyController;
-// use App\Http\Controllers\PositionController;
 use App\Http\Controllers\ArticleStockController;
 use App\Http\Controllers\ArticleController;
 use App\Http\Controllers\AuthController;
