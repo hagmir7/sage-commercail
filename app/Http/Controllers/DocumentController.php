@@ -848,7 +848,7 @@ class DocumentController extends Controller
         $companyId = auth()->user()->company_id;
 
         $statuses = Document::whereHas('companies', function ($query) use ($companyId) {
-            $query->where('companies.id', $companyId); // specify the table
+            $query->where('companies.id', $companyId);
         })
             ->whereIn('status_id', [1, 7, 3, 4, 8, 10])
             ->select('status_id', DB::raw('count(*) as total'))
@@ -864,4 +864,21 @@ class DocumentController extends Controller
             'validation'  => $statuses[10] ?? 0,
         ];
     }
+
+    public function receptions(Request $request, $piece)
+    {
+        $document = Document::on($request->company)
+            ->with('receptions.article')
+            ->where('piece', $piece)
+            ->first();
+
+        if (!$document) {
+            return response()->json([
+                'message' => 'Document not found'
+            ], 404);
+        }
+
+        return response()->json($document);
+    }
+
 }
