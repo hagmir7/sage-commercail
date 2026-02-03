@@ -518,31 +518,38 @@ class DocenteteController extends Controller
     }
 
 
-    // Validate the Document
-    public function validate(Request $request, $piece)
-    {
-        if (!$request->user()->hasRole('preparation')) {
-            return response()->json(["message" => "L'utilisateur n'est pas autorisé"], 401);
-        }
 
-        $document = Document::where('piece', $piece)
-            ->orWhere('piece_bl', $piece)
-            ->first();
 
-        if (!$document) {
-            \Log::alert($piece);
-            return response()->json([
-                "message" => "Le document n'existe pas"
-            ], 404);
-        }
+public function validate(Request $request, $piece)
+{
+    if (!$request->user()->hasRole('preparation')) {
+        return response()->json(["message" => "L'utilisateur n'est pas autorisé"], 401);
+    }
 
+    $document = Document::where('piece', $piece)
+        ->orWhere('piece_bl', $piece)
+        ->first();
+
+    if (!$document) {
+        Log::warning('Document not found', [
+            'piece' => $piece,
+            'user_id' => auth()->id(),
+        ]);
+
+        return response()->json([
+            "message" => "Le document n'existe pas"
+        ], 404);
+    }
+
+    try {
         DB::transaction(function () use ($document) {
+
             foreach ($document->lines->where('company_id', auth()->user()->company_id) as $line) {
                 $line->update(['status_id' => 11]);
             }
 
             $allLinesValidated = $document->lines
-                ->every(fn($line) => $line->status_id == 11);
+                ->every(fn ($line) => $line->status_id == 11);
 
             if ($allLinesValidated) {
                 $document->update([
@@ -550,25 +557,48 @@ class DocenteteController extends Controller
                     'validated_by' => auth()->id()
                 ]);
 
-                // Update Docentete Status
                 $this->updateDocStatus($document?->docentete);
             }
 
+            $document->companies()->updateExistingPivot(
+                auth()->user()->company_id,
+                [
+                    'status_id' => 11,
+                    'validated_by' => auth()->id(),
+                    'validated_at' => now()
+                ]
+            );
 
-
-            $document->companies()->updateExistingPivot(auth()->user()->company_id, [
-                'status_id' => 11,
-                'validated_by' => auth()->id(),
-                'validated_at' => now()
-            ]);
-
-            // Achate d'article
+            // Achat d'article
             $sellController = new SellController();
-            $sellController->calculator($document?->docentete->DO_Piece, $document->lines->where('company_id', auth()->user()?->company_id)->pluck('docligne_id'));
-
-            return response()->json(["message" => "Le document est validé avec succès"]);
+            $sellController->calculator(
+                $document?->docentete->DO_Piece,
+                $document->lines
+                    ->where('company_id', auth()->user()->company_id)
+                    ->pluck('docligne_id')
+            );
         });
+
+        return response()->json([
+            "message" => "Le document est validé avec succès"
+        ]);
+
+    } catch (\Throwable $e) {
+
+        \Log::error('Document validation failed', [
+            'piece' => $piece,
+            'document_id' => $document->id ?? null,
+            'user_id' => auth()->id(),
+            'company_id' => auth()->user()->company_id,
+            'error' => $e->getMessage(),
+            'trace' => $e->getTraceAsString(),
+        ]);
+
+        return response()->json([
+            'message' => 'Une erreur est survenue lors de la validation du document'
+        ], 500);
     }
+}
 
 
     public function competedPalettes($piece)

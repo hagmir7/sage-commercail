@@ -6,7 +6,6 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use App\Models\Docentete;
 use App\Models\Docligne;
-use App\Models\Document;
 use DateTime;
 use Exception;
 
@@ -63,68 +62,71 @@ class SellController extends Controller
         return ['TotalHT' => $TotalHT, 'TotalTTC' => $TotalTTC];
     }
 
-    public function calculator($sourcePiece, $lines = [])
-    {
-        DB::beginTransaction();
-
-        try {
-            if (!empty($lines) && (is_array($lines) || $lines instanceof \Illuminate\Support\Collection)) {
-                $doclignes = Docligne::with('line')->whereIn('cbMarq', $lines)->get();
-            } else {
-                $doclignes = Docligne::with('line')->where('DO_Piece', $sourcePiece)->get();
-            }
-
-            $grouped = $doclignes->groupBy(function ($doc) {
-                return $doc->line?->article_stock?->company_code ?? 'FR001';
-            });
-
-
-            foreach ($grouped as $companyCode => $companyLines) {
-
-                $DO_Piece = $this->generatePiece();
-
-                $total = $this->calculateTotal($companyLines);
-
-                $DO_Date = $this->createDocumentFromTemplate($sourcePiece, $DO_Piece, $total, $companyCode);
-
-                foreach ($companyLines as $line) {
-
-                    if ($line->AR_Ref != 'TF') {
-                        $newDL_No = $this->createDocumentLineFromTemplate(
-                            $line->DL_No,
-                            $DO_Piece,
-                            $DO_Date,
-                            floatval($line->DL_QteBL),
-                            $companyCode,
-                            $sourcePiece
-                        );
-
-                        DB::table('F_DOCLIGNEEMPL')->insert([
-                            'DL_No'             => $newDL_No,
-                            'DP_No'             => 1,
-                            'DL_Qte'            => $line->DL_Qte,
-                            'DL_QteAControler'  => 0,
-                            'cbCreationUser'    => self::CB_CREATION_USER,
-                        ]);
-
-                        // Update stock
-                        DB::table('F_ARTSTOCK')
-                            ->where('AR_Ref', $line->AR_Ref)
-                            ->update([
-                                'AS_QteSto' => DB::raw("AS_QteSto + " . floatval($line->DL_Qte))
-                            ]);
-                    }
-                }
-            }
-            DB::commit();
-
-            return response()->json(['success' => true]);
-        } catch (Exception $e) {
-            DB::rollBack();
-            Log::error('Calculator operation failed: ' . $e->getMessage());
-            return response()->json(['error' => $e->getMessage()], 500);
+public function calculator($sourcePiece, $lines = [])
+{
+    try {
+        if (!empty($lines) && (is_array($lines) || $lines instanceof \Illuminate\Support\Collection)) {
+            $doclignes = Docligne::with('line')->whereIn('cbMarq', $lines)->get();
+        } else {
+            $doclignes = Docligne::with('line')->where('DO_Piece', $sourcePiece)->get();
         }
+
+        $grouped = $doclignes->groupBy(function ($doc) {
+            return $doc->line?->article_stock?->company_code ?? 'FR001';
+        });
+
+        foreach ($grouped as $companyCode => $companyLines) {
+
+            $DO_Piece = $this->generatePiece();
+            $total = $this->calculateTotal($companyLines);
+
+            $DO_Date = $this->createDocumentFromTemplate(
+                $sourcePiece,
+                $DO_Piece,
+                $total,
+                $companyCode
+            );
+
+            foreach ($companyLines as $line) {
+                $newDL_No = $this->createDocumentLineFromTemplate(
+                    $line->DL_No,
+                    $DO_Piece,
+                    $DO_Date,
+                    floatval($line->DL_QteBL),
+                    $companyCode,
+                    $sourcePiece
+                );
+
+                // if ($line->AR_Ref != 'SV000002' && !$line->AR_Ref != 'TF') {
+                //     DB::table('F_DOCLIGNEEMPL')->insert([
+                //         'DL_No'            => $newDL_No,
+                //         'DP_No'            => 1,
+                //         'DL_Qte'           => $line->DL_Qte,
+                //         'DL_QteAControler' => 0,
+                //         'cbCreationUser'   => self::CB_CREATION_USER,
+                //     ]);
+                // }
+
+                DB::table('F_ARTSTOCK')
+                    ->where('AR_Ref', $line->AR_Ref)
+                    ->update([
+                        'AS_QteSto' => DB::raw("AS_QteSto + " . floatval($line->DL_Qte))
+                    ]);
+            }
+        }
+
+        return true;
+
+    } catch (\Throwable $e) {
+        Log::error('Calculator operation failed', [
+            'source_piece' => $sourcePiece,
+            'error' => $e->getMessage(),
+        ]);
+
+        throw $e; // 🔥 VERY IMPORTANT → let parent transaction rollback
     }
+}
+
 
     public function createDocumentFromTemplate(string $sourcePiece, string $DO_Piece, $total, $companyCode): string
     {
