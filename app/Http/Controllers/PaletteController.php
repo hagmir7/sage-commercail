@@ -436,15 +436,21 @@ class PaletteController extends Controller
             return response()->json(['message' => 'Emplacement destination introuvable.'], 404);
         }
 
-        $source = Emplacement::where('depot_id', 10)
-            ->whereNotIn('code', ['K-3P', 'K-4P'])
-            ->whereHas(
-                'palettes.articles',
-                fn($q) =>
-                $q->where('article_stocks.id', $article->id)
-                    ->where('article_palette.quantity', '>', 0)
-            )
-            ->first();
+        if (auth()->user()->hasRole("preparation_trailer")) {
+            $source = Emplacement::where('depot_id', 10)
+                ->whereNotIn('code', ['K-3P', 'K-4P'])
+                ->whereHas(
+                    'palettes.articles',
+                    fn($q) =>
+                    $q->where('article_stocks.id', $article->id)
+                        ->where('article_palette.quantity', '>', 0)
+                )
+                ->first();
+        } else {
+            $source_code = auth()->user()->company_id == 1 ? 'K-3P' : 'K-3SP';
+            $source = Emplacement::where('code', $source_code)->first();
+        }
+
 
         if (!$source) {
             return response()->json([
@@ -452,7 +458,7 @@ class PaletteController extends Controller
             ], 422);
         }
 
-        // ✅ Call service from controller
+
         try {
             $this->stockService->transfer(
                 $source,
@@ -476,14 +482,8 @@ class PaletteController extends Controller
         } catch (\Throwable $th) {
             //throw $th;
         }
-
-
         return response()->noContent();
     }
-
-
-
-
 
 
     public function confirmAll(Request $request, $piece)
@@ -501,7 +501,6 @@ class PaletteController extends Controller
 
             $lines = $document->lines->whereIn('role_id', $roleIds);
 
-            // Check if at least one line has status_id < 8
             $linesToProcess = $lines->filter(fn($line) => $line->status_id < 8 && $line->docligne);
 
             if ($linesToProcess->isEmpty()) {
@@ -512,7 +511,6 @@ class PaletteController extends Controller
                 ]);
             }
 
-            // Create a new palette only if there is at least one line to process
             $palette = Palette::create([
                 'code'             => $this->generatePaletteCode(),
                 'type'             => 'Livraison',
@@ -532,28 +530,29 @@ class PaletteController extends Controller
                         'quantity' => $lineQuantity
                     ]);
 
-                    // Increment delivered quantity on docligne
                     if(!$document->urgent){
-                        $docligne->increment('DL_QteBL', $lineQuantity);
+                        $docligne->update([
+                            'DL_QteBL' => $docligne->DL_Qte
+                        ]);
                     }else{
                         $line->increment('quantity_prepare', $lineQuantity);
                     }
                    
                     $status_id =  $document->urgent ? 11 : 8;
-                    // Update line status to 8
+
                     $line->update(['status_id' => $status_id]);
-                    // Stock movement
+ 
                     $this->stockMovement($line->ref, $docligne->DL_Qte);
                 }
             }
 
-            // Update document status
+ 
             $documentStatus = $document->validation() ? $status_id : 7;
             if ($document->status_id !== $documentStatus) {
                 $document->update(['status_id' => $documentStatus]);
             }
 
-            // Update company pivot status
+
             $companyStatus = $this->validationCompany($companyId, $document->id) ? $status_id : 7;
             $document->companies()->updateExistingPivot($companyId, [
                 'status_id'  => $companyStatus,

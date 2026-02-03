@@ -59,7 +59,7 @@ class PreparationDocumentsExport implements FromQuery, WithHeadings, WithMapping
                 if (!empty($common)) {
                     $q->whereIn('role_id', $user_roles->keys());
                 }
-            });
+            })->orderByDesc('id');
 
         // 🔍 Search
         if ($this->request->filled('search')) {

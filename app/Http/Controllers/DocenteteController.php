@@ -933,7 +933,7 @@ class DocenteteController extends Controller
 
                     if ($availableStock < (int) $line->EU_Qte) {
                         return response()->json([
-                           'message' => "L’article {$line->AR_Ref} ne dispose pas d’un stock suffisant. Quantité disponible : {$availableStock}"
+                            'message' => "L’article {$line->AR_Ref} ne dispose pas d’un stock suffisant. Quantité disponible : {$availableStock}"
                         ], 422);
                     }
                 }
