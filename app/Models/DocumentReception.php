@@ -14,12 +14,15 @@ class DocumentReception extends Model
         'username',
         'company',
         'colis_type',
-        'colis_quantity'
+        'colis_quantity',
+        'description',
+        'container_code',
+        'depot_code'
     ];
+
 
     public $timestamps = false;
 
-    // Add this relationship
     public function document()
     {
         return $this->belongsTo(Document::class);
@@ -32,6 +35,6 @@ class DocumentReception extends Model
 
     public function emplacement()
     {
-        return $this->belongsTo(Emplacement::class, 'emplacement_code', 'code');
+        return $this->belongsTo(Emplacement::class,'emplacement_code','code');
     }
 }

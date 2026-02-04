@@ -865,20 +865,21 @@ class DocumentController extends Controller
         ];
     }
 
-    public function receptions(Request $request, $piece)
-    {
+    public function receptions(Request $request, $piece) {
         $document = Document::on($request->company)
-            ->with('receptions.article')
             ->where('piece', $piece)
             ->first();
-
+        
         if (!$document) {
             return response()->json([
                 'message' => 'Document not found'
             ], 404);
         }
-
-        return response()->json($document);
+        
+        $receptions = $document->receptions()
+            ->with(['article', 'emplacement'])
+            ->get();
+        return response()->json($receptions);
     }
 
 }

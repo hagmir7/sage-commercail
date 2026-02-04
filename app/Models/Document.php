@@ -82,6 +82,7 @@ class Document extends Model
         return $this->hasMany(DocumentReception::class);
     }
 
+    
     public function validation(): bool
     {
         $lines = $this->lines()
@@ -203,8 +204,4 @@ class Document extends Model
 
         return true;
     }
-
-
-
-
 }

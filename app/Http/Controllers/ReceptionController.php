@@ -18,6 +18,8 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
 use Symfony\Component\HttpKernel\Exception\HttpException;
 
+use function Symfony\Component\Clock\now;
+
 class ReceptionController extends Controller
 {
 
@@ -490,7 +492,7 @@ class ReceptionController extends Controller
                 throw new HttpException(404, 'Emplacement non trouvé');
             }
 
-            DB::connection($request->company_db)->transaction(function () use ($request, $condition, $docligne, $docentete) {
+            DB::connection($request->company_db)->transaction(function () use ($request, $condition, $docligne, $docentete, $emplacement) {
 
                 $document = Document::on($request->company_db)
                     ->where('piece', $request->piece)
@@ -516,7 +518,11 @@ class ReceptionController extends Controller
                     'username'         => $user->name,
                     'company'          => (int) $request->company,
                     'colis_type'       => $request->type_colis,
-                    'colis_quantity'   => $request->condition
+                    'colis_quantity'   => $request->condition,
+                    'description'      => $docligne?->DL_Design,
+                    'container_code'   => $request->container_code,
+                    'depot_code' => $emplacement?->depot?->code,
+                    'created_at' => now()
                 ]);
 
                 $docligne->update([

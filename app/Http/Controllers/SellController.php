@@ -97,7 +97,7 @@ public function calculator($sourcePiece, $lines = [])
                     $sourcePiece
                 );
 
-                // if ($line->AR_Ref != 'SV000002' && !$line->AR_Ref != 'TF') {
+                // if ($line->AR_Ref != 'SV000002' && $line->AR_Ref != 'TF') {
                 //     DB::table('F_DOCLIGNEEMPL')->insert([
                 //         'DL_No'            => $newDL_No,
                 //         'DP_No'            => 1,
