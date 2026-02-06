@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Client;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
+use Spatie\LaravelPdf\Facades\Pdf;
 
 class ClientController extends Controller
 {
@@ -121,6 +122,22 @@ class ClientController extends Controller
             'client' => $client,
             'docentete' => $docentetes,
         ], 200, [], JSON_INVALID_UTF8_IGNORE);
+    }
+
+
+
+    public function download(Client $integration)
+    {
+        $integration->load(['resume', 'post', 'responsible', 'activities']);
+
+        $allActivities = Activity::all();
+
+        return Pdf::view('integration.pdf', [
+            'integration' => $integration,
+            'allActivities' => $allActivities,
+        ])
+            ->format('a4')
+            ->name('grille-evaluation.pdf');
     }
     
 

@@ -17,7 +17,6 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
 use Symfony\Component\HttpKernel\Exception\HttpException;
-
 use function Symfony\Component\Clock\now;
 
 class ReceptionController extends Controller
@@ -565,9 +564,4 @@ class ReceptionController extends Controller
             ], 500);
         }
     }
-
-
-
-
-  
 }
