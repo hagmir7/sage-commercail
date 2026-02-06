@@ -72,7 +72,6 @@ Route::post('import-movements', function (Request $request) {
 Route::get('logi', function () {
     return DB::connection('sqlsrv_logi')
         ->table('T_Utilisateurs')
-        // ->orderByDesc('Date')
         ->limit(20)
         ->get();
 });
@@ -83,6 +82,7 @@ Route::get("change/{piece}", [DocenteteController::class, 'change']);
 
 Route::prefix('client')->group(function () {
     Route::get("suppliers", [ClientController::class, 'suppliers']);
+    Route::post("suppliers/download", [ClientController::class, 'download']);
     Route::get("suppliers/{code}", [ClientController::class, 'showSupplier']);
     Route::get("{client}", [ClientController::class, 'show']);
     Route::put("{client}", [ClientController::class, 'update']);

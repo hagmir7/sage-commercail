@@ -126,19 +126,34 @@ class ClientController extends Controller
 
 
 
-    public function download(Client $integration)
+    public function download(Request $request)
     {
-        $integration->load(['resume', 'post', 'responsible', 'activities']);
+        $connection = $request->company_db ?? 'sqlsrv_inter';
 
-        $allActivities = Activity::all();
+        $suppliers = Client::on($connection)
+            ->select(
+                'CT_Intitule',
+                'CT_Num',
+                'CT_Sommeil',
+                'CT_EMail',
+                'cbMarq',
+                'CT_EMail',
+                'CT_Adresse',
+                'CT_Telephone',
+                'CT_Telecopie',
+                'CT_Ville',
+                'Nature_Achat',
+                'CT_Pays'
+            )
+            ->where('CT_Type', 1)
+            ->where('CT_Sommeil', '0')
+            ->get();
 
-        return Pdf::view('integration.pdf', [
-            'integration' => $integration,
-            'allActivities' => $allActivities,
+        return Pdf::view('pdfs.suppliers', [
+            'suppliers' => $suppliers,
         ])
             ->format('a4')
-            ->name('grille-evaluation.pdf');
+            ->landscape()
+            ->name(now().'-grille-evaluation.pdf');
     }
-    
-
 }
