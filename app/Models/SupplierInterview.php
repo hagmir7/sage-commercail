@@ -28,4 +28,13 @@ class SupplierInterview extends Model
     {
         return $this->belongsTo(Client::class, 'CT_Num');
     }
+
+
+    public function criterias()
+    {
+        return $this->belongsToMany(
+            SupplierCriteria::class,
+            'supplier_interview_criterias'
+        )->withPivot('note')->withTimestamps();
+    }
 }

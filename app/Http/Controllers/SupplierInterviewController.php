@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\SupplierCriteria;
 use App\Models\SupplierInterview;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
@@ -11,12 +12,18 @@ class SupplierInterviewController extends Controller
     /**
      * Display a listing of the resource.
      */
-    public function index()
+    public function index(Request $request)
     {
-        return SupplierInterview::with(['user', 'client'])
+        $connection = $request->company_db ?? 'sqlsrv_inter';
+
+        return SupplierInterview::on($connection)
+            ->with(['user', 'client'])
+            ->withSum('criterias as total_note', 'supplier_interview_criterias.note') // pivot column
             ->latest()
             ->get();
     }
+
+
 
     /**
      * Store a newly created resource in storage.
@@ -35,7 +42,9 @@ class SupplierInterviewController extends Controller
             ], 422);
         }
 
-        $supplierInterview = SupplierInterview::create([
+         $connection = $request->company_db ?? 'sqlsrv_inter';
+
+        $supplierInterview = SupplierInterview::on($connection)->create([
             'CT_Num' => $request->CT_Num,
             'date'          => $request->date,
             'description'   => $request->description,
@@ -49,9 +58,29 @@ class SupplierInterviewController extends Controller
     /**
      * Display the specified resource.
      */
-    public function show(SupplierInterview $supplierInterview)
+    public function show(SupplierInterview $supplierInterview, Request $request)
     {
-        return $supplierInterview->load(['user', 'client']);
+        $supplierInterview->load(['user', 'client']);
+
+         $connection = $request->company_db ?? 'sqlsrv_inter';
+
+        $criterias = SupplierCriteria::on($connection)->all()->map(function ($criteria) use ($supplierInterview) {
+
+            $pivot = $supplierInterview
+                ->criterias
+                ->firstWhere('id', $criteria->id);
+
+            return [
+                'id'          => $criteria->id,
+                'description' => $criteria->description,
+                'note'        => $pivot?->pivot?->note,
+            ];
+        });
+
+        return response()->json([
+            'interview' => $supplierInterview,
+            'criterias' => $criterias,
+        ]);
     }
 
     /**
@@ -86,6 +115,40 @@ class SupplierInterviewController extends Controller
 
         return response()->json([
             'message' => 'Deleted successfully'
+        ]);
+    }
+
+
+    public function addCriteria(Request $request, $supplierInterviewId)
+    {
+        $validator = Validator::make($request->all(), [
+            'criteria_id' => 'required|exists:supplier_criterias,id',
+            'note'        => 'required|integer|min:1|max:3',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'message' => $validator->errors()->first(),
+            ], 422);
+        }
+
+        // Determine which DB connection to use
+        $connection = $request->company_db ?? 'sqlsrv_inter';
+
+        // Fetch the SupplierInterview on the correct connection
+        $supplierInterview = SupplierInterview::on($connection)->findOrFail($supplierInterviewId);
+
+        // Attach or update pivot note
+        $supplierInterview->criterias()->syncWithoutDetaching([
+            $request->criteria_id => [
+                'note' => $request->note
+            ]
+        ]);
+
+        return response()->json([
+            'message' => 'Note saved successfully',
+            'criteria_id' => $request->criteria_id,
+            'note' => $request->note,
         ]);
     }
 }

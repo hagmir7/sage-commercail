@@ -110,14 +110,14 @@ class ClientController extends Controller
     public function show(Request $request, Client $client)
     {
         $perPage = $request->get('per_page', 10);
-    
+
         $docentetes = $client->docentete()->orderByDesc('cbCreation')->paginate($perPage);
-    
+
         // Eager load only selected columns from the remise relationship
         $client->load(['remise' => function ($query) {
             $query->select('FA_CodeFamille', 'CT_Num', 'FC_Remise', 'cbMarq');
         }]);
-    
+
         return response()->json([
             'client' => $client,
             'docentete' => $docentetes,
@@ -137,7 +137,6 @@ class ClientController extends Controller
                 'CT_Sommeil',
                 'CT_EMail',
                 'cbMarq',
-                'CT_EMail',
                 'CT_Adresse',
                 'CT_Telephone',
                 'CT_Telecopie',
@@ -154,6 +153,17 @@ class ClientController extends Controller
         ])
             ->format('a4')
             ->landscape()
-            ->name(now().'-grille-evaluation.pdf');
+            // ->headerView('pdfs.header')
+            // ->footerView('pdfs.footer')
+            ->footerHtml('
+                <div style="
+                    font-size:15px;
+                    text-align:center;
+                    width:100%;
+                    color:#555;
+                ">
+                    © Ce document ne doit être ni reproduit ni communiqué sans l’autorisation d’INTERCOCINA
+                </div>
+            ')->name(now()->format('Ymd_His') . '-grille-evaluation.pdf');
     }
 }

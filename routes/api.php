@@ -221,8 +221,18 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::delete('{palette:code}', 'destroy');
         Route::post('import', 'import')->name('palettes.import');
     });
+    
 
     Route::apiResource('supplier-interviews', SupplierInterviewController::class);
+
+
+
+    Route::prefix('supplier-interviews')->controller(SupplierInterviewController::class)->group(function(){
+        Route::post('{supplierInterview}/criteria', 'addCriteria');
+    });
+
+
+    
 
 
     Route::prefix('lines')->controller(LineController::class)->group(function () {
