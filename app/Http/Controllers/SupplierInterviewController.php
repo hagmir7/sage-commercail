@@ -30,8 +30,10 @@ class SupplierInterviewController extends Controller
      */
     public function store(Request $request)
     {
+        $connection = $request->company_db;
+
         $validator = Validator::make($request->all(), [
-            'CT_Num' => 'required|exists:sqlsrv_inter.F_COMPTET,CT_Num',
+            'CT_Num' => 'required',
             'date'          => 'required|date',
             'description'   => 'nullable|string',
         ]);
@@ -42,7 +44,7 @@ class SupplierInterviewController extends Controller
             ], 422);
         }
 
-         $connection = $request->company_db ?? 'sqlsrv_inter';
+         
 
         $supplierInterview = SupplierInterview::on($connection)->create([
             'CT_Num' => $request->CT_Num,
@@ -58,30 +60,33 @@ class SupplierInterviewController extends Controller
     /**
      * Display the specified resource.
      */
-    public function show(SupplierInterview $supplierInterview, Request $request)
+    public function show($supplierInterviewId, Request $request)
     {
-        $supplierInterview->load(['user', 'client']);
 
-         $connection = $request->company_db ?? 'sqlsrv_inter';
+        $supplierInterview = SupplierInterview::on($request->company_db)
+            ->with(['user', 'client', 'criterias'])
+            ->findOrFail($supplierInterviewId);
 
-        $criterias = SupplierCriteria::on($connection)->all()->map(function ($criteria) use ($supplierInterview) {
+        $notes = $supplierInterview->criterias
+            ->pluck('pivot.note', 'id');
 
-            $pivot = $supplierInterview
-                ->criterias
-                ->firstWhere('id', $criteria->id);
-
-            return [
-                'id'          => $criteria->id,
-                'description' => $criteria->description,
-                'note'        => $pivot?->pivot?->note,
-            ];
-        });
+        // Get all criterias from same connection
+        $criterias = SupplierCriteria::on($request->company_db)
+            ->get()
+            ->map(function ($criteria) use ($notes) {
+                return [
+                    'id'          => $criteria->id,
+                    'description' => $criteria->description,
+                    'note'        => $notes[$criteria->id] ?? null,
+                ];
+            });
 
         return response()->json([
             'interview' => $supplierInterview,
             'criterias' => $criterias,
         ]);
     }
+
 
     /**
      * Update the specified resource in storage.
@@ -132,16 +137,18 @@ class SupplierInterviewController extends Controller
             ], 422);
         }
 
-        // Determine which DB connection to use
         $connection = $request->company_db ?? 'sqlsrv_inter';
 
-        // Fetch the SupplierInterview on the correct connection
-        $supplierInterview = SupplierInterview::on($connection)->findOrFail($supplierInterviewId);
+        // Load interview on correct connection
+        $supplierInterview = SupplierInterview::on($connection)
+            ->findOrFail($supplierInterviewId);
 
-        // Attach or update pivot note
+        // IMPORTANT: set connection manually before using relationship
+        $supplierInterview->setConnection($connection);
+
         $supplierInterview->criterias()->syncWithoutDetaching([
             $request->criteria_id => [
-                'note' => $request->note
+                'note' => $request->note,
             ]
         ]);
 
@@ -151,4 +158,5 @@ class SupplierInterviewController extends Controller
             'note' => $request->note,
         ]);
     }
+
 }
