@@ -225,10 +225,9 @@ Route::middleware('auth:sanctum')->group(function () {
 
     Route::apiResource('supplier-interviews', SupplierInterviewController::class);
 
-
-
     Route::prefix('supplier-interviews')->controller(SupplierInterviewController::class)->group(function(){
         Route::post('{supplierInterview}/criteria', 'addCriteria');
+        Route::post('{supplierInterview}/download', 'download');
     });
 
 

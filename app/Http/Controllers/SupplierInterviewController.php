@@ -2,10 +2,12 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Client;
 use App\Models\SupplierCriteria;
 use App\Models\SupplierInterview;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
+use Spatie\LaravelPdf\Facades\Pdf;
 
 class SupplierInterviewController extends Controller
 {
@@ -157,6 +159,46 @@ class SupplierInterviewController extends Controller
             'criteria_id' => $request->criteria_id,
             'note' => $request->note,
         ]);
+    }
+
+
+
+    public function download($supplierInterviewId, Request $request)
+    {
+        $supplierInterview = SupplierInterview::on($request->company_db)
+            ->with(['user', 'client', 'criterias'])
+            ->findOrFail($supplierInterviewId);
+
+        $notes = $supplierInterview->criterias
+            ->pluck('pivot.note', 'id');
+
+
+        $criterias = SupplierCriteria::on($request->company_db)
+            ->get()
+            ->map(function ($criteria) use ($notes) {
+                return [
+                    'id'          => $criteria->id,
+                    'description' => $criteria->description,
+                    'note'        => $notes[$criteria->id] ?? null,
+                ];
+            });
+
+        return Pdf::view('pdfs.supplier-interview', [
+            'interview' => $supplierInterview,
+            'criterias' => $criterias,
+        ])
+            ->format('a4')
+            // ->landscape()
+            ->footerHtml('
+                <div style="
+                    font-size:15px;
+                    text-align:center;
+                    width:100%;
+                    color:#555;
+                ">
+                    © Ce document ne doit être ni reproduit ni communiqué sans l’autorisation d’INTERCOCINA
+                </div>
+            ')->name(now()->format('Ymd_His') . '-grille-evaluation.pdf');
     }
 
 }
