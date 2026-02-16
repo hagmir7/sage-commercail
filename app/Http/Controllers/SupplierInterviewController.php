@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Client;
 use App\Models\SupplierCriteria;
 use App\Models\SupplierInterview;
+use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
 use Spatie\LaravelPdf\Facades\Pdf;
@@ -47,13 +48,12 @@ class SupplierInterviewController extends Controller
         }
 
          
-
-        $supplierInterview = SupplierInterview::on($connection)->create([
-            'CT_Num' => $request->CT_Num,
-            'date'          => $request->date,
-            'description'   => $request->description,
-            'user_id'       => auth()->id(),
-        ]);
+    $supplierInterview = SupplierInterview::on($connection)->create([
+        'CT_Num'       => $request->CT_Num,
+        'date'         => Carbon::parse($request->date)->format('Y-m-d H:i:s'),
+        'description'  => $request->description,
+        'user_id'      => auth()->id(),
+    ]);
 
         return response()->json($supplierInterview, 201);
     }
@@ -141,11 +141,9 @@ class SupplierInterviewController extends Controller
 
         $connection = $request->company_db ?? 'sqlsrv_inter';
 
-        // Load interview on correct connection
         $supplierInterview = SupplierInterview::on($connection)
             ->findOrFail($supplierInterviewId);
 
-        // IMPORTANT: set connection manually before using relationship
         $supplierInterview->setConnection($connection);
 
         $supplierInterview->criterias()->syncWithoutDetaching([
