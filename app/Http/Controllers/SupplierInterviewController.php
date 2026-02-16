@@ -7,6 +7,7 @@ use App\Models\SupplierCriteria;
 use App\Models\SupplierInterview;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
 use Spatie\LaravelPdf\Facades\Pdf;
 
@@ -47,14 +48,18 @@ class SupplierInterviewController extends Controller
             ], 422);
         }
 
-
-
-    $supplierInterview = SupplierInterview::on($connection)->create([
-        'CT_Num'       => $request->CT_Num,
-        'date'         => Carbon::parse($request->date)->format('Y-m-d'),
-        'description'  => $request->description,
-        'user_id'      => auth()->id(),
-    ]);
+        
+        $supplierInterview = DB::connection($connection)->insert(
+            "INSERT INTO supplier_interviews 
+            (CT_Num, [date], description, user_id, created_at, updated_at)
+            VALUES (?, ?, ?, ?, GETDATE(), GETDATE())",
+            [
+                $request->CT_Num,
+                $request->date,   // must be '2026-02-16'
+                $request->description,
+                auth()->id(),
+            ]
+        );
 
         return response()->json($supplierInterview, 201);
     }
