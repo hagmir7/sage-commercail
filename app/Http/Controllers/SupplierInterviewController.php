@@ -50,7 +50,7 @@ class SupplierInterviewController extends Controller
          
     $supplierInterview = SupplierInterview::on($connection)->create([
         'CT_Num'       => $request->CT_Num,
-        'date'         => Carbon::parse($request->date)->format('Y-m-d H:i:s'),
+        'date'         => Carbon::parse($request->date)->format('Y-m-d'),
         'description'  => $request->description,
         'user_id'      => auth()->id(),
     ]);
