@@ -47,11 +47,11 @@ class SupplierInterviewController extends Controller
             ], 422);
         }
 
-    \Log::alert(Carbon::parse($request->date)->format('Ymd'));
-    \Log::alert($request->date);
+
+
     $supplierInterview = SupplierInterview::on($connection)->create([
         'CT_Num'       => $request->CT_Num,
-        'date'         => Carbon::parse($request->date)->format('Ymd'),
+        'date'         => Carbon::parse($request->date)->format('Y-m-d'),
         'description'  => $request->description,
         'user_id'      => auth()->id(),
     ]);

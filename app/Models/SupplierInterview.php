@@ -14,10 +14,6 @@ class SupplierInterview extends Model
         'user_id',
     ];
 
-    protected $casts = [
-        'date' => 'date',
-    ];
-
 
     public function user()
     {
