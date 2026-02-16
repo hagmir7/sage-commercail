@@ -155,6 +155,8 @@ class SupplierInterviewController extends Controller
         $supplierInterview->criterias()->syncWithoutDetaching([
             $request->criteria_id => [
                 'note' => $request->note,
+                'created_at' => null,
+                'updated_at' => null
             ]
         ]);
 
