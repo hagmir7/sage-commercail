@@ -59,19 +59,19 @@
             <table class="w-full border-collapse border border-gray-400">
                 <thead>
                     <tr class="bg-gray-200">
-                        <th class="border border-gray-400 px-4 py-3 text-left font-bold" rowspan="2">Critère d'évaluation</th>
-                        <th class="border border-gray-400 px-4 py-3 text-center font-bold" colspan="3">Niveau réel</th>
+                        <th class="border border-gray-400 px-4 py-3 text-left font-bold text-base" rowspan="2">Critère d'évaluation</th>
+                        <th class="border border-gray-400 px-4 py-3 text-center font-bold text-base" colspan="3">Niveau réel</th>
                     </tr>
                     <tr class="bg-gray-200">
-                        <th class="border border-gray-400 px-4 py-1.5 text-center font-bold">
+                        <th class="border border-gray-400 px-4 text-center font-bold text-sm">
                             <div>1</div>
                             <div class="font-normal">Insatisfaisant</div>
                         </th>
-                        <th class="border border-gray-400 px-4 py-1.5 text-center font-bold">
+                        <th class="border border-gray-400 px-4 text-center font-bold text-sm">
                             <div>2</div>
                             <div class="font-normal">Satisfaisant</div>
                         </th>
-                        <th class="border border-gray-400 px-4 py-1.5 text-center font-bold">
+                        <th class="border border-gray-400 px-4 text-center font-bold text-sm">
                             <div>3</div>
                             <div class="font-normal">Très satisfaisant</div>
                         </th>
@@ -85,16 +85,16 @@
                             $globalTotal += $note;
                         @endphp
                         <tr>
-                            <td class="border border-gray-400 px-4 py-3 bg-gray-50 font-medium">
+                            <td class="border border-gray-400 px-4 text-sm py-3 bg-gray-50 font-medium">
                                 {{ $criteria['description'] }}
                             </td>
-                            <td class="border border-gray-400 px-4 py-3 text-center bg-white">
+                            <td class="border border-gray-400 px-4 text-sm py-3 text-center bg-white">
                                 {{ $note === 1 ? 'X' : '' }}
                             </td>
-                            <td class="border border-gray-400 px-4 py-3 text-center bg-white">
+                            <td class="border border-gray-400 px-4 text-sm py-3 text-center bg-white">
                                 {{ $note === 2 ? 'X' : '' }}
                             </td>
-                            <td class="border border-gray-400 px-4 py-3 text-center bg-white">
+                            <td class="border border-gray-400 px-4 text-sm py-3 text-center bg-white">
                                 {{ $note === 3 ? 'X' : '' }}
                             </td>
                         </tr>

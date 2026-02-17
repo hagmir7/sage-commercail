@@ -48,18 +48,29 @@ class SupplierInterviewController extends Controller
             ], 422);
         }
 
-        
-        $supplierInterview = DB::connection($connection)->insert(
-            "INSERT INTO supplier_interviews 
+
+        if (app()->environment('local')) {
+
+            $supplierInterview = SupplierInterview::on($connection)->create([
+                'CT_Num'      => $request->CT_Num,
+                'date'        => $request->date,
+                'description' => $request->description,
+                'user_id'     => auth()->id(),
+            ]);
+        } else {
+            DB::connection($connection)->insert(
+                "INSERT INTO supplier_interviews 
             (CT_Num, [date], description, user_id, created_at, updated_at)
-            VALUES (?, ?, ?, ?, GETDATE(), GETDATE())",
-            [
-                $request->CT_Num,
-                $request->date,   // must be '2026-02-16'
-                $request->description,
-                auth()->id(),
-            ]
-        );
+        VALUES (?, ?, ?, ?, GETDATE(), GETDATE())",
+                [
+                    $request->CT_Num,
+                    $request->date,
+                    $request->description,
+                    auth()->id(),
+                ]
+            );
+        }
+
 
         return response()->json($supplierInterview, 201);
     }
@@ -152,20 +163,37 @@ class SupplierInterviewController extends Controller
 
         $supplierInterview->setConnection($connection);
 
-        $supplierInterview->criterias()->syncWithoutDetaching([
-            $request->criteria_id => [
-                'note' => $request->note,
-                'created_at' => null,
-                'updated_at' => null
-            ]
-        ]);
+        // Use correct pivot column name
+        $exists = $supplierInterview->criterias()
+            ->where('supplier_criteria_id', $request->criteria_id)
+            ->exists();
+
+        if ($exists) {
+
+            $supplierInterview->criterias()
+                ->updateExistingPivot($request->criteria_id, [
+                    'note'       => $request->note,
+                    'created_at' => null,
+                    'updated_at' => null,
+                ]);
+        } else {
+
+            $supplierInterview->criterias()
+                ->attach($request->criteria_id, [
+                    'note'       => $request->note,
+                    'created_at' => null,
+                    'updated_at' => null,
+                ]);
+        }
 
         return response()->json([
-            'message' => 'Note saved successfully',
+            'message'     => 'Note saved successfully',
             'criteria_id' => $request->criteria_id,
-            'note' => $request->note,
+            'note'        => $request->note,
         ]);
     }
+
+
 
 
 
