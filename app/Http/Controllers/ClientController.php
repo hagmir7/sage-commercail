@@ -71,11 +71,11 @@ class ClientController extends Controller
         $validator = Validator::make($request->all(), [
             'CT_Intitule'   => 'required|string|max:100',
             'CT_Num'        => 'required|string',
-            'CT_EMail'      => 'required|email|max:50|email',
-            'CT_Adresse'    => 'required|string|max:100',
-            'CT_Telephone'  => 'required|string|max:20',
-            'CT_Telecopie'  => 'required|string|max:20',
-            'CT_Ville'      => 'required|string|max:20',
+            // 'CT_EMail'      => 'required|email|max:50|email',
+            // 'CT_Adresse'    => 'required|string|max:100',
+            // 'CT_Telephone'  => 'required|string|max:20',
+            // 'CT_Telecopie'  => 'required|string|max:20',
+            // 'CT_Ville'      => 'required|string|max:20',
             'Nature_Achat'  => 'required|string|max:100',
         ]);
 
