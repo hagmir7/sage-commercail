@@ -54,13 +54,43 @@
             $globalTotal = 0;
         @endphp
 
+
+        <table class="mb-4 w-full table-fixed">
+            <tr class="bg-gray-200">
+                <th class="w-[30%] border border-gray-400 px-4 py-1 text-left font-bold text-sm">
+                    Date D'DEVALUATION
+                </th>
+                <th class="w-[70%] border border-gray-400 px-4 py-1 text-center text-sm font-normal">
+                    {{ \Carbon\Carbon::parse($interview->date)->format('d/m/Y') }}
+                </th>
+            </tr>
+            <tr class="bg-gray-200">
+                <th class="w-[30%] border border-gray-400 px-4 py-1 text-left font-bold text-sm">
+                    FOURNISSEUR
+                </th>
+                <th class="w-[70%] border border-gray-400 px-4 py-1 text-center text-sm font-normal">
+                    {{ $interview->client->CT_Intitule }} - {{ $interview->client->CT_Num}}
+                </th>
+            </tr>
+
+            <tr class="bg-gray-200">
+                <th class="w-[30%] border border-gray-400 px-4 py-1 text-left font-bold text-sm">
+                    PRODUIT / SERVICE ACHETE
+                </th>
+                <th class="w-[70%] border border-gray-400 px-4 py-1 text-center text-sm font-normal">
+                    {{ $interview->client?->Nature_Achat }}
+                </th>
+            </tr>
+        </table>
+
+
         <!-- Evaluation Criteria Table -->
         <div class="mb-6">
             <table class="w-full border-collapse border border-gray-400">
                 <thead>
                     <tr class="bg-gray-200">
-                        <th class="border border-gray-400 px-4 py-3 text-left font-bold text-base" rowspan="2">Critère d'évaluation</th>
-                        <th class="border border-gray-400 px-4 py-3 text-center font-bold text-base" colspan="3">Niveau réel</th>
+                        <th class="border border-gray-400 px-4 py-1 text-left font-bold text-base" rowspan="2">Critère d'évaluation</th>
+                        <th class="border border-gray-400 px-4 py-1 text-center font-bold text-base" colspan="3">Niveau réel</th>
                     </tr>
                     <tr class="bg-gray-200">
                         <th class="border border-gray-400 px-4 text-center font-bold text-sm">
@@ -117,12 +147,12 @@
             <table class="w-full border-collapse border border-gray-400">
                 <thead>
                     <tr class="bg-gray-200">
-                        <th class="border border-gray-400 px-4 py-3 text-center font-bold">Conclusion</th>
+                        <th class="border border-gray-400 px-4 py-1 text-center font-bold">Conclusion</th>
                     </tr>
                 </thead>
                 <tbody>
                     <tr>
-                        <td class="border border-gray-400 px-4 py-4 bg-white">
+                        <td class="border border-gray-400 px-4 py-2 bg-white">
                             <div class="space-y-2 text-sm">
                                 <p><strong>Note &gt; 14</strong> Résultat très satisfaisant : Prestataire qualifié de catégorie A</p>
                                 <p><strong>Note = 14</strong> Prestation satisfaisante : Prestataire confirmé de catégorie A</p>
@@ -140,12 +170,12 @@
             <table class="w-full border-collapse border border-gray-400">
                 <thead>
                     <tr class="bg-gray-200">
-                        <th class="border border-gray-400 px-4 py-3 text-center font-bold">Décision</th>
+                        <th class="border border-gray-400 px-4 py-1 text-center font-bold">Décision</th>
                     </tr>
                 </thead>
                 <tbody>
                     <tr>
-                        <td class="border border-gray-400 px-4 py-4 bg-white">
+                        <td class="border border-gray-400 px-4 py-2 bg-white">
                             <div class="space-y-2 text-sm">
                                 <p><strong>Prestataire de catégorie A :</strong> Continuer la collaboration</p>
                                 <p><strong>Prestataire de catégorie B :</strong> Engager un plan d'action</p>

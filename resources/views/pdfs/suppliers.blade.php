@@ -89,16 +89,35 @@
         </tbody>
     </table>
 
-    <!-- Footer Signature Table -->
-    <table class="w-full mt-12 border border-black border-collapse">
-        <tr>
-            <td class="w-1/2 border border-black p-2">
-                <p><strong>Nom & Prénom :</strong> Mme.</p>
-                <p class="mt-5"><strong>Fonction :</strong> Responsable ACHATS</p>
-                <p class="mt-10"><strong>Signature :</strong></p>
-            </td>
-        </tr>
-    </table>
+    <div class="flex justify-end w-full">
+        <table class="mb-4 w-1/2 table-fixed">
+            <tr class="">
+                <th class="w-[30%] border border-gray- px-4 py-1 text-left font-bold text-sm">
+                    Nom & Prénom :
+                </th>
+                <th class="w-[30%] border border-gray- px-4 py-1 text-center text-sm font-normal">
+                    Mme.
+                </th>
+            </tr>
+            <tr class="">
+                <th class="w-[30%] border border-gray- px-4 py-1 text-left font-bold text-sm">
+                    Fonction:
+                </th>
+                <th class="w-[30%] border border-gray- px-4 py-1 text-center text-sm font-normal">
+                    Responsable ACHATS
+                </th>
+            </tr>
+
+            <tr class=" py-6">
+                <th class="w-[30%] border border-gray- px-4 py-1 text-left font-bold text-sm">
+                    Signature:
+                </th>
+                <th class="w-[30%] border border-gray- px-4 py-1 text-center text-sm font-normal">
+                    
+                </th>
+            </tr>
+        </table>
+    </div>
 
 </div>
 

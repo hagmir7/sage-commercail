@@ -30,7 +30,9 @@ class SupplierInterview extends Model
     {
         return $this->belongsToMany(
             SupplierCriteria::class,
-            'supplier_interview_criterias'
-        )->withPivot('note')->withTimestamps();
+            'supplier_interview_criterias', 
+            'supplier_interview_id',
+            'supplier_criteria_id'
+        )->withPivot('note');
     }
 }
