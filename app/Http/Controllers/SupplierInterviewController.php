@@ -58,7 +58,7 @@ class SupplierInterviewController extends Controller
                 'user_id'     => auth()->id(),
             ]);
         } else {
-            DB::connection($connection)->insert(
+            $supplierInterview = DB::connection($connection)->insert(
                 "INSERT INTO supplier_interviews 
             (CT_Num, [date], description, user_id, created_at, updated_at)
         VALUES (?, ?, ?, ?, GETDATE(), GETDATE())",
