@@ -32,6 +32,25 @@ class PurchaseDocument extends Model
         'received_at' => 'datetime',
     ];
 
+
+     public const STATUS_OPTIONS = [
+        1 => "Brouillon",
+        2 => "Envoyer",
+        3 => "En révision",
+        4 => "Approuvé",
+        5 => "Rejeté",
+        6 => "Commandé",
+        7 => "Reçu",
+        8 => "Annulé",
+    ];
+
+    public function getStatusLabelAttribute()
+    {
+        return self::STATUS_OPTIONS[$this->status] ?? 'Inconnu';
+    }
+
+    
+
     protected static function booted()
     {
         static::creating(function ($record) {

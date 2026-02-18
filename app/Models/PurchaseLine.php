@@ -19,13 +19,13 @@ class PurchaseLine extends Model
         'total',
     ];
 
-    // parent document
+
     public function document()
     {
         return $this->belongsTo(PurchaseDocument::class, 'purchase_document_id');
     }
 
-    // attached files
+
     public function files()
     {
         return $this->hasMany(PurchaseLineFile::class);

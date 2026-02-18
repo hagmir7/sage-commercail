@@ -16,6 +16,7 @@ use App\Http\Controllers\InventoryMovementController;
 use App\Http\Controllers\LineController;
 use App\Http\Controllers\PaletteController;
 use App\Http\Controllers\PermissionController;
+use App\Http\Controllers\PurchaseController;
 use App\Http\Controllers\PurchaseDocumentController;
 use App\Http\Controllers\PurchaseDocumentHistoryController;
 use App\Http\Controllers\PurchaseLineController;
@@ -389,6 +390,13 @@ Route::middleware('auth:sanctum')->group(function () {
 });
 
 Route::apiResource('units', UnitController::class);
+
+
+
+Route::get('purchase/count-document-status', [PurchaseController::class, 'countDocumentStatus']);
+Route::get('purchase/count-document-service', [PurchaseController::class, 'countByService']);
+Route::get('purchase/count-active-suppliers', [PurchaseController::class, 'activeSuppliers']);
+Route::get('purchase/count-type-suppliers', [PurchaseController::class, 'countSupplierNaturAchat']);
 
 
 
