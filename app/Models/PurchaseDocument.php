@@ -21,6 +21,8 @@ class PurchaseDocument extends Model
         'rejected_at',
         'ordered_at',
         'received_at',
+        'planned_at',
+        'sended_at'
     ];
 
     protected $casts = [

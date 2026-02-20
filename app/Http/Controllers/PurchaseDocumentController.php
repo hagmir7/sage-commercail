@@ -116,6 +116,8 @@ class PurchaseDocumentController extends Controller
                 'status' => $validated['status'] ?? 1,
                 'service_id' => $validated['service_id'] ?? null,
                 'user_id' => $validated['user_id'] ?? null,
+                'planned_at' => $request->planned_at,
+                'sended_at' => intval($validated['status']) > 1 ? now() : null
             ]);
 
             // 2️⃣ Loop through lines and create them
@@ -210,8 +212,19 @@ class PurchaseDocumentController extends Controller
                 'urgent' => $validated['urgent'] ?? false,
                 'reference' => $validated['reference'] ??  $document->reference,
                 'status' => $validated['status'] ?? $document->status,
-                'service_id' => $validated['service_id'] ?? $document->status
+                'service_id' => $validated['service_id'] ?? $document->status,
+                'planned_at' => $request->planned_at ?? null
             ]);
+
+            if (intval($document->status) == 2) {
+                $document->update([
+                    'sended_at' =>  now() 
+                ]);
+            }elseif(intval($document->status) == 1){
+                $document->update([
+                    'sended_at' =>  null
+                ]);
+            }
 
             $updatedLineIds = [];
 
@@ -274,7 +287,7 @@ class PurchaseDocumentController extends Controller
                 }
             }
 
-            // 6️⃣ Delete removed lines
+
             $linesToDelete = PurchaseLine::where('purchase_document_id', $document->id)
                 ->whereNotIn('id', $updatedLineIds)
                 ->get();
@@ -428,7 +441,8 @@ class PurchaseDocumentController extends Controller
                 $request->souche,
                 $request->devise,
                 $request->company_db,
-
+                // $purchaseDocument->planned_at,
+                // $purchaseDocument->urgent
             );
 
             $documentArticles = $purchaseDocument->lines->pluck('code');
