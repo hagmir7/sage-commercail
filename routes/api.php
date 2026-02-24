@@ -398,7 +398,7 @@ Route::get('purchase/count-document-status', [PurchaseController::class, 'countD
 Route::get('purchase/count-document-service', [PurchaseController::class, 'countByService']);
 Route::get('purchase/count-active-suppliers', [PurchaseController::class, 'activeSuppliers']);
 Route::get('purchase/count-type-suppliers', [PurchaseController::class, 'countSupplierNaturAchat']);
-Route::get('states', [PurchaseController::class, 'states']);
+Route::get('purchase/states', [PurchaseController::class, 'states']);
 
 
 

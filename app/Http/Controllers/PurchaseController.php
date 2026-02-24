@@ -28,34 +28,45 @@ class PurchaseController extends Controller
     }
 
 
-    public function states()
-    {
-        return [
-            "suppliers" => $this->activeSuppliers(),
-            "expenditure" =>  $this->expenditure(),
-            "documents_in_progress" => PurchaseDocument::whereIn('status', [2,3,4,5,6])->count(),
-            "services" => Service::count()
-        ];
-    }
+ public function states(Request $request)
+{
+    $start = $request->start_date 
+        ? Carbon::parse($request->start_date)->format('Ymd')
+        : Carbon::now()->startOfYear()->format('Ymd');
+
+    $end = $request->end_date
+        ? Carbon::parse($request->end_date)->format('Ymd')
+        : Carbon::now()->endOfYear()->format('Ymd');
+
+    return [
+        "suppliers"            => $this->activeSuppliers(),
+        "expenditure"          => $this->expenditure($start, $end),
+        "documents_in_progress" => PurchaseDocument::whereIn('status', [2,3,4,5,6])->count(),
+        "services"             => Service::count()
+    ];
+}
 
 
+public function expenditure($start_date = null, $end_date = null)
+{
+    $start = $start_date
+        ? Carbon::parse($start_date)->format('Ymd')
+        : '20260101';
 
-    public function expenditure($start_date = null, $end_date = null)
-    {
-        $start_date = $start_date 
-            ? Carbon::parse($start_date)->startOfDay()
-            : Carbon::create(2026, 1, 1)->startOfDay();
+    $end = $end_date
+        ? Carbon::parse($end_date)->format('Ymd')
+        : Carbon::now()->format('Ymd');
 
-        $end_date = $end_date
-            ? Carbon::parse($end_date)->endOfDay()
-            : Carbon::now()->endOfDay();
-
-        return Docentete::on('sqlsrv_inter')
-            ->where('DO_Domaine', 1)
-            ->whereBetween('cbCreation', [$start_date, $end_date])
-            ->whereIn('DO_Type', [10, 11, 12, 13, 16])
-            ->sum('DO_TotalTTC');
-    }
+    return DB::connection('sqlsrv_inter')
+        ->table('F_DOCENTETE')
+        ->where('DO_Domaine', 1)
+        ->whereBetween(
+            DB::raw("CONVERT(varchar(8), cbCreation, 112)"),
+            [$start, $end]
+        )
+        ->whereIn('DO_Type', [10, 11, 12, 13, 16])
+        ->sum('DO_TotalTTC');
+}
 
 
 
