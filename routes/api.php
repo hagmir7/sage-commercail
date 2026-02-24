@@ -304,6 +304,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('stock', 'stock');
         Route::get('list', 'list');
         Route::get('{article_stock:code}', 'show');
+        Route::delete('{article_stock:code}', 'destroy');
       
         Route::get('emplacements/{piece}', 'emplacements');
         Route::get('', 'index');
@@ -397,6 +398,7 @@ Route::get('purchase/count-document-status', [PurchaseController::class, 'countD
 Route::get('purchase/count-document-service', [PurchaseController::class, 'countByService']);
 Route::get('purchase/count-active-suppliers', [PurchaseController::class, 'activeSuppliers']);
 Route::get('purchase/count-type-suppliers', [PurchaseController::class, 'countSupplierNaturAchat']);
+Route::get('states', [PurchaseController::class, 'states']);
 
 
 

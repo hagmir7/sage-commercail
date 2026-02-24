@@ -27,7 +27,8 @@ class User extends Authenticatable
         'phone',
         'company_id',
         'service_id',
-        'is_active'
+        'is_active',
+        'code'
     ];
 
     // protected $dateFormat = 'Y-d-m H:i:s.v';
@@ -56,6 +57,11 @@ class User extends Authenticatable
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
         ];
+    }
+
+    public function collaborator()
+    {
+        return $this->belongsTo(Collaborator::class, 'code', 'CO_Matricule');
     }
 
 

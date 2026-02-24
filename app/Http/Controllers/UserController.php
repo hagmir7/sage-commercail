@@ -20,7 +20,16 @@ class UserController extends Controller
             'phone' => 'nullable|string|max:255',
             'email' => 'required|string|email|max:255|unique:users,email,' . $id,
             'company_id' => 'nullable|numeric|exists:companies,id',
-            'service_id' => 'nullable|numeric|exists:services,id'
+            'service_id' => 'nullable|numeric|exists:services,id',
+            'code' => 'string|nullable|max:10|unique:users,code,' . $id
+        ], [], [
+            'name' => 'Nom d\'utilisateur',
+            'full_name' => 'Nom complet',
+            'phone' => 'Téléphone',
+            'email' => 'Adresse e-mail',
+            'company_id' => 'Société',
+            'service_id' => 'Service',
+            'code' => 'Matricule'
         ]);
 
         if ($validator->fails()) {
@@ -48,7 +57,8 @@ class UserController extends Controller
             'email' => $request->email,
             'phone' => $request->phone ?? null,
             'company_id' => $request->company_id ?? null,
-            'service_id' => $request->service_id ?? null
+            'service_id' => $request->service_id ?? null,
+            'code' => $request->code ?? null
         ]);
 
         $token = $user->createToken('auth_token')->plainTextToken;

@@ -327,14 +327,19 @@ class ArticleStockController extends Controller
      * @param  int  $id
      * @return \Illuminate\Http\Response
      */
-    public function destroy($id)
+    public function destroy(ArticleStock $article_stock)
     {
-        $article = ArticleStock::findOrFail($id);
-        $article->delete();
+        if (!auth()->user()->hasRole('admin')) {
+            return response()->json([
+                'message' => 'Unauthorized'
+            ], 403);
+        }
+        $article_stock->delete();
 
-        return response()->json(['message' => 'Article deleted successfully']);
+        return response()->json([
+            'message' => 'Article deleted successfully'
+        ], 200);
     }
-
 
     public function emplacements(string $code)
     {

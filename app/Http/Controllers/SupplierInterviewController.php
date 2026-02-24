@@ -22,7 +22,7 @@ class SupplierInterviewController extends Controller
 
         return SupplierInterview::on($connection)
             ->with(['user', 'client'])
-            ->withSum('criterias as total_note', 'supplier_interview_criterias.note') // pivot column
+            ->withSum('criterias as total_note', 'supplier_interview_criterias.note')
             ->latest()
             ->get();
     }

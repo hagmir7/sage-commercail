@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Article;
 use App\Models\ArticleSupplier;
+use App\Models\Collaborator;
 use App\Models\CurrentPiece;
 use App\Models\PurchaseDocument;
 use App\Models\PurchaseLine;
@@ -15,7 +16,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Validator;
 use Exception;
-
+use Illuminate\Support\Facades\Schema;
 
 class PurchaseDocumentController extends Controller
 {
@@ -366,14 +367,12 @@ class PurchaseDocumentController extends Controller
 
         $articleCodes = $purchaseDocument->lines->pluck('code')->filter()->unique();
 
-        // Get all existing article codes from F_ARTICLE
         $existingCodes = DB::connection($company_db)
             ->table('F_ARTICLE')
             ->whereIn('AR_Ref', $articleCodes)
             ->pluck('AR_Ref')
             ->toArray();
 
-        // Find missing ones
         $missingCodes = $articleCodes->diff($existingCodes);
 
         if ($missingCodes->isNotEmpty()) {
@@ -441,8 +440,9 @@ class PurchaseDocumentController extends Controller
                 $request->souche,
                 $request->devise,
                 $request->company_db,
-                // $purchaseDocument->planned_at,
-                // $purchaseDocument->urgent
+                $purchaseDocument->planned_at,
+                $purchaseDocument->urgent,
+                $purchaseDocument->user
             );
 
             $documentArticles = $purchaseDocument->lines->pluck('code');
@@ -539,7 +539,8 @@ class PurchaseDocumentController extends Controller
         }
     }
 
-    public function createDocentete(string $DO_Piece, string $DO_Tiers, string $DO_Ref, $DO_Souche, $DO_Devise, $company_db): string
+
+    public function createDocentete(string $DO_Piece, string $DO_Tiers, string $DO_Ref, $DO_Souche, $DO_Devise, $company_db, $planned, $urgent, $user): string
     {
         try {
 
@@ -551,26 +552,36 @@ class PurchaseDocumentController extends Controller
                 $currentDateTime = date('Y-d-m H:i:s.000');
             }
 
+            if ($planned) {
+                $type = "Planifiée";
+            } elseif ($urgent) {
+                $type = "Urgente";
+            } else {
+                $type = "Normale";
+            }
+
 
             $DO_Heure = $this->generateHeure();
 
+            $collaborateur = Collaborator::on($company_db)->where('CO_Matricule', $user->code)->first();
 
-            DB::connection($company_db)->table('F_DOCENTETE')->insert([
+
+            $data = [
                 'DO_Domaine'            => 1,
                 'DO_Type'               => 10,
                 'DO_Piece'              => $DO_Piece,
                 'DO_Date'               => $DO_Date,
                 'DO_Ref'                => $DO_Ref,
                 'DO_Tiers'              => $DO_Tiers,
-                'CO_No'                 => 0,
-                'cbCO_No'               => null,  // MISSING COLUMN
+                'CO_No'                 => $collaborateur ? $collaborateur->CO_No : null,
+                'cbCO_No'               => $collaborateur ? $collaborateur->CO_No : null,
                 'DO_Period'             => 1,
                 'DO_Devise'             => $DO_Devise,
                 'DO_Cours'              => 1.000000,
                 'DE_No'                 => 1,
-                'cbDE_No'               => 1,     // MISSING COLUMN
+                'cbDE_No'               => 1,   
                 'LI_No'                 => 0,
-                'cbLI_No'               => null,  // MISSING COLUMN
+                'cbLI_No'               => null,
                 'CT_NumPayeur'          => $DO_Tiers,
                 'DO_Expedit'            => 1,
                 'DO_NbFacture'          => 1,
@@ -584,7 +595,7 @@ class PurchaseDocumentController extends Controller
                 'DO_Coord03'            => '',
                 'DO_Coord04'            => '',
                 'DO_Souche'             => $DO_Souche,
-                'DO_DateLivr'           => '2026-11-11 00:00:00.000',
+                'DO_DateLivr'           => $currentDateTime,
                 'DO_Condition'          => 1,
                 'DO_Tarif'              => 1,
                 'DO_Colisage'           => 1,
@@ -667,8 +678,15 @@ class PurchaseDocumentController extends Controller
                 'cbHashVersion'         => 1,
                 'cbHashDate'            => null,
                 'cbHashOrder'           => null,
+                // 'Priorité'              => $type,
+            ];
 
-            ]);
+            if (Schema::connection($company_db)->hasColumn('F_DOCENTETE', 'Priorité')) {
+                $data['Priorité'] = $type;
+            }
+
+
+            DB::connection($company_db)->table('F_DOCENTETE')->insert($data);
 
             return $DO_Date;
         } catch (Exception $e) {

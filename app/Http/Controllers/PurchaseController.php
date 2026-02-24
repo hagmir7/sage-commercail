@@ -3,7 +3,10 @@
 namespace App\Http\Controllers;
 
 use App\Models\Client;
+use App\Models\Docentete;
 use App\Models\PurchaseDocument;
+use App\Models\Service;
+use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
@@ -22,6 +25,36 @@ class PurchaseController extends Controller
                 'total' => $item->total,
             ];
         })->values();
+    }
+
+
+    public function states()
+    {
+        return [
+            "suppliers" => $this->activeSuppliers(),
+            "expenditure" =>  $this->expenditure(),
+            "documents_in_progress" => PurchaseDocument::whereIn('status', [2,3,4,5,6])->count(),
+            "services" => Service::count()
+        ];
+    }
+
+
+
+    public function expenditure($start_date = null, $end_date = null)
+    {
+        $start_date = $start_date 
+            ? Carbon::parse($start_date)->startOfDay()
+            : Carbon::create(2026, 1, 1)->startOfDay();
+
+        $end_date = $end_date
+            ? Carbon::parse($end_date)->endOfDay()
+            : Carbon::now()->endOfDay();
+
+        return Docentete::on('sqlsrv_inter')
+            ->where('DO_Domaine', 1)
+            ->whereBetween('cbCreation', [$start_date, $end_date])
+            ->whereIn('DO_Type', [10, 11, 12, 13, 16])
+            ->sum('DO_TotalTTC');
     }
 
 
@@ -72,7 +105,7 @@ class PurchaseController extends Controller
             $total += $count;
         }
 
-        return ['count' => $total];
+        return $total;
     }
 
 
