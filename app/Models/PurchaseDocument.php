@@ -6,7 +6,7 @@ use Illuminate\Database\Eloquent\Model;
 
 class PurchaseDocument extends Model
 {
-    
+
     protected $fillable = [
         'code',
         'user_id',
@@ -22,7 +22,11 @@ class PurchaseDocument extends Model
         'ordered_at',
         'received_at',
         'planned_at',
-        'sended_at'
+        'sended_at',
+        'CT_Num',
+        'piece_bc',
+        'meet_deadline',
+        'document_pieces'
     ];
 
     protected $casts = [

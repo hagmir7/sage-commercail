@@ -143,56 +143,55 @@ class SupplierInterviewController extends Controller
     }
 
 
-public function addCriteria(Request $request, $supplierInterviewId)
-{
-    $validator = Validator::make($request->all(), [
-        'criteria_id' => 'required|exists:supplier_criterias,id',
-        'note'        => 'required|integer|min:1|max:3',
-    ]);
+    public function addCriteria(Request $request, $supplierInterviewId)
+    {
+        $validator = Validator::make($request->all(), [
+            'criteria_id' => 'required|exists:supplier_criterias,id',
+            'note'        => 'required|integer|min:1|max:3',
+        ]);
 
-    if ($validator->fails()) {
+        if ($validator->fails()) {
+            return response()->json([
+                'message' => $validator->errors()->first(),
+            ], 422);
+        }
+
+        $connection = $request->company_db ?? 'sqlsrv_inter';
+
+        $supplierInterview = SupplierInterview::on($connection)
+            ->findOrFail($supplierInterviewId);
+
+        $supplierInterview->setConnection($connection);
+
+        // Use wherePivot to target pivot column correctly
+        $exists = $supplierInterview->criterias()
+            ->wherePivot('supplier_criteria_id', $request->criteria_id)
+            ->exists();
+
+        if ($exists) {
+
+            $supplierInterview->criterias()
+                ->updateExistingPivot($request->criteria_id, [
+                    'note'       => $request->note,
+                    'created_at' => null,
+                    'updated_at' => null,
+                ]);
+        } else {
+
+            $supplierInterview->criterias()
+                ->attach($request->criteria_id, [
+                    'note'       => $request->note,
+                    'created_at' => null,
+                    'updated_at' => null,
+                ]);
+        }
+
         return response()->json([
-            'message' => $validator->errors()->first(),
-        ], 422);
+            'message'     => 'Note saved successfully',
+            'criteria_id' => $request->criteria_id,
+            'note'        => $request->note,
+        ]);
     }
-
-    $connection = $request->company_db ?? 'sqlsrv_inter';
-
-    $supplierInterview = SupplierInterview::on($connection)
-        ->findOrFail($supplierInterviewId);
-
-    $supplierInterview->setConnection($connection);
-
-    // Use wherePivot to target pivot column correctly
-    $exists = $supplierInterview->criterias()
-        ->wherePivot('supplier_criteria_id', $request->criteria_id)
-        ->exists();
-
-    if ($exists) {
-
-        $supplierInterview->criterias()
-            ->updateExistingPivot($request->criteria_id, [
-                'note'       => $request->note,
-                'created_at' => null,
-                'updated_at' => null,
-            ]);
-
-    } else {
-
-        $supplierInterview->criterias()
-            ->attach($request->criteria_id, [
-                'note'       => $request->note,
-                'created_at' => null,
-                'updated_at' => null,
-            ]);
-    }
-
-    return response()->json([
-        'message'     => 'Note saved successfully',
-        'criteria_id' => $request->criteria_id,
-        'note'        => $request->note,
-    ]);
-}
 
 
 
@@ -236,5 +235,4 @@ public function addCriteria(Request $request, $supplierInterviewId)
                 </div>
             ')->name(now()->format('Ymd_His') . '-grille-evaluation.pdf');
     }
-
 }

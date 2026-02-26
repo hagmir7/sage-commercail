@@ -520,6 +520,15 @@ class PurchaseDocumentController extends Controller
                 ]);
             }
 
+            $existing = $purchaseDocument->document_pieces ?? '';
+
+            $purchaseDocument->update([
+                'document_pieces' => $existing
+                    ? $existing . ',' . $piece
+                    : $piece
+            ]);
+
+            
             return response()->json([
                 'message' => 'Transfer successful',
                 'piece' => $piece

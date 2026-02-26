@@ -64,12 +64,17 @@ class StockMovement extends Model
 
     public function scopeFilterByEmplacement($query, $emplacement)
     {
-        return $query->whereHas('emplacement', function ($q) use ($emplacement) {
-            $q->where("code", 'like', "%$emplacement%");
-        })
-            ->orWhereHas('article', function ($q) use ($emplacement) {
+        return $query->where(function ($query) use ($emplacement) {
+
+            $query->whereHas('emplacement', function ($q) use ($emplacement) {
+                $q->where('code', 'like', "%$emplacement%");
+            })
+
+            ->orWhereHas('articleStock', function ($q) use ($emplacement) {
                 $q->where('code', 'like', "%$emplacement%");
             });
+
+        });
     }
 
     public function scopeSearch($query, $search)

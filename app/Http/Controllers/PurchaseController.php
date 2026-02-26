@@ -28,23 +28,23 @@ class PurchaseController extends Controller
     }
 
 
- public function states(Request $request)
-{
-    $start = $request->start_date 
-        ? Carbon::parse($request->start_date)->format('Ymd')
-        : Carbon::now()->startOfYear()->format('Ymd');
+    public function states(Request $request)
+    {
+        $start = $request->start_date
+            ? Carbon::parse($request->start_date)->format('Ymd')
+            : Carbon::now()->startOfYear()->format('Ymd');
 
-    $end = $request->end_date
-        ? Carbon::parse($request->end_date)->format('Ymd')
-        : Carbon::now()->endOfYear()->format('Ymd');
+        $end = $request->end_date
+            ? Carbon::parse($request->end_date)->format('Ymd')
+            : Carbon::now()->endOfYear()->format('Ymd');
 
-    return [
-        "suppliers"            => $this->activeSuppliers(),
-        "expenditure"          => $this->expenditure($start, $end),
-        "documents_in_progress" => PurchaseDocument::whereIn('status', [2,3,4,5,6])->count(),
-        "services"             => Service::count()
-    ];
-}
+        return [
+            "suppliers"            => $this->activeSuppliers(),
+            "expenditure"          => $this->expenditure($start, $end),
+            "documents_in_progress" => PurchaseDocument::whereIn('status', [2, 3, 4, 5, 6])->count(),
+            "services"             => Service::count()
+        ];
+    }
 
 
 public function expenditure($start_date = null, $end_date = null)
