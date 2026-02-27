@@ -3,7 +3,6 @@
 namespace App\Http\Controllers;
 
 use App\Models\Client;
-use App\Models\Docentete;
 use App\Models\PurchaseDocument;
 use App\Models\Service;
 use Carbon\Carbon;
@@ -47,27 +46,59 @@ class PurchaseController extends Controller
     }
 
 
-public function expenditure($start_date = null, $end_date = null)
-{
-    $start = $start_date
-        ? Carbon::parse($start_date)->format('Ymd')
-        : '20260101';
+    public function expenditure($start_date = null, $end_date = null)
+    {
+        $start = $start_date
+            ? Carbon::parse($start_date)->format('Ymd')
+            : '20260101';
 
-    $end = $end_date
-        ? Carbon::parse($end_date)->format('Ymd')
-        : Carbon::now()->format('Ymd');
+        $end = $end_date
+            ? Carbon::parse($end_date)->format('Ymd')
+            : Carbon::now()->format('Ymd');
 
-    return DB::connection('sqlsrv_inter')
-        ->table('F_DOCENTETE')
-        ->where('DO_Domaine', 1)
-        ->whereBetween(
-            DB::raw("CONVERT(varchar(8), cbCreation, 112)"),
-            [$start, $end]
-        )
-        ->whereIn('DO_Type', [10, 11, 12, 13, 16])
-        ->sum('DO_TotalTTC');
-}
+        return DB::connection('sqlsrv_inter')
+            ->table('F_DOCENTETE')
+            ->where('DO_Domaine', 1)
+            ->whereBetween(
+                DB::raw("CONVERT(varchar(8), cbCreation, 112)"),
+                [$start, $end]
+            )
+            ->whereIn('DO_Type', [10, 11, 12, 13, 16, 17])
+            ->sum('DO_TotalTTC');
+    }
 
+    public function monthlyPurchases()
+    {
+        $start = \Carbon\Carbon::now()
+            ->subMonths(11)
+            ->startOfMonth()
+            ->format('Ymd');
+
+        $end = \Carbon\Carbon::now()
+            ->endOfMonth()
+            ->format('Ymd');
+
+        return DB::connection('sqlsrv_inter')
+            ->table('F_DOCENTETE')
+            ->selectRaw("
+            YEAR(DO_Date) AS year,
+            MONTH(DO_Date) AS month,
+            COUNT(*) AS total_documents,
+            SUM(DO_TotalTTC) AS total_ttc
+        ")
+            ->where('DO_Domaine', 1)
+            ->whereRaw("CONVERT(int, CONVERT(varchar, DO_Date, 112)) BETWEEN ? AND ?", [$start, $end])
+            ->whereIn('DO_Type', [10, 11, 12, 13, 16, 17])
+            ->groupByRaw("YEAR(DO_Date), MONTH(DO_Date)")
+            ->orderByRaw("YEAR(DO_Date), MONTH(DO_Date)")
+            ->get()
+            ->map(fn($row) => [
+                'year'            => (int) $row->year,
+                'month'           => (int) $row->month,
+                'total_documents' => (int) $row->total_documents,
+                'total_ttc'       => (float) $row->total_ttc,
+            ]);
+    }
 
 
     public function countByService()
@@ -94,6 +125,34 @@ public function expenditure($start_date = null, $end_date = null)
                 'percent'      => $percent,
             ];
         })->values();
+    }
+
+
+
+    public function serviceExpenditures(Request $request)
+    {
+        $start = $request->input('start', '20260101');
+        $end   = $request->input('end', now()->format('Ymd'));
+
+        return DB::connection('sqlsrv_inter')
+            ->table('F_DOCENTETE as d')
+            ->selectRaw("
+            c.CO_Service       AS service_name,
+            COUNT(*)           AS total_documents,
+            SUM(d.DO_TotalTTC) AS total_ttc
+        ")
+            ->leftJoin('F_COLLABORATEUR as c', 'd.CO_No', '=', 'c.CO_No')
+            ->where('d.DO_Domaine', 1)
+            ->whereIn('d.DO_Type', [10, 11, 12, 13, 16,15])
+            ->whereRaw("CONVERT(int, CONVERT(varchar, d.DO_Date, 112)) BETWEEN ? AND ?", [$start, $end])
+            ->groupByRaw("c.CO_Service")
+            ->orderByRaw("SUM(d.DO_TotalTTC) DESC")
+            ->get()
+            ->map(fn($row) => [
+                'service_name'    => $row->service_name ?? 'Sans service',
+                'total_documents' => (int)   $row->total_documents,
+                'total_ttc'       => (float) $row->total_ttc,
+            ]);
     }
 
 
@@ -172,5 +231,4 @@ public function expenditure($start_date = null, $end_date = null)
             'data'        => $final
         ];
     }
-
 }
