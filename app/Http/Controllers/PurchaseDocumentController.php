@@ -6,6 +6,7 @@ use App\Models\Article;
 use App\Models\ArticleSupplier;
 use App\Models\Collaborator;
 use App\Models\CurrentPiece;
+use App\Models\Devise;
 use App\Models\PurchaseDocument;
 use App\Models\PurchaseLine;
 use App\Models\PurchaseLineFile;
@@ -528,7 +529,7 @@ class PurchaseDocumentController extends Controller
                     : $piece
             ]);
 
-            
+
             return response()->json([
                 'message' => 'Transfer successful',
                 'piece' => $piece
@@ -569,6 +570,8 @@ class PurchaseDocumentController extends Controller
                 $type = "Normale";
             }
 
+            $devise = Devise::on($company_db)->where('cbIndice', $DO_Devise)->first();
+
 
             $DO_Heure = $this->generateHeure();
 
@@ -586,7 +589,7 @@ class PurchaseDocumentController extends Controller
                 'cbCO_No'               => $collaborateur ? $collaborateur->CO_No : null,
                 'DO_Period'             => 1,
                 'DO_Devise'             => $DO_Devise,
-                'DO_Cours'              => 1.000000,
+                'DO_Cours'              => $devise->D_Cours,
                 'DE_No'                 => 1,
                 'cbDE_No'               => 1,   
                 'LI_No'                 => 0,
