@@ -619,13 +619,13 @@ class DocumentController extends Controller
     public function livraison(Request $request)
     {
 
-        if (!$request->filled('search')) {
-            $documents = Document::whereDoesntHave('docentete')->whereNull('piece_bl')->orWhereNull('piece_fa')->get();
+        // if (!$request->filled('search')) {
+        //     $documents = Document::whereDoesntHave('docentete')->whereNull('piece_bl')->orWhereNull('piece_fa')->get();
 
-            if ($documents->isNotEmpty()) {
-                $documents->each(fn($document) => $this->convertDocument($document));
-            }
-        }
+        //     if ($documents->isNotEmpty()) {
+        //         $documents->each(fn($document) => $this->convertDocument($document));
+        //     }
+        // }
 
         $query = Docentete::with([
             'document' => function ($q) {
@@ -785,32 +785,52 @@ class DocumentController extends Controller
 
     public function archive(Request $request)
     {
-        $query = Document::with([
-            'docentete:DO_Domaine,DO_Type,DO_Piece,DO_Date,DO_Ref,DO_Tiers,DO_Statut,cbMarq,cbCreation,DO_DateLivr,DO_Expedit',
-            'status'
-        ])
-            ->whereHas('docentete', function ($q) use ($request) {
+        if (auth()->user()->hasRole('fabrication')) {
 
-                // ✅ DATE RANGE FILTER ON cbCreation
-                if ($request->filled('date')) {
-                    $dates = explode(',', $request->date, 2);
-
-                    $start = Carbon::parse(urldecode($dates[0]))->startOfDay();
-                    $end   = Carbon::parse(urldecode($dates[1] ?? $dates[0]))->endOfDay();
-
-                    $q->whereBetween('cbCreation', [$start, $end]);
+            $query = Document::with([
+                'docentete:DO_Domaine,DO_Type,DO_Piece,DO_Date,DO_Ref,DO_Tiers,DO_Statut,cbMarq,cbCreation,DO_DateLivr,DO_Expedit',
+                'status',
+                'lines' => function ($q) {
+                    $q->whereNotNull('fabricated_at')->limit(1);
                 }
-            })
-            ->when($request->filled('type'), function ($q) use ($request) {
-                if ($request->type == 1) {
-                    $q->where('piece', 'like', '%BC%');
-                } elseif ($request->type == 2) {
-                    $q->where(function ($q2) {
-                        $q2->where('piece_bl', 'like', '%BL%')
-                            ->orWhere('piece', 'like', '%BL%');
-                    });
-                }
+            ])->whereHas('lines', function ($q) {
+                $q->whereNotNull('fabricated_by');
             });
+        } elseif (auth()->user()->hasRole('commercial')) {
+            $query = Document::with([
+                'docentete:DO_Domaine,DO_Type,DO_Piece,DO_Date,DO_Ref,DO_Tiers,DO_Statut,cbMarq,cbCreation,DO_DateLivr,DO_Expedit',
+                'status'
+            ]);
+        } else {
+            $userCompanyId = auth()->user()->company_id;
+            $query = Document::with([
+                'docentete:cbMarq,DO_Domaine,DO_Type,DO_Piece,DO_Date,DO_Ref,DO_Tiers,DO_Statut,cbCreation,DO_DateLivr,DO_Expedit',
+                'status'
+            ])->whereHas('companies', function ($q) use ($userCompanyId) {
+                $q->where('companies.id', $userCompanyId);
+            });
+        }
+
+        if ($request->filled('date')) {
+            $dates = explode(',', $request->date, 2);
+
+            $start = Carbon::parse(urldecode($dates[0]))->startOfDay();
+            $end   = Carbon::parse(urldecode($dates[1] ?? $dates[0]))->endOfDay();
+
+            $query->whereBetween('created_at', [$start, $end]);
+        }
+
+
+
+        $query->when($request->filled('type'), function ($q) use ($request) {
+            if ($request->type == 2) {
+                $q->where(function ($q2) {
+                    $q2->where('piece_bl', 'like', '%BL%')
+                        ->orWhere('piece', 'like', '%BL%');
+                });
+            }
+        });
+
 
         if ($request->filled('search')) {
             $search = $request->search;
@@ -819,8 +839,7 @@ class DocumentController extends Controller
                 $q->where('piece_fa', 'like', "%$search%")
                     ->orWhere('piece', 'like', "%$search%")
                     ->orWhere('ref', 'like', "%$search%")
-                    ->orWhere('client_id', 'like', "%$search%")
-                    ->orWhere('piece_bl', 'like', "%$search%");
+                    ->orWhere('client_id', 'like', "%$search%");
             });
         }
 

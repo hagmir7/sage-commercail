@@ -25,6 +25,7 @@ class Document extends Model
         'piece_bc',
         'user_id',
         'urgent',
+        'delivery_date',
         'created_at'
     ];
 

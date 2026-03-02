@@ -25,7 +25,17 @@ class Line extends Model
         'status_id',
         'first_company_id',
         'quantity_prepare',
-        'company_code'
+        'company_code',
+        'piece_bc',
+        'piece_pl',
+        'piece_bl',
+        'piece_fa',
+        'fabricated_by',
+        'fabricated_at',
+        'mounted_by',
+        'mounted_at',
+        'prepared_by',
+        'prepared_at',
     ];
 
 
@@ -50,7 +60,7 @@ class Line extends Model
 
     public function docligne()
     {
-        return $this->belongsTo(Docligne::class, 'docligne_id', 'cbMarq');
+        return $this->hasOne(Docligne::class, 'Line_ID', 'id');
     }
 
 

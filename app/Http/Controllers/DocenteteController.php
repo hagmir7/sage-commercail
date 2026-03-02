@@ -21,6 +21,8 @@ use App\Models\StockMovement;
 use App\Services\StockMovementService;
 use App\Services\StockService;
 
+use function Symfony\Component\Clock\now;
+
 class DocenteteController extends Controller
 {
 
@@ -118,6 +120,10 @@ class DocenteteController extends Controller
             $line->update([
                 'role_id' => $line->next_role_id ? $line->next_role_id : null,
                 'next_role_id' => null,
+                'fabricated_by' => $user->hasRole("fabrication") ? auth()->id() : $line->fabricated_by,
+                'fabricated_at' => $user->hasRole("fabrication") ? now() : $line->fabricated_at,
+                'mounted_by' => $user->hasRole("montage") ? auth()->id() : $line->mounted_by,
+                'mounted_at' => $user->hasRole("montage") ? now() : $line->mounted_at,
                 'status_id' => $line->next_role_id ? 7 : ($user->hasRole("fabrication") ? 4 : 6)
             ]);
 
@@ -520,85 +526,84 @@ class DocenteteController extends Controller
 
 
 
-public function validate(Request $request, $piece)
-{
-    if (!$request->user()->hasRole('preparation')) {
-        return response()->json(["message" => "L'utilisateur n'est pas autorisé"], 401);
+    public function validate(Request $request, $piece)
+    {
+        if (!$request->user()->hasRole('preparation')) {
+            return response()->json(["message" => "L'utilisateur n'est pas autorisé"], 401);
+        }
+
+        $document = Document::where('piece', $piece)
+            ->orWhere('piece_bl', $piece)
+            ->first();
+
+        if (!$document) {
+            Log::warning('Document not found', [
+                'piece' => $piece,
+                'user_id' => auth()->id(),
+            ]);
+
+            return response()->json([
+                "message" => "Le document n'existe pas"
+            ], 404);
+        }
+
+        try {
+            DB::transaction(function () use ($document) {
+
+                foreach ($document->lines->where('company_id', auth()->user()->company_id) as $line) {
+                    $line->update(['status_id' => 11]);
+                }
+
+                $allLinesValidated = $document->lines
+                    ->every(fn($line) => $line->status_id == 11);
+
+                if ($allLinesValidated) {
+                    $document->update([
+                        'status_id' => 11,
+                        'validated_by' => auth()->id()
+                    ]);
+
+                    $this->updateDocStatus($document?->docentete);
+                }
+
+                $document->companies()->updateExistingPivot(
+                    auth()->user()->company_id,
+                    [
+                        'status_id' => 11,
+                        'validated_by' => auth()->id(),
+                        'validated_at' => now()
+                    ]
+                );
+
+                // Achat d'article
+                $sellController = new SellController();
+                $sellController->calculator(
+                    $document?->docentete->DO_Piece,
+                    $document->lines
+                        ->where('company_id', auth()->user()->company_id)
+                        ->pluck('docligne_id')
+                );
+            });
+
+            return response()->json([
+                "message" => "Le document est validé avec succès"
+            ]);
+        } catch (\Throwable $e) {
+
+            \Log::error('Document validation failed', [
+                'piece' => $piece,
+                'document_id' => $document->id ?? null,
+                'user_id' => auth()->id(),
+                'company_id' => auth()->user()->company_id,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
+
+            return response()->json([
+                'message' => 'Une erreur est survenue lors de la validation du document'
+            ], 500);
+        }
     }
-
-    $document = Document::where('piece', $piece)
-        ->orWhere('piece_bl', $piece)
-        ->first();
-
-    if (!$document) {
-        Log::warning('Document not found', [
-            'piece' => $piece,
-            'user_id' => auth()->id(),
-        ]);
-
-        return response()->json([
-            "message" => "Le document n'existe pas"
-        ], 404);
-    }
-
-    try {
-        DB::transaction(function () use ($document) {
-
-            foreach ($document->lines->where('company_id', auth()->user()->company_id) as $line) {
-                $line->update(['status_id' => 11]);
-            }
-
-            $allLinesValidated = $document->lines
-                ->every(fn ($line) => $line->status_id == 11);
-
-            if ($allLinesValidated) {
-                $document->update([
-                    'status_id' => 11,
-                    'validated_by' => auth()->id()
-                ]);
-
-                $this->updateDocStatus($document?->docentete);
-            }
-
-            $document->companies()->updateExistingPivot(
-                auth()->user()->company_id,
-                [
-                    'status_id' => 11,
-                    'validated_by' => auth()->id(),
-                    'validated_at' => now()
-                ]
-            );
-
-            // Achat d'article
-            $sellController = new SellController();
-            $sellController->calculator(
-                $document?->docentete->DO_Piece,
-                $document->lines
-                    ->where('company_id', auth()->user()->company_id)
-                    ->pluck('docligne_id')
-            );
-        });
-
-        return response()->json([
-            "message" => "Le document est validé avec succès"
-        ]);
-
-    } catch (\Throwable $e) {
-
-        \Log::error('Document validation failed', [
-            'piece' => $piece,
-            'document_id' => $document->id ?? null,
-            'user_id' => auth()->id(),
-            'company_id' => auth()->user()->company_id,
-            'error' => $e->getMessage(),
-            'trace' => $e->getTraceAsString(),
-        ]);
-
-        return response()->json([
-            'message' => 'Une erreur est survenue lors de la validation du document'
-        ], 500);
-    }
-}
 
 
     public function competedPalettes($piece)
@@ -649,6 +654,11 @@ public function validate(Request $request, $piece)
         $userRoles = $user->roles()->pluck('name')->toArray();
         $userRoleIds = $user->roles()->pluck('id')->toArray();
 
+
+        $doc = Document::where('piece', $id)->first();
+        
+        $piece = $doc?->lines->first()?->docligne?->DO_Piece ?? $id;
+
         $docentete = Docentete::with(['document.status', 'document.companies', 'document.palettes'])
             ->select(
                 "DO_Piece",
@@ -661,7 +671,7 @@ public function validate(Request $request, $piece)
                 "DO_Date",
                 "DO_DateLivr"
             )
-            ->where('DO_Piece', $id)
+            ->where('DO_Piece', $piece)
             ->firstOrFail();
 
 
@@ -681,9 +691,9 @@ public function validate(Request $request, $piece)
             }
         ])
 
-            ->select("DO_Piece", "AR_Ref", 'DL_Design', 'DL_Qte', "Nom", "Hauteur", "Largeur", "Profondeur", "Langeur", "Couleur", "Chant", "Episseur", "cbMarq", "DL_Ligne", 'Description', "Poignée as Poignee", "Rotation", 'DL_QteBL', 'EU_Qte')
+            ->select("DO_Piece", "AR_Ref", 'DL_Design', 'DL_Qte', "Nom", "Hauteur", "Largeur", "Profondeur", "Langeur", "Couleur", "Chant", "Episseur", "cbMarq", "DL_Ligne", 'Description', "Poignée as Poignee", "Rotation", 'DL_QteBL', 'EU_Qte', 'Line_ID', 'DL_QtePL')
             ->OrderBy("DL_Ligne")
-            ->where('DO_Piece', $id);
+            ->where('DO_Piece', $piece);
 
 
         // Reliqa rest
@@ -715,11 +725,17 @@ public function validate(Request $request, $piece)
             });
         } elseif (array_intersect(['fabrication', 'montage', 'preparation_cuisine', 'preparation_trailer', 'magasinier'], $userRoles)) {
 
-            $docligneQuery->whereHas('line', function ($query) use ($userCompanyId, $userRoleIds) {
+            $docligneQuery->whereHas('line', function ($query) use ($userCompanyId, $userRoleIds, $id) {
+
                 $query->where('company_id', $userCompanyId)
-                    ->where(function ($subQuery) use ($userRoleIds) {
+                    ->where(function ($subQuery) use ($userRoleIds, $id) {
+
                         $subQuery->whereIn('role_id', $userRoleIds)
                             ->orWhereIn('next_role_id', $userRoleIds);
+
+                        if (auth()->user()->hasRole("fabrication")) {
+                            $subQuery->orWhereNotNull('fabricated_by')->where('piece_pl', $id);
+                        }
                     });
             });
         }
@@ -928,7 +944,8 @@ public function validate(Request $request, $piece)
                     'client_id' => $docentete->DO_Tiers,
                     'expedition' => $docentete->DO_Expedit,
                     'urgent' => $request->urgent ?? 0,
-                    'created_at' => now()
+                    'created_at' => now(),
+                    'delivery_date' => $docentete?->DO_DateLivr
                 ]);
             }
 
@@ -971,7 +988,7 @@ public function validate(Request $request, $piece)
                 $urgant_articles = ['AC002001', 'AC002002', 'AC002003', 'AC002004'];
 
 
-                Line::firstOrCreate(
+                $new_line = Line::firstOrCreate(
                     ['docligne_id' => $line->cbMarq],
                     [
                         'tiers' => $line->CT_Num,
@@ -988,9 +1005,16 @@ public function validate(Request $request, $piece)
                         'first_company_id' => $request->company,
                         'document_id' => $document->id,
                         'company_code' => $article?->company_code,
+                        'piece_bc' => $docentete->DO_Piece,
+                        'piece_pl' => $document->piece,
+
                         // 'status_id' => in_array($article->code, $urgant_articles) ? 11 : 1
                     ]
                 );
+
+                $line->update([
+                    'Line_ID' => $new_line->id
+                ]);
             }
 
 
@@ -1004,6 +1028,7 @@ public function validate(Request $request, $piece)
                 foreach ($new_docentete->doclignes as $docligne) {
                     $docligne->update([
                         "DL_QteBL" => $docligne->DL_Qte,
+                        'Line_ID' => $line->id
                     ]);
                 }
 
