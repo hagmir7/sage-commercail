@@ -680,7 +680,7 @@ class DocenteteController extends Controller
 
         $docligneQuery = Docligne::with([
             'article' => function ($query) {
-                $query->select("AR_Ref", "Nom", 'Hauteur', 'Largeur', 'Profonduer', 'Longueur', 'Couleur', 'Chant', 'Episseur', 'Description');
+                $query->select("AR_Ref", "Nom", 'Hauteur', 'Largeur', 'Profonduer', 'Longueur', 'Couleur', 'Chant', 'Episseur', 'Description', 'FA_CodeFamille');
             },
             'line.palettes',
             'line.status',
