@@ -443,7 +443,9 @@ class PurchaseDocumentController extends Controller
                 $request->company_db,
                 $purchaseDocument->planned_at,
                 $purchaseDocument->urgent,
-                $purchaseDocument->user
+                $purchaseDocument->user,
+                 $purchaseDocument->code,
+
             );
 
             $documentArticles = $purchaseDocument->lines->pluck('code');
@@ -550,7 +552,7 @@ class PurchaseDocumentController extends Controller
     }
 
 
-    public function createDocentete(string $DO_Piece, string $DO_Tiers, string $DO_Ref, $DO_Souche, $DO_Devise, $company_db, $planned, $urgent, $user): string
+    public function createDocentete(string $DO_Piece, string $DO_Tiers, string $DO_Ref, $DO_Souche, $DO_Devise, $company_db, $planned, $urgent, $user, $DA_Code): string
     {
         try {
 
@@ -695,6 +697,10 @@ class PurchaseDocumentController extends Controller
 
             if (Schema::connection($company_db)->hasColumn('F_DOCENTETE', 'Priorité')) {
                 $data['Priorité'] = $type;
+            }
+
+            if (Schema::connection($company_db)->hasColumn('F_DOCENTETE', 'DA_Code')) {
+                $data['DA_Code'] = $DA_Code;
             }
 
 
