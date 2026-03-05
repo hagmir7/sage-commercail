@@ -125,7 +125,7 @@ return [
                 PDO::ATTR_EMULATE_PREPARES => true,
             ],
             'date_format' => 'Y-d-m H:i:s.v',
-            'timezone' => 'UTC',
+            'timezone' => 'Africa/Casablanca',
             'dateformat' => '%Y-%m-%d %H:%M:%S',
         ],
 
@@ -150,7 +150,7 @@ return [
                 PDO::ATTR_EMULATE_PREPARES => true,
             ],
             'date_format' => 'Y-d-m H:i:s.v',
-            'timezone' => 'UTC',
+            'timezone' => 'Africa/Casablanca',
             'dateformat' => '%Y-%m-%d %H:%M:%S',
         ],
 
@@ -174,7 +174,7 @@ return [
                 PDO::ATTR_EMULATE_PREPARES => true,
             ],
             'date_format' => 'Y-d-m H:i:s.v',
-            'timezone' => 'UTC',
+            'timezone' => 'Africa/Casablanca',
             'dateformat' => '%Y-%m-%d %H:%M:%S',
         ],
 
@@ -198,7 +198,7 @@ return [
                 PDO::ATTR_EMULATE_PREPARES => true,
             ],
             'date_format' => 'Y-d-m H:i:s.v',
-            'timezone' => 'UTC',
+            'timezone' => 'Africa/Casablanca',
             'dateformat' => '%Y-%m-%d %H:%M:%S',
         ],
 
@@ -223,7 +223,7 @@ return [
                 PDO::ATTR_EMULATE_PREPARES => true,
             ],
             'date_format' => 'Y-d-m H:i:s.v',
-            'timezone' => 'UTC',
+            'timezone' => 'Africa/Casablanca',
             'dateformat' => '%Y-%m-%d %H:%M:%S',
         ],
 

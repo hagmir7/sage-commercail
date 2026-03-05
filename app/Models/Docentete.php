@@ -25,10 +25,16 @@ class Docentete extends Model
     protected function casts(): array
     {
         return [
-            'DO_DateLivr' => 'datetime',
+
             'DO_DateLivrRealisee' => 'datetime',
             'DO_DateExpedition' => 'datetime',
+            // 'DO_DateLivr' => 'date:Y-m-d H:i:s',
         ];
+    }
+
+    public function getDODateLivrAttribute($value)
+    {
+        return $value ? \Carbon\Carbon::parse($value)->format('Y-m-d H:i:s') : null;
     }
 
     // 🔹 Relation with Compte (client/fournisseur)
