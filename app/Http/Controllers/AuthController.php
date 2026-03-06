@@ -6,6 +6,7 @@ namespace App\Http\Controllers;
 use App\Models\Role;
 use App\Models\User;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Validator;
@@ -50,6 +51,36 @@ class AuthController extends Controller
             'token_type' => 'Bearer',
             'user' => $user
         ]);
+    }
+
+    public function loginWeb(Request $request)
+    {
+        $request->validate([
+            'login'    => ['required', 'string'],
+            'password' => ['required'],
+        ]);
+
+        // Determine if input is email or username
+        $field = filter_var($request->login, FILTER_VALIDATE_EMAIL) ? 'email' : 'name';
+
+        $credentials = [
+            $field     => $request->login,
+            'password' => $request->password,
+        ];
+
+        if (Auth::attempt($credentials, $request->boolean('remember'))) {
+            $request->session()->regenerate();
+            return redirect()->intended('/dashboard');
+        }
+
+        return back()->withErrors([
+            'login' => 'These credentials do not match our records.',
+        ])->onlyInput('login');
+    }
+
+    public function showLogin()
+    {
+        return view('login');
     }
 
 

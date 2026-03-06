@@ -1,6 +1,7 @@
 <?php
 
 use App\Exports\StockMovementsExport;
+use App\Http\Controllers\AuthController;
 use App\Http\Controllers\DocenteteController;
 use App\Http\Controllers\SqlEditorController;
 use App\Http\Controllers\UserController;
@@ -13,7 +14,7 @@ Route::get('/', function () {
 });
 
 Route::get('/test/{id}', [DocenteteController::class, 'show']);
-Route::post('login', [UserController::class, 'login'])->name("login");
+// Route::post('login', [UserController::class, 'login'])->name("login");
 
 Route::get('sql-editor', [SqlEditorController::class, 'show'])->name('sql-editor.show');
 Route::post('sql-editor/execute', [SqlEditorController::class, 'execute'])
@@ -24,3 +25,7 @@ Route::post('sql-editor/execute', [SqlEditorController::class, 'execute'])
 
 Route::get('/logs', [LogViewerController::class, 'show'])->name('logs.show');
 Route::delete('/logs/clear', [LogViewerController::class, 'clear'])->name('logs.clear');
+
+
+Route::get('/login', [AuthController::class, 'showLogin'])->name('login');
+Route::post('/login', [AuthController::class, 'loginWeb']);

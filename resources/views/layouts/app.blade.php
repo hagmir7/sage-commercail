@@ -45,18 +45,6 @@
                 <a href="#" class="text-gray-600 hover:text-blue-600 font-medium transition">Dashboard</a>
                 <a href="#" class="text-gray-600 hover:text-blue-600 font-medium transition">Settings</a>
 
-                @auth
-                    <form method="POST" action="{{ route('logout') }}" class="inline">
-                        @csrf
-                        <button type="submit" class="ml-3 bg-red-500 text-white text-sm px-3 py-1.5 rounded hover:bg-red-600 transition">
-                            Logout
-                        </button>
-                    </form>
-                @else
-                    <a href="{{ route('login') }}" class="bg-blue-600 text-white text-sm px-3 py-1.5 rounded hover:bg-blue-700 transition">
-                        Login
-                    </a>
-                @endauth
             </div>
         </div>
     </nav>

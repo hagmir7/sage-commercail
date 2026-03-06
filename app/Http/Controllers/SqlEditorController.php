@@ -11,7 +11,7 @@ class SqlEditorController extends Controller
     public function show()
     {
         // Optional: prevent on production
-        if (!auth()->user()->hasRole('admin')) {
+        if (!auth()?->user()?->hasRole('admin')) {
             abort(403, 'SQL editor disabled on production.');
         }
 
@@ -20,7 +20,7 @@ class SqlEditorController extends Controller
 
     public function execute(Request $request)
     {
-        if (!auth()->user()->hasRole('admin')) {
+        if (!auth()?->user()?->hasRole('admin')) {
             return back()->withErrors(['env' => 'SQL editor disabled on production.']);
         }
 
