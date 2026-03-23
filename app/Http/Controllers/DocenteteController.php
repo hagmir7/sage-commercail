@@ -649,6 +649,8 @@ class DocenteteController extends Controller
 
     public function show($id)
     {
+
+
         $user = auth()->user();
         $userCompanyId = $user->company_id;
         $userRoles = $user->roles()->pluck('name')->toArray();
@@ -659,7 +661,9 @@ class DocenteteController extends Controller
         
         $piece = $doc?->lines->first()?->docligne?->DO_Piece ?? $id;
 
-        $docentete = Docentete::with(['document.status', 'document.companies', 'document.palettes'])
+
+        try {
+             $docentete = Docentete::with(['document.status', 'document.companies', 'document.palettes'])
             ->select(
                 "DO_Piece",
                 "DO_Ref",
@@ -672,33 +676,36 @@ class DocenteteController extends Controller
                 "DO_DateLivr"
             )
             ->where('DO_Piece', $piece)
-            ->firstOrFail();
-
-
-
-
+            ->first();
+        } catch (\Throwable $th) {
+            $docentete = null;
+        }
+       
 
         $docligneQuery = Docligne::with([
-            'article' => function ($query) {
-                $query->select("AR_Ref", "Nom", 'Hauteur', 'Largeur', 'Profonduer', 'Longueur', 'Couleur', 'Chant', 'Episseur', 'Description', 'FA_CodeFamille');
-            },
-            'line.palettes',
-            'line.status',
-            'line.role',
-            'line.roleQuantity',
-            'stock' => function ($query) {
-                $query->select('code', 'qte_inter', 'qte_serie', 'code_supplier');
-            }
-        ])
-
+                'article' => function ($query) {
+                    $query->select("AR_Ref", "Nom", 'Hauteur', 'Largeur', 'Profonduer', 'Longueur', 'Couleur', 'Chant', 'Episseur', 'Description', 'FA_CodeFamille');
+                },
+                'line.palettes',
+                'line.status',
+                'line.role',
+                'line.roleQuantity',
+                'stock' => function ($query) {
+                    $query->select('code', 'qte_inter', 'qte_serie', 'code_supplier');
+                }
+            ])
             ->select("DO_Piece", "AR_Ref", 'DL_Design', 'DL_Qte', "Nom", "Hauteur", "Largeur", "Profondeur", "Langeur", "Couleur", "Chant", "Episseur", "cbMarq", "DL_Ligne", 'Description', "Poignée as Poignee", "Rotation", 'DL_QteBL', 'EU_Qte', 'Line_ID', 'DL_QtePL')
-            ->OrderBy("DL_Ligne")
-            ->where('DO_Piece', $piece);
+            ->orderBy("DL_Ligne")
+            ->where(function ($q) use ($piece) {
+                $q->where('DO_Piece', $piece)
+                ->orWhere('DL_PiecePL', $piece);
+            });
+                
 
 
         // Reliqa rest
         DB::transaction(function () use ($docentete, $docligneQuery) {
-            if ($docentete->DO_Reliquat == "1") {
+            if ($docentete?->DO_Reliquat == "1") {
                 foreach ($docligneQuery->get() as $docligne) {
                     $prepared = (float) ($docligne->line->quantity_prepare ?? 0);
                     $delivered = (float) ($docligne->DL_QtePL ?? 0);

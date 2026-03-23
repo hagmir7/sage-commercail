@@ -469,6 +469,10 @@ class ArticleStockController extends Controller
             ->join('article_palette as ap', 'ap.palette_id', '=', 'p.id')
             ->join('article_stocks as a', 'a.id', '=', 'ap.article_stock_id')
             ->join('depots as d', 'd.id', '=', 'e.depot_id')
+            ->leftJoin('emplacement_limit as el', function ($join) {
+                $join->on('el.emplacement_id', '=', 'e.id')
+                    ->on('el.article_stock_id', '=', 'a.id');
+            })
             ->select([
                 'e.id as emplacement_id',
                 'e.code as emplacement_code',
@@ -476,7 +480,7 @@ class ArticleStockController extends Controller
                 'a.id as article_stock_id',
                 'a.code as article_code',
                 'a.code_supplier',
-                'a.category', // STRING
+                'a.category',
                 'a.name',
                 'a.description',
                 'a.width',
@@ -484,8 +488,10 @@ class ArticleStockController extends Controller
                 'a.depth',
                 'a.thickness',
 
-                DB::raw('SUM(ap.quantity) as total_quantity')
+                DB::raw('SUM(ap.quantity) as total_quantity'),
+                'el.quantity as quantity_limit',
             ])
+            ->where('category', '=', 'semi-fini')
             ->groupBy(
                 'e.id',
                 'e.code',
@@ -498,7 +504,8 @@ class ArticleStockController extends Controller
                 'a.width',
                 'a.height',
                 'a.depth',
-                'a.thickness'
+                'a.thickness',
+                'el.quantity'
             );
 
         /* =======================
@@ -536,7 +543,7 @@ class ArticleStockController extends Controller
         return $query
             ->orderBy('e.code')
             ->orderBy('a.code')
-            ->paginate(100);
+            ->paginate(200);
     }
 
 }
