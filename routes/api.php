@@ -14,6 +14,7 @@ use App\Http\Controllers\InventoryController;
 use App\Http\Controllers\InventoryExportController;
 use App\Http\Controllers\InventoryMovementController;
 use App\Http\Controllers\LineController;
+use App\Http\Controllers\OfController;
 use App\Http\Controllers\PaletteController;
 use App\Http\Controllers\PermissionController;
 use App\Http\Controllers\PurchaseController;
@@ -182,6 +183,9 @@ Route::middleware('auth:sanctum')->group(function () {
     });
 
 
+    Route::apiResource('ordres-fabrication', OfController::class);
+
+
     Route::prefix('emplacement')->controller(EmplacementController::class)->group(function () {
         Route::get('{code}/articles', 'articles');
         Route::post('create', 'create');
@@ -296,6 +300,8 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('{inventory}/depot/{depot}', 'depotEmplacements');
         Route::get("{inventory}", 'show');
     });
+
+    
 
    
 

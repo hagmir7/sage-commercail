@@ -7,6 +7,7 @@ use App\Imports\ArticleStockImport;
 use App\Models\ArticleStock;
 use App\Models\Docligne;
 use App\Models\Emplacement;
+use App\Models\EmplacementLimit;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
@@ -52,6 +53,7 @@ class ArticleStockController extends Controller
             $article->stock_prepare    = $this->calculateStockPreparation($article->code);
             $article->stock_prepartion = $this->calculateZoonPrepartion($article->code);
             $article->stock            = $this->calculateStock($article->code, $company);
+            $article->max            = $this->calculateLimit($article->id);
 
             return $article;
         });
@@ -97,6 +99,12 @@ class ArticleStockController extends Controller
         }
 
         return $query->sum('article_palette.quantity');
+    }
+
+    public function calculateLimit($article_id)
+    {
+        return EmplacementLimit::where('article_stock_id', $article_id)
+            ->sum('quantity');
     }
 
 
