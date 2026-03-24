@@ -28,7 +28,7 @@ class Of extends Model
         return $this->hasMany(OfLine::class, 'of_id');
     }
 
-    public function createdBy()
+    public function user()
     {
         return $this->belongsTo(User::class, 'user_id');
     }

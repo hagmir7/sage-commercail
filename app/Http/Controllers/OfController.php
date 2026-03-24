@@ -6,7 +6,7 @@ use App\Models\Of;
 use App\Models\OfLine;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Str;
+use Carbon\Carbon;
 
 class OfController extends Controller
 {
@@ -59,11 +59,33 @@ class OfController extends Controller
         }
     }
 
-    public function index()
+    public function index(Request $request)
     {
-        $ofs = Of::with(['lines.article'])->latest()->paginate(20);
-        return response()->json($ofs);
+        $query = Of::with(['lines.article', 'user'])->latest();
+
+        // Search by reference
+        if ($request->filled('reference')) {
+            $query->where('reference', 'like', '%' . $request->reference . '%');
+        }
+
+        // Filter by statut
+
+    
+        if ($request->filled('statut')) {
+            $query->where('statut', $request->statut);
+        }
+
+        // Filter by date range (date_lancement)
+        if ($request->filled('date_debut') && $request->filled('date_fin')) {
+            $query->whereBetween('date_lancement', [
+                $request->date_debut,
+                $request->date_fin,
+            ]);
+        }
+
+        return response()->json($query->paginate(20));
     }
+
 
     public function show($id)
     {
@@ -94,6 +116,6 @@ class OfController extends Controller
             'statut' => $request->statut
         ]);
 
-        return response()->json(['message' => 'OF mis à jour33', 'of' => $of]);
+        return response()->json(['message' => 'OF mis à jour', 'of' => $of]);
     }
 }
