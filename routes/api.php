@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\MachineController;
 use App\Http\Controllers\CompanyController;
 use App\Http\Controllers\ArticleStockController;
 use App\Http\Controllers\ArticleController;
@@ -181,6 +182,12 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('documents', 'documents');
         Route::get('documents/{piece}', 'showDocument');
     });
+
+
+    Route::prefix('machines')->controller(MachineController::class)->group(function () {
+        Route::get('', 'index');
+    });
+
 
 
     Route::apiResource('ordres-fabrication', OfController::class);
