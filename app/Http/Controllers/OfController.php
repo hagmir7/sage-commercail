@@ -14,7 +14,7 @@ class OfController extends Controller
     {
         $request->validate([
             'date_lancement'    => 'required|date',
-            'date_demarrage'    => 'required|date',
+            'date_demarrage'    => 'date',
             'reference_machine' => 'nullable|string|max:100',
             'type_commande'     => 'required|in:standard,speciale',
             'articles'          => 'required|array|min:1',

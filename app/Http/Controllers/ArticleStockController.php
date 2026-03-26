@@ -20,63 +20,115 @@ class ArticleStockController extends Controller
      *
      * @return \Illuminate\Http\Response
      */
-    public function index(Request $request)
-    {
-        $query = ArticleStock::query();
-
-        // Apply category filter only if not "tout"
-        if ($request->filled('category') && $request->category !== 'tout') {
-            $query->where('category', $request->category);
-        }
-
-        $company = null;
-        if ($request->filled('company')) {
-            $company = $request->company;
-        }
-
-        if ($request->filled('search')) {
-            $search = $request->search;
-            $query->where(function ($q) use ($search) {
-                $q->where('code', 'like', "%{$search}%")
+public function index(Request $request)
+{
+    $query = ArticleStock::query();
+ 
+    // ── Category ──────────────────────────────────────────────────────────────
+    if ($request->filled('category') && $request->category !== 'tout') {
+        $query->where('category', $request->category);
+    }
+ 
+    // ── Color ─────────────────────────────────────────────────────────────────
+    if ($request->filled('color') && $request->color !== 'tout') {
+        $query->where('color', $request->color);
+    }
+ 
+    // ── Company ───────────────────────────────────────────────────────────────
+    $company = null;
+    if ($request->filled('company')) {
+        $company = $request->company;
+    }
+ 
+    // ── Search ────────────────────────────────────────────────────────────────
+    if ($request->filled('search')) {
+        $search = $request->search;
+        $query->where(function ($q) use ($search) {
+            $q->where('code', 'like', "%{$search}%")
                 ->orWhere('name', 'like', "%{$search}%")
                 ->orWhere('description', 'like', "%{$search}%")
                 ->orWhere('color', 'like', "%{$search}%");
-            });
-        }
-
-        // Pagination
-        $perPage = $request->get('per_page', 100);
-        $articles = $query->paginate($perPage);
-
-        // Map stock quantities
-        $articles->getCollection()->transform(function ($article) use ($company) {
-            $article->stock_prepare    = $this->calculateStockPreparation($article->code);
-            $article->stock_prepartion = $this->calculateZoonPrepartion($article->code);
-            $article->stock            = $this->calculateStock($article->code, $company);
-            $article->max            = $this->calculateLimit($article->id);
-
-            return $article;
         });
-
-        return response()->json($articles);
     }
-
-
-    public function list(Request $request)
-    {
-        $query = ArticleStock::query();
-
-        if ($request->filled('search')) {
-            $search = $request->search;
-
-            $query->where(function ($q) use ($search) {
-                $q->where('description', 'like', "%{$search}%")
+ 
+    // ── Sort (columns that exist on the model) ────────────────────────────────
+    $allowedSorts = ['code', 'name', 'stock_min'];
+    $sortBy    = $request->get('sort_by', 'code');
+    $sortOrder = $request->get('sort_order', 'asc') === 'desc' ? 'desc' : 'asc';
+ 
+    if (in_array($sortBy, $allowedSorts)) {
+        $query->orderBy($sortBy, $sortOrder);
+    }
+ 
+    // ── Pagination ────────────────────────────────────────────────────────────
+    $perPage  = $request->get('per_page', 100);
+    $articles = $query->paginate($perPage);
+ 
+    // ── Enrich with computed fields ───────────────────────────────────────────
+    $articles->getCollection()->transform(function ($article) use ($company) {
+        $article->stock_prepare    = $this->calculateStockPreparation($article->code);
+        $article->stock_prepartion = $this->calculateZoonPrepartion($article->code);
+        $article->stock            = $this->calculateStock($article->code, $company);
+        $article->max              = $this->calculateLimit($article->id);
+ 
+        // Computed helpers consumed by the frontend
+        $stock   = floor($article->stock * 100) / 100;
+        $max     = (float) $article->max;
+        $min     = (float) $article->stock_min;
+        $moyenne = $max / 2;
+ 
+        if ($stock < $min)                      $article->urgency_level = 1;
+        elseif ($stock >= $min && $stock < $moyenne) $article->urgency_level = 2;
+        elseif ($stock >= $moyenne && $stock < $max)  $article->urgency_level = 3;
+        else                                          $article->urgency_level = 4;
+ 
+        $article->ecart = $max - $stock;
+ 
+        return $article;
+    });
+ 
+    // ── Post-pagination sort for computed fields ──────────────────────────────
+    // (urgency_level, stock, ecart are not DB columns — sort in memory after enrichment)
+    $computedSorts = ['urgency_level', 'stock', 'ecart'];
+ 
+    if (in_array($sortBy, $computedSorts)) {
+        $sorted = $articles->getCollection()->sortBy(
+            fn ($a) => $a->{$sortBy},
+            SORT_REGULAR,
+            $sortOrder === 'desc'
+        )->values();
+ 
+        $articles->setCollection($sorted);
+    }
+ 
+    // ── Urgency filter (post-enrichment) ──────────────────────────────────────
+    if ($request->filled('urgency') && $request->urgency !== 'tout') {
+        $level   = (int) $request->urgency;   // 1 | 2 | 3 | 4
+        $filtered = $articles->getCollection()->filter(
+            fn ($a) => $a->urgency_level === $level
+        )->values();
+ 
+        $articles->setCollection($filtered);
+    }
+ 
+    return response()->json($articles);
+}
+ 
+ 
+public function list(Request $request)
+{
+    $query = ArticleStock::query();
+ 
+    if ($request->filled('search')) {
+        $search = $request->search;
+        $query->where(function ($q) use ($search) {
+            $q->where('description', 'like', "%{$search}%")
                 ->orWhere('code', 'like', "%{$search}%");
-            });
-        }
-
-        return $query->paginate(50);
+        });
     }
+ 
+    return $query->paginate(50);
+}
 
 
 

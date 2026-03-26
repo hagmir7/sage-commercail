@@ -11,6 +11,7 @@ use App\Http\Controllers\DeviseController;
 use App\Http\Controllers\DocenteteController;
 use App\Http\Controllers\DocumentController;
 use App\Http\Controllers\EmplacementController;
+use App\Http\Controllers\EmplacementLimitController;
 use App\Http\Controllers\InventoryController;
 use App\Http\Controllers\InventoryExportController;
 use App\Http\Controllers\InventoryMovementController;
@@ -155,6 +156,8 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/roles', [RoleController::class, 'index']);
     Route::post('/roles', [RoleController::class, 'store']);
     Route::get('/roles/permissions/{roleName}', [RoleController::class, 'permissions']);
+
+    Route::post('/import-emplacement-limit', [EmplacementLimitController::class, 'import']);
 
     // Permissions
     Route::get('/permissions', [PermissionController::class, 'index']);

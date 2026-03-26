@@ -21,6 +21,7 @@ class Emplacement extends Model
     }
 
 
+
     public function depot()
     {
         return $this->belongsTo(Depot::class, 'depot_id');
