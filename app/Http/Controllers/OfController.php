@@ -20,7 +20,7 @@ class OfController extends Controller
             'articles'          => 'required|array|min:1',
             'articles.*.id'     => 'required|integer',
             'articles.*.code'   => 'required|string',
-            'articles.*.qte'    => 'required|numeric|min:0',
+            'articles.*.qte'    => 'required|numeric',
         ]);
 
         DB::beginTransaction();
