@@ -157,7 +157,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/roles', [RoleController::class, 'store']);
     Route::get('/roles/permissions/{roleName}', [RoleController::class, 'permissions']);
 
-    Route::post('/import-emplacement-limit', [EmplacementLimitController::class, 'import']);
+
 
     // Permissions
     Route::get('/permissions', [PermissionController::class, 'index']);
@@ -246,7 +246,10 @@ Route::middleware('auth:sanctum')->group(function () {
     });
 
 
-    
+    Route::get('emplacement-limit', [EmplacementLimitController::class, 'index']);
+    Route::post('emplacement-limits', [EmplacementLimitController::class, 'store']);
+    Route::put('emplacement-limits', [EmplacementLimitController::class, 'update']);
+    Route::post('/import-emplacement-limit', [EmplacementLimitController::class, 'import']);
 
 
     Route::prefix('lines')->controller(LineController::class)->group(function () {
