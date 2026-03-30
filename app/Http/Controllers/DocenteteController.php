@@ -183,17 +183,17 @@ class DocenteteController extends Controller
     }
 
 
-
     public function start(Request $request)
     {
+        \Log::alert($request->complation_date);
 
         $validator = Validator::make(
             $request->all(),
             [
-                'complation_date'  => "required",
+                'complation_date' => "required",
                 'lines' => 'required|array'
             ],
-            [], // messages (empty if you just want custom names)
+            [],
             [
                 'complation_date' => 'date de complétion',
                 'lines' => 'lignes',
@@ -209,29 +209,49 @@ class DocenteteController extends Controller
 
         $user = auth()->user();
 
-        if ($user->hasRole("fabrication") ||  $user->hasRole("montage")) {
-            foreach ($request->lines as $line) {
-                $line = Line::find($line);
-
-                $line->update([
-                    'complation_date' => $request->complation_date,
-                    'status_id' => $user->hasRole("fabrication") ? 3 : 5
-                ]);
-
-                Action::create([
-                    'user_id' => auth()->id(),
-                    'action_type_id' =>  $user->hasRole("fabrication") ? 4 : 5,
-                    'line_id' => $line->id,
-                    'description' => "Fabrication",
-                    'start' => now(),
-                ]);
-            }
-            return response()->json(['message' => "Date updated successfully"]);
+        if (!($user->hasRole("fabrication") || $user->hasRole("montage"))) {
+            return response()->json(['error' => "You have no access"], 500);
         }
 
-        return response()->json(['error' => "Your Have no access"], 500);
-    }
+        // 🔥 Get all lines with documents
+        $lines = Line::whereIn('id', $request->lines)
+            ->with('document')
+            ->get();
 
+        if ($lines->isEmpty()) {
+            return response()->json(['error' => 'No lines found'], 404);
+        }
+
+        // 🔥 Update each document ONLY ONCE
+        $documents = $lines->pluck('document')->filter()->unique('id');
+
+        foreach ($documents as $document) {
+            $document->update([
+                'complation_date' => $request->complation_date
+            ]);
+        }
+
+        // 🔥 Update each line + actions
+        foreach ($lines as $line) {
+
+            $line->update([
+                'complation_date' => $request->complation_date,
+                'status_id' => $user->hasRole("fabrication") ? 3 : 5
+            ]);
+
+            Action::create([
+                'user_id' => auth()->id(),
+                'action_type_id' => $user->hasRole("fabrication") ? 4 : 5,
+                'line_id' => $line->id,
+                'description' => "Fabrication",
+                'start' => now(),
+            ]);
+        }
+
+        return response()->json([
+            'message' => "Date updated successfully"
+        ]);
+    }
 
     public function commercial(Request $request)
     {
@@ -658,49 +678,49 @@ class DocenteteController extends Controller
 
 
         $doc = Document::where('piece', $id)->first();
-        
+
         $piece = $doc?->lines->first()?->docligne?->DO_Piece ?? $id;
 
 
         try {
-             $docentete = Docentete::with(['document.status', 'document.companies', 'document.palettes'])
-            ->select(
-                "DO_Piece",
-                "DO_Ref",
-                "DO_Tiers",
-                "DO_Expedit",
-                "cbMarq",
-                "Type",
-                "DO_Reliquat",
-                "DO_Date",
-                "DO_DateLivr"
-            )
-            ->where('DO_Piece', $piece)
-            ->first();
+            $docentete = Docentete::with(['document.status', 'document.companies', 'document.palettes'])
+                ->select(
+                    "DO_Piece",
+                    "DO_Ref",
+                    "DO_Tiers",
+                    "DO_Expedit",
+                    "cbMarq",
+                    "Type",
+                    "DO_Reliquat",
+                    "DO_Date",
+                    "DO_DateLivr"
+                )
+                ->where('DO_Piece', $piece)
+                ->first();
         } catch (\Throwable $th) {
             $docentete = null;
         }
-       
+
 
         $docligneQuery = Docligne::with([
-                'article' => function ($query) {
-                    $query->select("AR_Ref", "Nom", 'Hauteur', 'Largeur', 'Profonduer', 'Longueur', 'Couleur', 'Chant', 'Episseur', 'Description', 'FA_CodeFamille');
-                },
-                'line.palettes',
-                'line.status',
-                'line.role',
-                'line.roleQuantity',
-                'stock' => function ($query) {
-                    $query->select('code', 'qte_inter', 'qte_serie', 'code_supplier');
-                }
-            ])
+            'article' => function ($query) {
+                $query->select("AR_Ref", "Nom", 'Hauteur', 'Largeur', 'Profonduer', 'Longueur', 'Couleur', 'Chant', 'Episseur', 'Description', 'FA_CodeFamille');
+            },
+            'line.palettes',
+            'line.status',
+            'line.role',
+            'line.roleQuantity',
+            'stock' => function ($query) {
+                $query->select('code', 'qte_inter', 'qte_serie', 'code_supplier');
+            }
+        ])
             ->select("DO_Piece", "AR_Ref", 'DL_Design', 'DL_Qte', "Nom", "Hauteur", "Largeur", "Profondeur", "Langeur", "Couleur", "Chant", "Episseur", "cbMarq", "DL_Ligne", 'Description', "Poignée as Poignee", "Rotation", 'DL_QteBL', 'EU_Qte', 'Line_ID', 'DL_QtePL')
             ->orderBy("DL_Ligne")
             ->where(function ($q) use ($piece) {
                 $q->where('DO_Piece', $piece)
-                ->orWhere('DL_PiecePL', $piece);
+                    ->orWhere('DL_PiecePL', $piece);
             });
-                
+
 
 
         // Reliqa rest
@@ -797,6 +817,24 @@ class DocenteteController extends Controller
     }
 
 
+    private function generateFabricationCode()
+    {
+        $lastCode = Document::whereNotNull('code')
+            ->where('code', 'like', 'BPS%')
+            ->orderByDesc('code')
+            ->value('code');
+
+        if (!$lastCode) {
+            return 'BPS00001';
+        }
+
+        $number = (int) substr($lastCode, 3);
+        $nextNumber = $number + 1;
+
+        return 'BPS' . str_pad($nextNumber, 5, '0', STR_PAD_LEFT);
+    }
+
+
 
     // Transfer to Role (Fabrication, Montage, Preparation)
     public function roleTransfer($request)
@@ -862,6 +900,25 @@ class DocenteteController extends Controller
                     'next_role_id' => $next_role,
                 ];
                 $line->update($updateData);
+            }
+
+            if ($lines->isNotEmpty()) {
+                $document = $lines->first()->document;
+
+                // ✅ Generate code only if role is fabrication AND no code exists
+                if ($role->name === 'fabrication' && empty($document->code)) {
+                    $document->code = $this->generateFabricationCode();
+                }
+
+                $document->update([
+                    'status_id' => $status == 7 ? 7 : 2,
+                    'code' => $document->code, // ensure it's saved
+                ]);
+
+                $document->companies()->updateExistingPivot(auth()->user()->company_id, [
+                    'status_id' => $status,
+                    'updated_at' => now(),
+                ]);
             }
 
             DB::commit();
@@ -952,6 +1009,7 @@ class DocenteteController extends Controller
                     'expedition' => $docentete->DO_Expedit,
                     'urgent' => $request->urgent ?? 0,
                     'created_at' => now(),
+                    'status_id' => 1,
                     'delivery_date' => $docentete?->DO_DateLivr
                 ]);
             }
@@ -1014,6 +1072,8 @@ class DocenteteController extends Controller
                         'company_code' => $article?->company_code,
                         'piece_bc' => $docentete->DO_Piece,
                         'piece_pl' => $document->piece,
+                        'status_id' => 1,
+
 
                         // 'status_id' => in_array($article->code, $urgant_articles) ? 11 : 1
                     ]

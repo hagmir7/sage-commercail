@@ -26,7 +26,9 @@ class Document extends Model
         'user_id',
         'urgent',
         'delivery_date',
-        'created_at'
+        'created_at',
+        'complation_date',
+        'date'
     ];
 
     // protected $dateFormat = 'Y-d-m H:i:s.v';

@@ -17,8 +17,7 @@ class EmplacementLimitController extends Controller
     public function index(Request $request)
     {
         $query = EmplacementLimit::with(['emplacement', 'article']);
-
-        // Search across article and emplacement fields
+        
         if ($request->filled('search')) {
             $search = $request->search;
             $query->where(function ($q) use ($search) {

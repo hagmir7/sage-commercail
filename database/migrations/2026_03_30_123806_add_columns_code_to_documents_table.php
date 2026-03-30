@@ -12,7 +12,8 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('documents', function (Blueprint $table) {
-            //
+            $table->string('code')->nullable();
+            $table->date('complation_date')->nullable();
         });
     }
 
@@ -22,7 +23,8 @@ return new class extends Migration
     public function down(): void
     {
         Schema::table('documents', function (Blueprint $table) {
-            //
+            $table->dropColumn('code');
+            $table->dropColumn('complation_date');
         });
     }
 };
