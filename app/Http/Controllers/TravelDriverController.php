@@ -7,6 +7,8 @@ use App\Models\TravelReception;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\DB;
+use App\Exports\TravelReceptionExport;
+use Maatwebsite\Excel\Facades\Excel;
 
 class TravelDriverController extends Controller
 {
@@ -59,8 +61,10 @@ class TravelDriverController extends Controller
             'cin'         => 'required|string|max:20|unique:travel_drivers,cin',
             'code'        => 'nullable|string',
             'travel_code' => 'nullable|string',
-            'company_id'  => 'nullable|numeric',   // ← was 'integer', strings like "12" fail integer rule
+            'company_id'  => 'nullable|numeric',
         ]);
+
+        
         DB::beginTransaction();
 
         try {
@@ -120,5 +124,10 @@ class TravelDriverController extends Controller
         return response()->json(
             $query->paginate($request->per_page ?? 30)
         );
+    }
+
+    public function export()
+    {
+        return Excel::download(new TravelReceptionExport, 'receptions.xlsx');
     }
 }

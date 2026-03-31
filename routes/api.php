@@ -60,7 +60,7 @@ Route::get('check-cin',       [TravelDriverController::class, 'checkCIN']);
 Route::post('travel-receptions', [TravelDriverController::class, 'storeReception']);
 Route::post('travel-drivers',    [TravelDriverController::class, 'storeDriverAndReception']);
 Route::get('travel-receptions', [TravelDriverController::class, 'index']);
-
+Route::get('travel-receptions/export', [TravelDriverController::class, 'export']);
 
 Route::get('/download/purchase-file/{id}', [PurchaseDocumentController::class, 'download'])
     ->name('purchase.file.download');
