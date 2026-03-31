@@ -31,11 +31,13 @@ use App\Http\Controllers\ServiceController;
 use App\Http\Controllers\StockMovementController;
 use App\Http\Controllers\SupplierInterviewController;
 use App\Http\Controllers\TransferController;
+use App\Http\Controllers\TravelDriverController;
 use App\Http\Controllers\UnitController;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\UserPermissionController;
 use App\Http\Controllers\WhatsappController;
 use App\Imports\MovementImport;
+use App\Models\TravelDriver;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -54,6 +56,10 @@ Route::get('login', function(){
 })->name('login');
 
 
+Route::get('check-cin',       [TravelDriverController::class, 'checkCIN']);
+Route::post('travel-receptions', [TravelDriverController::class, 'storeReception']);
+Route::post('travel-drivers',    [TravelDriverController::class, 'storeDriverAndReception']);
+Route::get('travel-receptions', [TravelDriverController::class, 'index']);
 
 
 Route::get('/download/purchase-file/{id}', [PurchaseDocumentController::class, 'download'])
