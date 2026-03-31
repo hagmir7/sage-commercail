@@ -21,154 +21,152 @@ class ArticleStockController extends Controller
      *
      * @return \Illuminate\Http\Response
      */
-    public function index(Request $request)
-    {
-        $query = ArticleStock::query();
+public function index(Request $request)
+{
+    $query = ArticleStock::query();
 
-        // ── Filters ───────────────────────────────────────────────────────────────
-        if ($request->filled('category') && $request->category !== 'tout') {
-            $query->where('category', $request->category);
-        }
-        if ($request->filled('color') && $request->color !== 'tout') {
-            $query->where('color', $request->color);
-        }
-        if ($request->filled('search')) {
-            $search = $request->search;
-            $query->where(function ($q) use ($search) {
-                $q->where('code', 'like', "%{$search}%")
-                    ->orWhere('name', 'like', "%{$search}%")
-                    ->orWhere('description', 'like', "%{$search}%")
-                    ->orWhere('color', 'like', "%{$search}%");
-            });
-        }
-
-        // ── DB-level sort ─────────────────────────────────────────────────────────
-        $allowedDbSorts = ['code', 'name', 'stock_min'];
-        $computedSorts  = ['urgency_level', 'stock', 'ecart'];
-        $sortBy         = $request->get('sort_by', 'code');
-        $sortOrder      = $request->get('sort_order', 'asc') === 'desc' ? 'desc' : 'asc';
-
-        if (in_array($sortBy, $allowedDbSorts)) {
-            $query->orderBy($sortBy, $sortOrder);
-        }
-
-        $company = $request->filled('company') ? $request->company : null;
-
-        // ── Fetch ALL records ─────────────────────────────────────────────────────
-        $all = $query->get();
-        $codes = $all->pluck('code')->all();
-        $ids   = $all->pluck('id')->all();
-
-        // ══════════════════════════════════════════════════════════════════════════
-        // BATCH QUERY 1 — Stock per article (replaces calculateStock loop)
-        // ══════════════════════════════════════════════════════════════════════════
-        $stockQuery = DB::table('article_palette as ap')
-            ->join('palettes as p', 'p.id', '=', 'ap.palette_id')
-            ->join('article_stocks as a', 'a.code', '=', DB::raw('ap.ref_article')) // adjust FK if needed
-            ->where('p.type', 'Stock')
-            ->whereNotExists(function ($q) {
-                $q->select(DB::raw(1))
-                    ->from('emplacements as e')
-                    ->whereColumn('e.id', 'p.emplacement_id')
-                    ->whereIn('e.code', ['K-3P', 'K-4P', 'K-4SP', 'K-3SP']);
-            })
-            ->whereIn('a.code', $codes);
-
-        if ($company) {
-            $stockQuery->where('p.company_id', $company);
-        }
-
-        $stockMap = $stockQuery
-            ->groupBy('a.code')
-            ->select('a.code', DB::raw('SUM(ap.quantity) as total'))
-            ->pluck('total', 'a.code');
-
-        // ══════════════════════════════════════════════════════════════════════════
-        // BATCH QUERY 2 — EmplacementLimit totals (replaces calculateLimit loop)
-        // ══════════════════════════════════════════════════════════════════════════
-        $limitMap = EmplacementLimit::whereIn('article_stock_id', $ids)
-            ->groupBy('article_stock_id')
-            ->selectRaw('article_stock_id, SUM(quantity) as total')
-            ->pluck('total', 'article_stock_id');
-
-        // ══════════════════════════════════════════════════════════════════════════
-        // BATCH QUERY 3 — Stock preparation (replaces calculateStockPreparation loop)
-        // ══════════════════════════════════════════════════════════════════════════
-        $prepMap = Docligne::whereIn('AR_Ref', $codes)
-            ->whereIn('DO_Type', [1, 2, 3])
-            ->whereColumn('DL_Qte', '>', 'DL_QteBL')
-            ->groupBy('AR_Ref')
-            ->selectRaw('AR_Ref, SUM(DL_Qte) as total')
-            ->pluck('total', 'AR_Ref');
-
-        // ══════════════════════════════════════════════════════════════════════════
-        // BATCH QUERY 4 — Zone preparation (replaces calculateZoonPrepartion loop)
-        // ══════════════════════════════════════════════════════════════════════════
-        $zoneMap = Docligne::whereIn('AR_Ref', $codes)
-            ->whereIn('DO_Type', [1, 2, 3])
-            ->groupBy('AR_Ref')
-            ->selectRaw('AR_Ref, SUM(DL_QteBL) as total')
-            ->pluck('total', 'AR_Ref');
-
-        // ══════════════════════════════════════════════════════════════════════════
-        // ENRICH — O(n) map lookups, zero extra queries
-        // ══════════════════════════════════════════════════════════════════════════
-        $all->transform(function ($article) use ($stockMap, $limitMap, $prepMap, $zoneMap) {
-            $article->stock_prepare    = (float) ($prepMap[$article->code]  ?? 0);
-            $article->stock_prepartion = (float) ($zoneMap[$article->code]  ?? 0);
-            $article->stock            = (float) ($stockMap[$article->code] ?? 0);
-            $article->max              = (float) ($limitMap[$article->id]   ?? 0);
-
-            $stock   = floor($article->stock * 100) / 100;
-            $max     = $article->max;
-            $min     = (float) $article->stock_min;
-            $moyenne = $max / 2;
-
-            $article->urgency_level = match (true) {
-                $stock < $min                           => 1,
-                $stock >= $min && $stock < $moyenne     => 2,
-                $stock >= $moyenne && $stock < $max     => 3,
-                default                                 => 4,
-            };
-
-            $article->ecart = $max - $stock;
-
-            return $article;
+    // ── Filters ───────────────────────────────────────────────────────────────
+    if ($request->filled('category') && $request->category !== 'tout') {
+        $query->where('category', $request->category);
+    }
+    if ($request->filled('color') && $request->color !== 'tout') {
+        $query->where('color', $request->color);
+    }
+    if ($request->filled('search')) {
+        $search = $request->search;
+        $query->where(function ($q) use ($search) {
+            $q->where('code', 'like', "%{$search}%")
+              ->orWhere('name', 'like', "%{$search}%")
+              ->orWhere('description', 'like', "%{$search}%")
+              ->orWhere('color', 'like', "%{$search}%");
         });
-
-        // ── Sort by computed field ────────────────────────────────────────────────
-        if (in_array($sortBy, $computedSorts)) {
-            $all = $all->sortBy(
-                fn($a) => $a->{$sortBy},
-                SORT_REGULAR,
-                $sortOrder === 'desc'
-            )->values();
-        }
-
-        // ── Urgency filter ────────────────────────────────────────────────────────
-        if ($request->filled('urgency') && $request->urgency !== 'tout') {
-            $level = (int) $request->urgency;
-            $all   = $all->filter(fn($a) => $a->urgency_level === $level)->values();
-        }
-
-        // ── Manual pagination ─────────────────────────────────────────────────────
-        $perPage     = (int) $request->get('per_page', 100);
-        $currentPage = (int) $request->get('page', 1);
-        $total       = $all->count();
-
-        $pageItems = $all->slice(($currentPage - 1) * $perPage, $perPage)->values();
-
-        $paginator = new LengthAwarePaginator(
-            $pageItems,
-            $total,
-            $perPage,
-            $currentPage,
-            ['path' => $request->url(), 'query' => $request->query()]
-        );
-
-        return response()->json($paginator);
     }
 
+    // ── DB-level sort (only for real DB columns) ──────────────────────────────
+    $allowedDbSorts = ['code', 'name', 'stock_min'];
+    $computedSorts  = ['urgency_level', 'stock', 'ecart'];
+    $sortBy         = $request->get('sort_by', 'code');
+    $sortOrder      = $request->get('sort_order', 'asc') === 'desc' ? 'desc' : 'asc';
+
+    if (in_array($sortBy, $allowedDbSorts)) {
+        $query->orderBy($sortBy, $sortOrder);
+    }
+
+    $company = $request->filled('company') ? $request->company : null;
+
+    // ── Fetch ALL matching records (no paginate yet) ──────────────────────────
+    $all  = $query->get();
+    $ids  = $all->pluck('id')->all();
+    $codes = $all->pluck('code')->all();
+
+    // ══════════════════════════════════════════════════════════════════════════
+    // BATCH QUERY 1 — Stock per article
+    // ══════════════════════════════════════════════════════════════════════════
+    $stockQuery = DB::table('article_palette as ap')
+        ->join('palettes as p', 'p.id', '=', 'ap.palette_id')
+        ->where('p.type', 'Stock')
+        ->whereNotExists(function ($q) {
+            $q->select(DB::raw(1))
+              ->from('emplacements as e')
+              ->whereColumn('e.id', 'p.emplacement_id')
+              ->whereIn('e.code', ['K-3P', 'K-4P', 'K-4SP', 'K-3SP']);
+        })
+        ->whereIn('ap.article_stock_id', $ids);
+
+    if ($company) {
+        $stockQuery->where('p.company_id', $company);
+    }
+
+    $stockMap = $stockQuery
+        ->groupBy('ap.article_stock_id')
+        ->select('ap.article_stock_id', DB::raw('SUM(ap.quantity) as total'))
+        ->pluck('total', 'ap.article_stock_id');
+
+    // ══════════════════════════════════════════════════════════════════════════
+    // BATCH QUERY 2 — EmplacementLimit totals
+    // ══════════════════════════════════════════════════════════════════════════
+    $limitMap = EmplacementLimit::whereIn('article_stock_id', $ids)
+        ->groupBy('article_stock_id')
+        ->selectRaw('article_stock_id, SUM(quantity) as total')
+        ->pluck('total', 'article_stock_id');
+
+    // ══════════════════════════════════════════════════════════════════════════
+    // BATCH QUERY 3 — Stock preparation
+    // ══════════════════════════════════════════════════════════════════════════
+    $prepMap = Docligne::whereIn('AR_Ref', $codes)
+        ->whereIn('DO_Type', [1, 2, 3])
+        ->whereColumn('DL_Qte', '>', 'DL_QteBL')
+        ->groupBy('AR_Ref')
+        ->selectRaw('AR_Ref, SUM(DL_Qte) as total')
+        ->pluck('total', 'AR_Ref');
+
+    // ══════════════════════════════════════════════════════════════════════════
+    // BATCH QUERY 4 — Zone preparation
+    // ══════════════════════════════════════════════════════════════════════════
+    $zoneMap = Docligne::whereIn('AR_Ref', $codes)
+        ->whereIn('DO_Type', [1, 2, 3])
+        ->groupBy('AR_Ref')
+        ->selectRaw('AR_Ref, SUM(DL_QteBL) as total')
+        ->pluck('total', 'AR_Ref');
+
+    // ══════════════════════════════════════════════════════════════════════════
+    // ENRICH — O(n) map lookups, zero extra queries
+    // ══════════════════════════════════════════════════════════════════════════
+    $all->transform(function ($article) use ($stockMap, $limitMap, $prepMap, $zoneMap) {
+        $article->stock_prepare    = (float) ($prepMap[$article->code]  ?? 0);
+        $article->stock_prepartion = (float) ($zoneMap[$article->code]  ?? 0);
+        $article->stock            = (float) ($stockMap[$article->id]   ?? 0);
+        $article->max              = (float) ($limitMap[$article->id]   ?? 0);
+
+        $stock   = floor($article->stock * 100) / 100;
+        $max     = $article->max;
+        $min     = (float) $article->stock_min;
+        $moyenne = $max / 2;
+
+        $article->urgency_level = match(true) {
+            $stock < $min                           => 1,
+            $stock >= $min && $stock < $moyenne     => 2,
+            $stock >= $moyenne && $stock < $max     => 3,
+            default                                 => 4,
+        };
+
+        $article->ecart = $max - $stock;
+
+        return $article;
+    });
+
+    // ── Sort by computed field (across ALL records) ───────────────────────────
+    if (in_array($sortBy, $computedSorts)) {
+        $all = $all->sortBy(
+            fn($a) => $a->{$sortBy},
+            SORT_REGULAR,
+            $sortOrder === 'desc'
+        )->values();
+    }
+
+    // ── Urgency filter (post-enrichment) ──────────────────────────────────────
+    if ($request->filled('urgency') && $request->urgency !== 'tout') {
+        $level = (int) $request->urgency;
+        $all   = $all->filter(fn($a) => $a->urgency_level === $level)->values();
+    }
+
+    // ── Manual pagination over the fully sorted+filtered collection ───────────
+    $perPage     = (int) $request->get('per_page', 100);
+    $currentPage = (int) $request->get('page', 1);
+    $total       = $all->count();
+
+    $pageItems = $all->slice(($currentPage - 1) * $perPage, $perPage)->values();
+
+    $paginator = new LengthAwarePaginator(
+        $pageItems,
+        $total,
+        $perPage,
+        $currentPage,
+        ['path' => $request->url(), 'query' => $request->query()]
+    );
+
+    return response()->json($paginator);
+}
 
     public function list(Request $request)
     {
