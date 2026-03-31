@@ -131,87 +131,116 @@ class ReceptionController extends Controller
             ->find($piece);
     }
 
-    public function transfer(Request $request)
-    {
+public function transfer(Request $request)
+{
+    $validator = Validator::make($request->all(), [
+        'document_piece' => 'required',
+        'user_id' => 'required|exists:users,id',
+        'lines' => 'required|array|min:1',
+    ]);
 
-        $validator = Validator::make($request->all(), [
-            'document_piece' => 'required',
-            'user_id' => 'required|exists:users,id',
-            'lines' => 'required|array',
-        ]);
+    if ($validator->fails()) {
+        return response()->json([
+            'errors' => $validator->errors(),
+            'message' => $validator->errors()->first()
+        ], 422);
+    }
 
-        if ($validator->fails()) {
-            return response()->json([
-                'errors' => $validator->errors(),
-                'message' => $validator->errors()->first()
-            ], 422);
-        }
+    DB::beginTransaction();
 
+    try {
+        // ✅ Get user
+        $user = User::findOrFail($request->user_id);
 
-        try {
-            $user = User::find($request->user_id);
+        // ✅ Get document header
+        $docentete = Docentete::on($request->company)
+            ->findOrFail($request->document_piece);
 
-            $docentete = Docentete::on($request->company)->with('doclignes')->findOrFail($request->document_piece);
+        // ✅ Create or get document
+        $document = Document::on($request->company)->firstOrCreate(
+            ['docentete_id' => $docentete->cbMarq],
+            [
+                'piece' => (string) $docentete->DO_Piece,
+                'transfer_by' => auth()->id(),
+                'type' => "Document Achate",
+                'ref' => (string) $docentete->DO_Ref,
+                'client_id' => (string) $docentete->DO_Tiers,
+                'expedition' => (string) $docentete->DO_Expedit,
+            ]
+        );
 
-            if (!$docentete) {
-                throw new \Exception("Le document avec la référence $request->document_piece n'existe pas");
+        $createdLines = [];
+
+        foreach ($request->lines as $lineId) {
+
+            // ✅ Ensure line exists
+            $docligne = Docligne::on($request->company)->find($lineId);
+
+            if (!$docligne) {
+                \Log::warning("Docligne not found: " . $lineId);
+                continue;
             }
-            $document = Document::on($request->company)->firstOrCreate(
-                ['docentete_id' => $docentete->cbMarq],
-                [
 
-                    'piece' => (string) $docentete->DO_Piece,
-                    'transfer_by' => auth()->id(),
-                    'type' => "Document Achate",
-                    'ref' => (string) $docentete->DO_Ref,
-                    'client_id' => (string) $docentete->DO_Tiers,
-                    'expedition' => (string) $docentete->DO_Expedit,
-                    // 'created_at' => now()->format('Y-m-d H:i:s'),
-                    // 'updated_at' => now()->format('Y-m-d H:i:s')
+            // ✅ Reset quantity (if needed)
+            $docligne->update([
+                'DL_QteBL' => 0,
+            ]);
+
+            // ❗ Skip if no product reference
+            if (empty($docligne->AR_Ref)) {
+                \Log::info("Skipped line (no AR_Ref): " . $docligne->cbMarq);
+                continue;
+            }
+
+            // ✅ Create or get line
+            $line = Line::on($request->company)->firstOrCreate(
+                [
+                    'docligne_id' => $docligne->cbMarq,
+                ],
+                [
+                    'tiers' => $docligne->CT_Num,
+                    'name' => $docligne->Nom,
+                    'ref' => $docligne->AR_Ref,
+                    'design' => $docligne->DL_Design,
+                    'quantity' => $docligne->DL_Qte,
+                    'dimensions' => $docligne->item,
+                    'company_id' => $user->company_id,
+                    'document_id' => $document->id,
+                    'role_id' => $user->id
                 ]
             );
 
-
-            $lines = [];
-            foreach ($request->lines as $lineId) {
-                $docligne = Docligne::on($request->company)->where('cbMarq', $lineId)->first();
+            $createdLines[] = $line;
 
                 $docligne->update([
-                    'DL_QteBL' => floatval(0),
+                    'Line_ID' => $line->id
                 ]);
 
-                if ($docligne->AR_Ref != null) {
-                    $line = Line::on($request->company)->firstOrCreate([
-                        'docligne_id' => $docligne->cbMarq,
-                    ], [
-                        'docligne_id' => $docligne->cbMarq,
-                        'tiers' => $docligne->CT_Num,
-                        'name' => $docligne?->Nom,
-                        'ref' => $docligne?->AR_Ref,
-                        'design' => $docligne->DL_Design,
-                        'quantity' => $docligne->DL_Qte,
-                        'dimensions' => $docligne->item,
-                        'company_id' => $user->company_id,
-                        'document_id' => $document->id,
-                        'role_id' => $user->id
-                    ]);
-                }
-
-
-                $lines[] = $line;
-            }
-
-            return response()->json([
-                'status'  => 'success',
-                'message' => 'Document transferred successfully',
-            ], 200);
-        } catch (\Exception $e) {
-            return response()->json([
-                'status' => 'error',
-                'message' => $e->getMessage(),
-            ], 500);
+                \Log::info("Line processed: " . $docligne->cbMarq);
         }
+
+        
+
+        DB::commit();
+
+        return response()->json([
+            'status'  => 'success',
+            'message' => 'Document transferred successfully',
+            'lines_created' => count($createdLines)
+        ], 200);
+
+    } catch (\Exception $e) {
+
+        DB::rollBack();
+
+        \Log::error('Transfer error: ' . $e->getMessage());
+
+        return response()->json([
+            'status' => 'error',
+            'message' => $e->getMessage(),
+        ], 500);
     }
+}
 
 
     public function list(Request $request)
