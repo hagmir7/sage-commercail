@@ -7,8 +7,9 @@ use App\Models\Emplacement;
 use App\Models\EmplacementLimit;
 use Illuminate\Support\Collection;
 use Maatwebsite\Excel\Concerns\ToCollection;
+use Maatwebsite\Excel\Concerns\WithCalculatedFormulas; // 👈 add this
 
-class EmplacementLimitImport implements ToCollection
+class EmplacementLimitImport implements ToCollection, WithCalculatedFormulas // 👈 add this
 {
     public function collection(Collection $rows)
     {
@@ -21,17 +22,27 @@ class EmplacementLimitImport implements ToCollection
                 continue;
             }
 
-            $articleRef      = trim($row[0]);
-            $emplacementCode = trim($row[4]);
-            $stockMin        = isset($row[5]) ? intval($row[5]) : 0;
-            $capacity        = isset($row[7]) ? intval($row[7]) : 0;
+            $articleRef      = trim((string) $row[0]);
+            $emplacementCode = trim((string) $row[4]);
+            $stockMin        = isset($row[5]) && $row[5] !== null && $row[5] !== ''
+                                ? (int) round((float) $row[5])
+                                : 0;
+            $capacity        = isset($row[7]) && $row[7] !== null && $row[7] !== ''
+                                ? (int) round((float) $row[7])
+                                : 0;
 
             \Log::info("Row data", [
                 'articleRef'      => $articleRef,
                 'emplacementCode' => $emplacementCode,
                 'stockMin'        => $stockMin,
                 'capacity'        => $capacity,
+                'raw_row5'        => $row[5] ?? 'NULL',
+                'raw_row7'        => $row[7] ?? 'NULL',
             ]);
+
+            if (empty($articleRef) || empty($emplacementCode)) {
+                continue;
+            }
 
             $article = ArticleStock::where('code', $articleRef)->first();
             if (!$article) {
@@ -44,12 +55,6 @@ class EmplacementLimitImport implements ToCollection
                 \Log::warning("Emplacement not found: " . $emplacementCode);
                 continue;
             }
-
-            \Log::info("Creating EmplacementLimit", [
-                'article_stock_id' => $article->id,
-                'emplacement_id'   => $emplacement->id,
-                'quantity'         => $capacity,
-            ]);
 
             $article->update(['stock_min' => $stockMin]);
 

@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Machine;
 use App\Models\Of;
 use App\Models\OfLine;
 use Illuminate\Http\Request;
@@ -25,9 +26,11 @@ class OfController extends Controller
 
         DB::beginTransaction();
 
+        $machine = Machine::where('ref_machine', $request->reference_machine)->first();
+
         try {
             $of = Of::create([
-                'reference'         => $this->generateReference(),
+                'reference'         => $this->generateReference($machine->machine_id),
                 'date_lancement'    => $request->date_lancement,
                 'date_demarrage'    => $request->date_demarrage,
                 'reference_machine' => $request->reference_machine,
@@ -93,12 +96,12 @@ class OfController extends Controller
         return response()->json($of);
     }
 
-    private function generateReference(): string
+    private function generateReference($machine_id): string
     {
         $year    = now()->year;
         $last    = Of::whereYear('created_at', $year)->lockForUpdate()->count();
         $counter = str_pad($last + 1, 4, '0', STR_PAD_LEFT);
-        return "OF-{$year}-{$counter}";
+        return "OF-{$machine_id}-{$counter}";
     }
 
 
@@ -108,10 +111,7 @@ class OfController extends Controller
             'statut' => 'sometimes|in:brouillon,lancé,en_cours,terminé,annulé',
         ]);
 
-
         $of = Of::find($of_id);
-
-
         $of->update([
             'statut' => $request->statut
         ]);
