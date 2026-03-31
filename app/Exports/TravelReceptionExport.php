@@ -19,6 +19,7 @@ class TravelReceptionExport implements FromCollection, WithMapping, WithHeadings
         return [
             $reception->code,
             $reception->driver?->full_name,
+            $reception->driver?->cin,
             $reception->driver?->code,
             $reception->company?->name,
             $reception->created_at,
@@ -29,8 +30,8 @@ class TravelReceptionExport implements FromCollection, WithMapping, WithHeadings
     {
         return [
             'Code Voyage',
-            'Nom du chauffeur',
-            'CIN du chauffeur',
+            'Nom',
+            'CIN',
             'Matricule',
             'Société',
             'Date de création',
