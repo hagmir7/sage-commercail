@@ -215,8 +215,6 @@ public function transfer(Request $request)
                 $docligne->update([
                     'Line_ID' => $line->id
                 ]);
-
-                \Log::info("Line processed: " . $docligne->cbMarq);
         }
 
         
