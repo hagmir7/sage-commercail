@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Article;
+use App\Models\ArticleStock;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
@@ -24,15 +25,32 @@ class ArticleController extends Controller
         return response()->json($articles);
     }
 
-
     public function show(Article $article)
     {
+        $stock = ArticleStock::where('code', $article->AR_Ref)
+            ->first()
+            ?->palettes()
+            ->where('type', 'Stock')
+            ->whereDoesntHave('emplacement', function ($q) {
+                $q->whereIn('code', ['K-3P', 'K-4P', 'K-4SP', 'K-3SP']);
+            })
+            ->sum('article_palette.quantity') ?? 0;
 
-        $article = $article->select("AR_Ref", "AR_Design", "Nom", "FA_CodeFamille", "AR_PrixVen", "Hauteur", "Largeur", "Couleur")
-            ->take(15)->get();
-        return response()->json($article, 200, [], JSON_INVALID_UTF8_IGNORE);
+        return response()->json([
+            'AR_Ref'        => $article->AR_Ref,
+            'AR_Design'     => $article->AR_Design,
+            'Nom'           => $article->Nom,
+            'FA_CodeFamille' => $article->FA_CodeFamille,
+            'AR_PrixVen'    => $article->AR_PrixVen,
+            'Hauteur'       => $article->Hauteur,
+            'Largeur'       => $article->Largeur,
+            'Couleur'       => $article->Couleur,
+            'Profonduer' => $article->Profonduer,
+            'Longueur'   => $article->Longueur,
+            'stock'         => $stock,
+
+        ], 200, [], JSON_INVALID_UTF8_IGNORE);
     }
-
 
     public function update(Article $article){
         
