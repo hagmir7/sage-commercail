@@ -99,7 +99,7 @@ class PaletteController extends Controller
         // Define the relationships to load consistently
         $relationships = [
             'lines',
-            'lines.docligne:cbMarq,DO_Piece,DO_Ref,CT_Num,Hauteur,Largeur,Poignée,Chant,Description,Rotation,Couleur,AR_Ref,Episseur',
+            'lines.docligne:cbMarq,DO_Piece,DO_Ref,CT_Num,Hauteur,Largeur,Poignée,Chant,Description,Rotation,Couleur,AR_Ref,Episseur,Line_ID',
             'lines.docligne.article:AR_Ref,Nom,cbMarq,Hauteur,Largeur,Chant,Profonduer,Episseur,Description,AR_Design,Couleur',
             'lines.article_stock:code,name,height,width,depth,color,thickness,chant,description',
         ];
@@ -223,7 +223,7 @@ class PaletteController extends Controller
 
         try {
             $line = Line::with([
-                'docligne:cbMarq,DO_Piece,DO_Ref,CT_Num,Hauteur,Largeur,Poignée,Chant,Description,Rotation,Couleur,AR_Ref,Profondeur',
+                'docligne:cbMarq,DO_Piece,DO_Ref,CT_Num,Hauteur,Largeur,Poignée,Chant,Description,Rotation,Couleur,AR_Ref,Profondeur,Line_ID',
                 'docligne.article:AR_Ref,Nom,cbMarq,Hauteur,Largeur,Chant,Profonduer,Episseur,Description,AR_Design,Couleur',
                 'article_stock:code,name,height,width,depth,color,thickness,chant,description',
             ])
@@ -793,7 +793,7 @@ class PaletteController extends Controller
     public function show($code)
     {
         $palette = Palette::with([
-            'lines.docligne:DL_No,cbMarq,AR_Ref,Nom,DL_Design,Description,Hauteur,Largeur,Profondeur,Couleur,Chant,Episseur,DL_Qte,Poignée,EU_Qte',
+            'lines.docligne:DL_No,cbMarq,AR_Ref,Nom,DL_Design,Description,Hauteur,Largeur,Profondeur,Couleur,Chant,Episseur,DL_Qte,Poignée,EU_Qte,Line_ID',
             'document',
             'user',
             'lines.docligne.article:cbMarq,AR_Ref,Nom,Hauteur,Largeur,Couleur,Profonduer,Episseur,Chant'
