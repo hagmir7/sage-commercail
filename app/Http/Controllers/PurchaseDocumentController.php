@@ -88,6 +88,7 @@ class PurchaseDocumentController extends Controller
             'lines.*.quantity' => 'required|numeric|min:1',
             'lines.*.unit' => 'nullable|string',
             'lines.*.estimated_price' => 'nullable|numeric',
+            'lines.*.status' => 'nullable|numeric',
 
             // --- Files for each line ---
             'lines.*.files' => 'nullable|array',
@@ -186,6 +187,7 @@ class PurchaseDocumentController extends Controller
             'lines.*.unit' => 'nullable|string|max:50',
             'lines.*.estimated_price' => 'nullable|numeric|min:0',
             'service_id' => 'nullable|exists:services,id',
+            'lines.*.status' => 'nullable|numeric',
 
             // --- Files per line ---
             'lines.*.files.*' => 'nullable|file|max:100240|mimes:pdf,doc,docx,xls,xlsx,jpg,jpeg,png,gif,ods',
@@ -243,12 +245,13 @@ class PurchaseDocumentController extends Controller
                     $line = PurchaseLine::find($lineData['id']);
                     if ($line && $line->purchase_document_id == $document->id) {
                         $line->update([
-                            'code' => $lineData['code'] ?? $line->code,
-                            'description' => $lineData['description'],
-                            'quantity' => $lineData['quantity'],
-                            'unit' => $lineData['unit'] ?? $line->unit,
-                            'estimated_price' => $lineData['estimated_price'] ?? $line->estimated_price,
-                        ]);
+                                'code' => $lineData['code'] ?? $line->code,
+                                'description' => $lineData['description'],
+                                'quantity' => $lineData['quantity'],
+                                'unit' => $lineData['unit'] ?? $line->unit,
+                                'estimated_price' => $lineData['estimated_price'] ?? $line->estimated_price,
+                                'status' => $lineData['status'] ?? $line->status,
+                            ]);
                     } else {
                         continue;
                     }
@@ -481,6 +484,10 @@ class PurchaseDocumentController extends Controller
                     $line['unit'] ?? '',
 
                 );
+                
+                PurchaseLine::find($line['id'])->update([
+                    'status' => 4,
+                ]);
             }
 
             $lastDRNo = DB::connection($request->company_db)

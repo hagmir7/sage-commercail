@@ -16,6 +16,7 @@ class PurchaseLine extends Model
         'quantity',
         'unit',
         'estimated_price',
+        'status',
         'total',
     ];
 
