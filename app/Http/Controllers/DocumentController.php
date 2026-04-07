@@ -228,133 +228,133 @@ class DocumentController extends Controller
 
 
     public function preparationList(Request $request)
-{
-    $user = auth()->user();
-    $user_roles = $user->roles()->pluck('name', 'id');
+    {
+        $user = auth()->user();
+        $user_roles = $user->roles()->pluck('name', 'id');
 
-    $query = Document::query()
-        ->with([
-            'companies',
-            'docentete:cbMarq,DO_Date,DO_DateLivr,DO_Reliquat,DO_Piece,cbCreation'
-        ])
-        ->join('document_companies as dc', function ($join) use ($user) {
-            $join->on('documents.id', '=', 'dc.document_id')
-                ->where('dc.company_id', $user->company_id)
-                ->whereIn('dc.status_id', [1, 2, 3, 4, 5, 6, 7]);
-        })
-        ->whereHas('docentete', function ($q) {
-            $q->where('DO_Domaine', 0)
-                ->whereIn('DO_Type', [1, 2]);
-        })
-        ->whereHas('lines', function ($q) use ($user_roles, $user) {
-            $q->where('company_id', (string) $user->company_id);
+        $query = Document::query()
+            ->with([
+                'companies',
+                'docentete:cbMarq,DO_Date,DO_DateLivr,DO_Reliquat,DO_Piece,cbCreation'
+            ])
+            ->join('document_companies as dc', function ($join) use ($user) {
+                $join->on('documents.id', '=', 'dc.document_id')
+                    ->where('dc.company_id', $user->company_id)
+                    ->whereIn('dc.status_id', [1, 2, 3, 4, 5, 6, 7]);
+            })
+            ->whereHas('docentete', function ($q) {
+                $q->where('DO_Domaine', 0)
+                    ->whereIn('DO_Type', [1, 2]);
+            })
+            ->whereHas('lines', function ($q) use ($user_roles, $user) {
+                $q->where('company_id', (string) $user->company_id);
 
-            $common = array_intersect(
-                $user_roles->toArray(),
-                [
-                    'fabrication',
-                    'montage',
-                    'preparation_cuisine',
-                    'preparation_trailer',
-                    'magasinier'
-                ]
-            );
+                $common = array_intersect(
+                    $user_roles->toArray(),
+                    [
+                        'fabrication',
+                        'montage',
+                        'preparation_cuisine',
+                        'preparation_trailer',
+                        'magasinier'
+                    ]
+                );
 
-            if (!empty($common)) {
-                $q->whereIn('role_id', $user_roles->keys());
-            }
-        })
-        ->addSelect([
-            'documents.*',
-            'has_user_printer' => \DB::table('user_document_printer')
-                ->selectRaw('CASE WHEN COUNT(*) > 0 THEN 1 ELSE 0 END')
-                ->whereColumn('user_document_printer.document_id', 'documents.id')
-                ->where('user_document_printer.user_id', $user->id)
-        ]);
+                if (!empty($common)) {
+                    $q->whereIn('role_id', $user_roles->keys());
+                }
+            })
+            ->addSelect([
+                'documents.*',
+                'has_user_printer' => \DB::table('user_document_printer')
+                    ->selectRaw('CASE WHEN COUNT(*) > 0 THEN 1 ELSE 0 END')
+                    ->whereColumn('user_document_printer.document_id', 'documents.id')
+                    ->where('user_document_printer.user_id', $user->id)
+            ]);
 
-    /*
+        /*
     |--------------------------------------------------------------------------
     | 🔍 Search
     |--------------------------------------------------------------------------
     */
-    if ($request->filled('search')) {
-        $search = $request->search;
+        if ($request->filled('search')) {
+            $search = $request->search;
 
-        $query->where(function ($q) use ($search) { // ✅ single closure, no top-level OR
-            $q->where('documents.ref', 'like', "%{$search}%")
-                ->orWhere('documents.piece', 'like', "%{$search}%")
-                ->orWhere('documents.piece_bc', 'like', "%{$search}%")
-                ->orWhereHas('companies', function ($q) use ($search) {
-                    $q->where('client_id', 'like', "%{$search}%");
-                });
-        });
-    }
+            $query->where(function ($q) use ($search) { // ✅ single closure, no top-level OR
+                $q->where('documents.ref', 'like', "%{$search}%")
+                    ->orWhere('documents.piece', 'like', "%{$search}%")
+                    ->orWhere('documents.piece_bc', 'like', "%{$search}%")
+                    ->orWhereHas('companies', function ($q) use ($search) {
+                        $q->where('client_id', 'like', "%{$search}%");
+                    });
+            });
+        }
 
-    /*
+        /*
     |--------------------------------------------------------------------------
     | 📅 Date range
     |--------------------------------------------------------------------------
     */
-    if ($request->filled('date')) {
-        $dates = explode(',', $request->date);
+        if ($request->filled('date')) {
+            $dates = explode(',', $request->date);
 
-        $start = Carbon::parse(urldecode($dates[0]))->startOfDay();
-        $end   = Carbon::parse(urldecode($dates[1] ?? $dates[0]))->endOfDay();
+            $start = Carbon::parse(urldecode($dates[0]))->startOfDay();
+            $end   = Carbon::parse(urldecode($dates[1] ?? $dates[0]))->endOfDay();
 
-        $query->whereHas('docentete', function ($q) use ($start, $end) {
-            $q->whereBetween('DO_Date', [$start, $end]);
-        });
-    }
+            $query->whereHas('docentete', function ($q) use ($start, $end) {
+                $q->whereBetween('DO_Date', [$start, $end]);
+            });
+        }
 
-    /*
+        /*
     |--------------------------------------------------------------------------
     | 📦 Type
     |--------------------------------------------------------------------------
     */
-    if ($request->filled('type')) {
-        $query->whereHas('docentete', function ($q) use ($request) {
-            $q->where('Type', $request->type);
-        });
-    }
+        if ($request->filled('type')) {
+            $query->whereHas('docentete', function ($q) use ($request) {
+                $q->where('Type', $request->type);
+            });
+        }
 
-    /*
+        /*
     |--------------------------------------------------------------------------
     | 🔃 ORDERING (user controlled)
     |--------------------------------------------------------------------------
     */
-    $orderBy  = $request->get('order_by');
-    $orderDir = strtolower($request->get('order_dir', 'asc'));
+        $orderBy  = $request->get('order_by');
+        $orderDir = strtolower($request->get('order_dir', 'asc'));
 
-    if (!in_array($orderDir, ['asc', 'desc'])) {
-        $orderDir = 'asc';
-    }
+        if (!in_array($orderDir, ['asc', 'desc'])) {
+            $orderDir = 'asc';
+        }
 
-    switch ($orderBy) {
-        case 'piece':
-            $query->orderBy('documents.piece', $orderDir);
-            break;
-        case 'client':
-            $query->orderBy('documents.client_id', $orderDir);
-            break;
-        case 'expedition':
-            $query->orderBy('documents.expedition', $orderDir);
-            break;
-        case 'status':
-            $query->orderBy('dc.status_id', $orderDir);
-            break;
-        default:
-            $query->orderByDesc('documents.id');
-    }
+        switch ($orderBy) {
+            case 'piece':
+                $query->orderBy('documents.piece', $orderDir);
+                break;
+            case 'client':
+                $query->orderBy('documents.client_id', $orderDir);
+                break;
+            case 'expedition':
+                $query->orderBy('documents.expedition', $orderDir);
+                break;
+            case 'status':
+                $query->orderBy('dc.status_id', $orderDir);
+                break;
+            default:
+                $query->orderByDesc('documents.id');
+        }
 
-    /*
+        /*
     |--------------------------------------------------------------------------
     | 📄 Pagination
     |--------------------------------------------------------------------------
     */
-    $documents = $query->paginate(40);
+        $documents = $query->paginate(40);
 
-    return response()->json($documents);
-}
+        return response()->json($documents);
+    }
 
 
     /**
@@ -883,21 +883,171 @@ class DocumentController extends Controller
         ];
     }
 
-    public function receptions(Request $request, $piece) {
+    public function receptions(Request $request, $piece)
+    {
         $document = Document::on($request->company)
             ->where('piece', $piece)
             ->first();
-        
+
         if (!$document) {
             return response()->json([
                 'message' => 'Document not found'
             ], 404);
         }
-        
+
         $receptions = $document->receptions()
             ->with(['article', 'emplacement'])
             ->get();
         return response()->json($receptions);
     }
 
+
+    public function receptionsDelete(Request $request, $piece, $id)
+    {
+        $document = Document::on($request->company)
+            ->where('piece', $piece)
+            ->first();
+
+        if (!$document) {
+            return response()->json([
+                'message' => 'Document not found'
+            ], 404);
+        }
+
+        $reception = $document->receptions()
+            ->where('id', $id)
+            ->first();
+
+        if (!$reception) {
+            return response()->json([
+                'message' => 'Reception not found'
+            ], 404);
+        }
+
+        if (!$document->docentete) {
+            return response()->json([
+                'message' => 'Document lines not found'
+            ], 404);
+        }
+
+        try {
+            DB::connection($request->company)->transaction(function () use ($document, $reception) {
+                $line = $document->docentete->doclignes()
+                    ->where('AR_Ref', $reception->article_code)
+                    ->lockForUpdate()
+                    ->first();
+
+                if (!$line) {
+                    throw new \Exception("Doc ligne introuvable");
+                }
+
+                if ($line->DL_QteBL < $reception->quantity) {
+                    throw new \Exception("Quantité insuffisante pour annuler cette réception");
+                }
+
+                $line->decrement('DL_QteBL', $reception->quantity);
+
+                $reception->delete();
+
+                $doclignes = $document->docentete->doclignes();
+                $totalQteBL = $doclignes->sum('DL_QteBL');
+                $totalQte = $doclignes->sum('DL_Qte');
+
+                if ($totalQteBL != $totalQte) {
+                    $document->update([
+                        'status_id' => 1
+                    ]);
+                }
+            });
+
+            return response()->json([
+                'message' => 'Reception deleted successfully'
+            ], 200);
+        } catch (\Exception $e) {
+            return response()->json([
+                'message' => $e->getMessage()
+            ], 400);
+        }
+    }
+
+
+
+    public function receptionsUpdate(Request $request, $piece, $id)
+    {
+        $request->validate([
+            'quantity' => 'required|numeric|min:1'
+        ]);
+
+        $document = Document::on($request->company)
+            ->where('piece', $piece)
+            ->first();
+
+        if (!$document) {
+            return response()->json(['message' => 'Document not found'], 404);
+        }
+
+        $reception = $document->receptions()
+            ->where('id', $id)
+            ->first();
+
+        if (!$reception) {
+            return response()->json(['message' => 'Reception not found'], 404);
+        }
+
+        if (!$document->docentete) {
+            return response()->json(['message' => 'Document lines not found'], 404);
+        }
+
+        $newQty = $request->quantity;
+        $oldQty = $reception->quantity;
+        $delta = $newQty - $oldQty;
+
+        try {
+            DB::connection($request->company)->transaction(function () use ($document, $reception, $delta, $newQty) {
+                $line = $document->docentete->doclignes()
+                    ->where('AR_Ref', $reception->article_code)
+                    ->first();
+
+                if (!$line) {
+                    throw new \Exception("Doc ligne introuvable");
+                }
+
+                if ($delta < 0) {
+                    $giveBack = abs($delta);
+                    $line->decrement('DL_QteBL', $giveBack);
+                }
+
+                if ($delta > 0) {
+                    $available = $line->DL_Qte - $line->DL_QteBL;
+                    if ($available < $delta) {
+                        throw new \Exception("Quantité insuffisante pour mise à jour");
+                    }
+                    $line->increment('DL_QteBL', $delta);
+                }
+
+
+                $reception->update([
+                    'quantity' => $newQty
+                ]);
+
+                if ($document->docentete->doclignes()->sum('DL_QteBL') === $document->docentete->doclignes()->sum('DL_Qte')) {
+                    $document->update([
+                        'status_id' => 2
+                    ]);
+                }else{
+                     $document->update([
+                        'status_id' => 1
+                    ]);
+                }
+            });
+
+            return response()->json([
+                'message' => 'Reception updated successfully'
+            ], 200);
+        } catch (\Exception $e) {
+            return response()->json([
+                'message' => $e->getMessage()
+            ], 400);
+        }
+    }
 }

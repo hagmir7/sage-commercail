@@ -130,115 +130,113 @@ class ReceptionController extends Controller
             ->with(['doclignes:DO_Piece,AR_Ref,DL_Design,DL_Qte,DL_QteBL,DL_Ligne,cbMarq,DL_Qte,Line_ID', 'doclignes.line', 'doclignes.line.user_role', 'document'])
             ->find($piece);
     }
+    public function transfer(Request $request)
+    {
+        $validator = Validator::make($request->all(), [
+            'document_piece' => 'required',
+            'user_id' => 'required|exists:users,id',
+            'lines' => 'required|array|min:1',
+        ]);
 
-public function transfer(Request $request)
-{
-    $validator = Validator::make($request->all(), [
-        'document_piece' => 'required',
-        'user_id' => 'required|exists:users,id',
-        'lines' => 'required|array|min:1',
-    ]);
+        if ($validator->fails()) {
+            return response()->json([
+                'errors' => $validator->errors(),
+                'message' => $validator->errors()->first()
+            ], 422);
+        }
 
-    if ($validator->fails()) {
-        return response()->json([
-            'errors' => $validator->errors(),
-            'message' => $validator->errors()->first()
-        ], 422);
-    }
+        $connection = $request->company;
 
-    DB::beginTransaction();
+        DB::connection($connection)->beginTransaction();
 
-    try {
-        // ✅ Get user
-        $user = User::findOrFail($request->user_id);
+        try {
+            // ✅ Get user
+            $user = User::findOrFail($request->user_id);
 
-        // ✅ Get document header
-        $docentete = Docentete::on($request->company)
-            ->findOrFail($request->document_piece);
+            // ✅ Get document header
+            $docentete = Docentete::on($connection)
+                ->findOrFail($request->document_piece);
 
-        // ✅ Create or get document
-        $document = Document::on($request->company)->firstOrCreate(
-            ['docentete_id' => $docentete->cbMarq],
-            [
-                'piece' => (string) $docentete->DO_Piece,
-                'transfer_by' => auth()->id(),
-                'type' => "Document Achate",
-                'ref' => (string) $docentete->DO_Ref,
-                'client_id' => (string) $docentete->DO_Tiers,
-                'expedition' => (string) $docentete->DO_Expedit,
-            ]
-        );
-
-        $createdLines = [];
-
-        foreach ($request->lines as $lineId) {
-
-            // ✅ Ensure line exists
-            $docligne = Docligne::on($request->company)->find($lineId);
-
-            if (!$docligne) {
-                \Log::warning("Docligne not found: " . $lineId);
-                continue;
-            }
-
-            // ✅ Reset quantity (if needed)
-            $docligne->update([
-                'DL_QteBL' => 0,
-            ]);
-
-            // ❗ Skip if no product reference
-            if (empty($docligne->AR_Ref)) {
-                \Log::info("Skipped line (no AR_Ref): " . $docligne->cbMarq);
-                continue;
-            }
-
-            // ✅ Create or get line
-            $line = Line::on($request->company)->firstOrCreate(
+            // ✅ Create or get document
+            $document = Document::on($connection)->firstOrCreate(
+                ['docentete_id' => $docentete->cbMarq],
                 [
-                    'docligne_id' => $docligne->cbMarq,
-                ],
-                [
-                    'tiers' => $docligne->CT_Num,
-                    'name' => $docligne->Nom,
-                    'ref' => $docligne->AR_Ref,
-                    'design' => $docligne->DL_Design,
-                    'quantity' => $docligne->DL_Qte,
-                    'dimensions' => $docligne->item,
-                    'company_id' => $user->company_id,
-                    'document_id' => $document->id,
-                    'role_id' => $user->id
+                    'piece' => (string) $docentete->DO_Piece,
+                    'transfer_by' => auth()->id(),
+                    'type' => "Document Achate",
+                    'ref' => (string) $docentete->DO_Ref,
+                    'client_id' => (string) $docentete->DO_Tiers,
+                    'expedition' => (string) $docentete->DO_Expedit,
                 ]
             );
 
-            $createdLines[] = $line;
+            $createdLines = [];
+
+            foreach ($request->lines as $lineId) {
+
+                // ✅ Ensure line exists
+                $docligne = Docligne::on($connection)->find($lineId);
+
+                if (!$docligne) {
+                    \Log::warning("Docligne not found: " . $lineId);
+                    continue;
+                }
+
+                // ✅ Reset quantity
+                $docligne->update([
+                    'DL_QteBL' => 0,
+                ]);
+
+                // ❗ Skip if no product reference
+                if (empty($docligne->AR_Ref)) {
+                    \Log::info("Skipped line (no AR_Ref): " . $docligne->cbMarq);
+                    continue;
+                }
+
+                // ✅ Create or get line
+                $line = Line::on($connection)->firstOrCreate(
+                    [
+                        'docligne_id' => $docligne->cbMarq,
+                    ],
+                    [
+                        'tiers' => $docligne->CT_Num,
+                        'name' => $docligne->Nom,
+                        'ref' => $docligne->AR_Ref,
+                        'design' => $docligne->DL_Design,
+                        'quantity' => $docligne->DL_Qte,
+                        'dimensions' => $docligne->item,
+                        'company_id' => $user->company_id,
+                        'document_id' => $document->id,
+                        'role_id' => $user->id
+                    ]
+                );
+
+                $createdLines[] = $line;
 
                 $docligne->update([
                     'Line_ID' => $line->id
                 ]);
+            }
+
+            DB::connection($connection)->commit();
+
+            return response()->json([
+                'status'  => 'success',
+                'message' => 'Document transferred successfully',
+                'lines_created' => count($createdLines)
+            ], 200);
+        } catch (\Exception $e) {
+
+            DB::connection($connection)->rollBack();
+
+            \Log::error('Transfer error: ' . $e->getMessage());
+
+            return response()->json([
+                'status' => 'error',
+                'message' => $e->getMessage(),
+            ], 500);
         }
-
-        
-
-        DB::commit();
-
-        return response()->json([
-            'status'  => 'success',
-            'message' => 'Document transferred successfully',
-            'lines_created' => count($createdLines)
-        ], 200);
-
-    } catch (\Exception $e) {
-
-        DB::rollBack();
-
-        \Log::error('Transfer error: ' . $e->getMessage());
-
-        return response()->json([
-            'status' => 'error',
-            'message' => $e->getMessage(),
-        ], 500);
     }
-}
 
 
     public function list(Request $request)
@@ -590,5 +588,10 @@ public function transfer(Request $request)
                 'error'   => 'Internal server error'
             ], 500);
         }
+    }
+
+
+    public function movementDelete(){
+
     }
 }

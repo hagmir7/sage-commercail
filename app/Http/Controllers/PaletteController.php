@@ -665,8 +665,6 @@ class PaletteController extends Controller
                     }
                 }
 
-                // ✅ Update doc line
-
                 $multiplier = floatval($ctValue ?: 1);
 
                 $docligne = Docligne::where('cbMarq', $line->docligne_id);

@@ -368,7 +368,9 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('print/{document}', 'print');
         Route::get('reset-print/{document}', 'resetPrint');
 
-          Route::get('{piece}/receptions', 'receptions');
+        Route::get('{piece}/receptions', 'receptions');
+        Route::delete('{piece}/receptions/{id}', 'receptionsDelete');
+        Route::put('{piece}/receptions/{id}', 'receptionsUpdate');
 
 
         Route::get('{piece}/palettes', 'documentPalettes');
@@ -386,6 +388,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('transfer', 'transfer');
         Route::get('reset/{piece}', 'reset');
         Route::post('movement/{piece}', 'movement');
+       
         Route::get('validation/{piece}', 'validation');
     });
 
