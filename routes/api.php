@@ -41,9 +41,16 @@ use App\Models\TravelDriver;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Route;
 use Maatwebsite\Excel\Facades\Excel;
 use Carbon\Carbon;
+use App\Http\Controllers\QuoteComparisonController;
+use App\Http\Controllers\QuoteOfferController;
+use App\Http\Controllers\QuoteEvaluationController;
+use Illuminate\Support\Facades\Route;
+ 
+
+
+
 
 
 
@@ -162,6 +169,21 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/roles', [RoleController::class, 'index']);
     Route::post('/roles', [RoleController::class, 'store']);
     Route::get('/roles/permissions/{roleName}', [RoleController::class, 'permissions']);
+
+
+
+    // Comparatifs des devis
+    Route::apiResource('quote-comparisons', QuoteComparisonController::class);
+    
+    // Offres & Évaluations (nested sous comparatif)
+    Route::prefix('quote-comparisons/{quoteComparison}')->group(function () {
+        Route::post('offers', [QuoteOfferController::class, 'store']);
+        Route::put('offers/{offer}', [QuoteOfferController::class, 'update']);
+        Route::delete('offers/{offer}', [QuoteOfferController::class, 'destroy']);
+        Route::post('evaluations', [QuoteEvaluationController::class, 'storeOrUpdate']);
+        Route::get('pdf', [QuoteComparisonController::class, 'download']);
+    });
+    
 
 
 

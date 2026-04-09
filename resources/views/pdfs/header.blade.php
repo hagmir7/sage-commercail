@@ -1,54 +1,80 @@
-<!DOCTYPE html>
-<html lang="fr">
-<head>
-<meta charset="UTF-8">
-<title>Liste des prestataires externes référencés</title>
-<!-- Tailwind CDN -->
-<script src="https://cdn.tailwindcss.com"></script>
 <style>
-    @page {
-        margin: 50px 30px 80px 30px; /* top right bottom left */
-    }
+* {
+    font-size: 20px;
+}
 
-    .footer {
-        position: fixed;
-        bottom: 0;
-        left: 0;
-        right: 0;
-    }
+.table {
+    width: 100%;
+    border-collapse: collapse;
+    /* margin-bottom: 20px; */
+    margin: 0mm 10mm 0mm 10mm;
+}
+
+.td {
+    border: 1px solid black;
+    padding: 4px;
+    text-align: center;
+    vertical-align: middle;
+}
+
+.logo-cell {
+    width: 120px;
+}
+
+.right-cell {
+    width: 120px;
+    font-size: 9pt;
+}
+
+.small-text {
+    font-size: 9pt;
+}
+
+.medium-text {
+    font-size: 11pt;
+    font-weight: bold;
+}
+
+.bold {
+    font-weight: bold;
+}
+
+.logo {
+    display: block;
+    margin: 0 auto;
+    width: 160px;
+}
+
 </style>
-</head>
 
-<body class="font-sans text-sm m-0"> 
- 
- <!-- Header Table -->
-    <table class="w-full mb-5 border border-black border-collapse">
-        <tr>
-            <td rowspan="3" class="w-1/3 align-middle border border-black py-2">
-                <img src="{{ public_path('imgs/intercocina-logo.png') }}" class="mx-auto" width="160">
-            </td>
-            <td class="w-1/3 font-bold align-middle border border-black text-center ">
-                SYSTEME DE MANAGEMENT DE LA QUALITE
-            </td>
-            <td class="w-1/3 text-xs align-middle border border-black text-center py-2">
-                <strong></strong> ENR.ACH.06
-            </td>
-        </tr>
+@php
+    $logo = public_path('imgs/inter-icon.webp');
+@endphp
 
-        <tr>
-            <td rowspan="2" class="font-bold uppercase align-middle border border-black text-center ">
-                LISTE DES PRESTATAIRES EXTERNES RÉFÉRENCÉS
-            </td>
-            <td class="text-xs align-middle border border-black text-center py-2">
-                <strong>Version :</strong> 01
-            </td>
-        </tr>
-
-        <tr>
-            <td class="text-xs align-middle border border-black text-center py-2">
-                <strong>Page :</strong> 1 sur 1
-            </td>
-        </tr>
-    </table>
-
-</body>
+<table class="table">
+    <tr>
+        <td class="td logo-cell" rowspan="3">
+            <img src="@inlinedImage($logo)" class="logo">
+            {{-- <img src="https://intercocina.com/assets/imgs/intercocina-logo.png" class="logo"> --}}
+        </td>
+        <td class="td bold small-text">
+            SYSTEME DE MANAGEMENT DE LA QUALITE
+        </td>
+        <td class="td right-cell">
+            ENR.ACH.03
+        </td>
+    </tr>
+    <tr>
+        <td class="td medium-text" rowspan="2">
+            Comparatif des devis
+        </td>
+        <td class="td small-text">
+            Version : 1.0
+        </td>
+    </tr>
+    <tr>
+        <td class="td small-text">
+            Page <spans style="font-size: 10px!important">@pageNumber</span> | @totalPages
+        </td>
+    </tr>
+</table>
