@@ -118,4 +118,59 @@ class OfController extends Controller
 
         return response()->json(['message' => 'OF mis à jour', 'of' => $of]);
     }
+
+
+    public function duplicate(Request $request, $id)
+    {
+        $original = Of::with('lines')->findOrFail($id);
+
+        $referenceMachine = $request->query('reference_machine', $original->reference_machine);
+
+        $newOf = $original->replicate();
+        $newOf->reference_machine = $referenceMachine;
+        $newOf->reference = $this->generateReference($referenceMachine);
+        $newOf->statut = 'brouillon';
+        $newOf->save();
+
+        foreach ($original->lines as $line) {
+            $newLine = $line->replicate();
+            $newLine->of_id = $newOf->id;
+            $newLine->save();
+        }
+
+        return ['message' => "OF dupliqué avec succès"];
+    }
+
+    public function destroy($id)
+    {
+        $of = Of::findOrFail($id);
+        $of->lines()->delete();
+        $of->delete();
+
+        return ['message' => "OF Supprimé avec succès"];
+    }
+
+
+    public function destroyOfLine($of_line_id)
+    {
+        $line = OfLine::findOrFail($of_line_id);
+        $line->delete();
+
+        return ['message' => "Article Supprimé avec succès"];
+    }
+
+    public function updateOfLine(Request $request, $of_line_id)
+    {
+        $line = OfLine::findOrFail($of_line_id);
+
+        $request->validate([
+            'quantity' => 'required|numeric|min:0',
+        ]);
+
+        $line->update([
+            'quantity' => $request->quantity,
+        ]);
+
+        return ['message' => "Quantité mise à jour avec succès"];
+    }
 }

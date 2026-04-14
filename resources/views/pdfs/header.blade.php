@@ -48,13 +48,13 @@
 </style>
 
 @php
-    $logo = public_path('imgs/inter-icon.webp');
+    $logo = public_path('imgs/inter-icon.svg');
 @endphp
 
 <table class="table">
     <tr>
         <td class="td logo-cell" rowspan="3">
-            <img src="@inlinedImage($logo)" class="logo">
+            <img src="{{ public_path('imgs/inter-icon.svg') }}" class="logo">
             {{-- <img src="https://intercocina.com/assets/imgs/intercocina-logo.png" class="logo"> --}}
         </td>
         <td class="td bold small-text">

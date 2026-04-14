@@ -5,12 +5,15 @@ namespace App\Http\Controllers;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\StoreQuoteComparisonRequest;
 use App\Models\QuoteComparison;
+use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Spatie\LaravelPdf\Facades\Pdf;
 
 class QuoteComparisonController extends Controller
 {
+
+    use AuthorizesRequests;
 
     public function index(): JsonResponse
     {
@@ -74,16 +77,15 @@ class QuoteComparisonController extends Controller
             ->format('a4')
             ->margins(10, 10, 10, 10)
             ->footerHtml('
-                <div style="
-                    font-size:15px;
-                    text-align:center;
-                    width:100%;
-                    color:#555;
-                ">
-                    © Ce document ne doit être ni reproduit ni communiqué sans l’autorisation d’INTERCOCINA
-                </div>
-            ')
-            ->headerView('pdfs.header')
+            <div style="
+                font-size: 15px;
+                text-align: center;
+                width: 100%;
+                color: #555;
+            ">
+                © Ce document ne doit être ni reproduit ni communiqué sans l\'autorisation d\'INTERCOCINA
+            </div>
+        ')
             ->name("comparatif_{$quoteComparison->reference}.pdf")
             ->download();
     }

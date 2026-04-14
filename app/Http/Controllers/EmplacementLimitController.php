@@ -17,17 +17,14 @@ class EmplacementLimitController extends Controller
     public function index(Request $request)
     {
         $query = EmplacementLimit::with(['emplacement', 'article']);
-        
+
         if ($request->filled('search')) {
             $search = $request->search;
-            $query->where(function ($q) use ($search) {
-                $q->whereHas('article', function ($q) use ($search) {
-                    $q->where('code', 'like', "%{$search}%")
-                        ->orWhere('description', 'like', "%{$search}%");
-                })
-                    ->orWhereHas('emplacement', function ($q) use ($search) {
-                        $q->where('code', 'like', "%{$search}%");
-                    });
+
+            $query->whereHas('article', function ($q) use ($search) {
+                $q->where('code', 'like', "%{$search}%")
+                    ->orWhere('description', 'like', "%{$search}%")
+                    ->orWhere('name', 'like', "%{$search}%"); // optional
             });
         }
 

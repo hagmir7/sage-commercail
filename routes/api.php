@@ -1,5 +1,7 @@
 <?php
 
+use App\Http\Controllers\NcfAttachmentController;
+use App\Http\Controllers\SupplierNonConformityController;
 use App\Http\Controllers\MachineController;
 use App\Http\Controllers\CompanyController;
 use App\Http\Controllers\ArticleStockController;
@@ -155,6 +157,27 @@ Route::get("progress/{piece}", [DocenteteController::class, 'progress']);
 
 
 Route::middleware('auth:sanctum')->group(function () {
+
+    Route::prefix('ncf')->group(function () {
+    
+        Route::get('/',    [SupplierNonConformityController::class, 'index']);
+        Route::post('/',   [SupplierNonConformityController::class, 'store']);
+        Route::get('/{id}',    [SupplierNonConformityController::class, 'show']);
+        Route::delete('/{id}', [SupplierNonConformityController::class, 'destroy']);
+    
+        // Step-based updates
+        Route::put('/{id}/step/2', [SupplierNonConformityController::class, 'updateStep2']);
+        Route::put('/{id}/step/3', [SupplierNonConformityController::class, 'updateStep3']);
+        Route::put('/{id}/step/4', [SupplierNonConformityController::class, 'updateStep4']);
+        Route::put('/{id}/step/5', [SupplierNonConformityController::class, 'updateStep5']);
+        Route::put('/{id}/step/6', [SupplierNonConformityController::class, 'updateStep6']);
+    
+        // Attachments
+        Route::post('/{id}/attachments',          [NcfAttachmentController::class, 'store']);
+        Route::delete('/{id}/attachments/{attId}', [NcfAttachmentController::class, 'destroy']);
+    });
+
+
     Route::get('inventory/{inventory}/init', [InventoryController::class, 'resetToStock']);
     Route::post('/logout', [AuthController::class, 'logout']);
     Route::get('/user', [AuthController::class, 'user']);
@@ -222,6 +245,9 @@ Route::middleware('auth:sanctum')->group(function () {
 
 
     Route::apiResource('ordres-fabrication', OfController::class);
+    Route::get('ordres-fabrication/{id}/duplicate', [OfController::class, 'duplicate']);
+    Route::delete('of-line/{id}', [OfController::class, 'destroyOfLine']);
+    Route::put('of-line/{id}', [OfController::class, 'updateOfLine']);
 
 
     Route::prefix('emplacement')->controller(EmplacementController::class)->group(function () {

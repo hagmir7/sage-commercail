@@ -16,7 +16,7 @@
         }
     </script>
     <style>
-        @page { margin: 27mm 10mm 10mm 10mm; }
+        @page { margin: 5mm 5mm 10mm 5mm; }
     </style>
 </head>
 <body class="font-['Segoe_UI',Arial,sans-serif] text-[9pt] text-black leading-tight">
@@ -24,7 +24,39 @@
 {{-- ═══════════════════════════════════════════════════════ --}}
 {{-- HEADER (Logo + Title + Reference)                      --}}
 {{-- ═══════════════════════════════════════════════════════ --}}
-
+<table class="w-full border-collapse border border-black mb-3">
+  <tbody>
+    <tr>
+      <td rowspan="3" class="border border-black p-2 text-center align-middle w-36">
+        <img src="{{ public_path('imgs/inter-icon.webp') }}"
+             class="mx-auto w-28 block">
+      </td>
+      <td class="border border-black px-4 py-1.5 text-center ">
+        <span class="text-balck text-[9pt] font-bold tracking-wide uppercase">
+          Système de Management de la Qualité
+        </span>
+      </td>
+      <td class="border border-black px-3 py-1.5 text-center align-middle w-32">
+        <span class="text-[9pt] font-bold text-[#002060] tracking-wide">ENR.ACH.03</span>
+      </td>
+    </tr>
+    <tr>
+      <td rowspan="2" class="border border-black px-4 py-2.5 text-center align-middle bg-white">
+        <span class="text-[11pt] font-bold text-[#002060]">Comparatif des devis</span>
+      </td>
+      <td class="border border-black px-3 py-1.5 text-center">
+        <span class="text-[9pt] text-gray-600 font-medium">Version : 1.0</span>
+      </td>
+    </tr>
+    <tr>
+      <td class="border border-black px-3 py-1.5 text-center">
+        <span class="text-[9pt] text-gray-600 font-medium">
+          Page <span class="pageNumber"></span> | <span class="totalPages"></span>
+        </span>
+      </td>
+    </tr>
+  </tbody>
+</table>
 
 {{-- ═══════════════════════════════════════════════════════ --}}
 {{-- SECTION 1 : Informations générales                     --}}
