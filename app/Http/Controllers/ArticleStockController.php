@@ -576,9 +576,11 @@ class ArticleStockController extends Controller
     public function stock(Request $request)
     {
         $search         = $request->input('search');
-        $depotCodes     = $request->input('depot_code', []);  
+        $depotCodes     = $request->input('depot_code', []);
         $category       = $request->input('category');
         $emplacement    = $request->input('emplacement');
+
+        $excludedEmplacements = ['K-4P', 'K-3P', 'K-4SP', 'K-2SP'];
 
         $query = DB::table('emplacements as e')
             ->join('palettes as p', 'p.emplacement_id', '=', 'e.id')
@@ -607,43 +609,30 @@ class ArticleStockController extends Controller
                 DB::raw('SUM(ap.quantity) as total_quantity'),
                 'el.quantity as quantity_limit',
             ])
-            ->where('category', '=', 'semi-fini')
-            ->where('p.type', '=', 'STOCK') 
-            ->groupBy(
-                'e.id',
-                'e.code',
-                'a.id',
-                'a.code',
-                'a.code_supplier',
-                'a.category',
-                'a.name',
-                'a.description',
-                'a.width',
-                'a.height',
-                'a.depth',
-                'a.thickness',
-                'el.quantity'
-            );
+            ->where('p.type', '=', 'STOCK')
+            ->where('a.category', '=', 'semi-fini')
+            ->whereNotIn('e.code', $excludedEmplacements);
 
         /* =======================
-        SEARCH
-        ======================= */
+    SEARCH
+    ======================= */
         if (!empty($search)) {
-            $query->where(function ($q) use ($search) {
+            $query->where(function ($q) use ($search, $excludedEmplacements) {
                 $q->where('a.code', 'like', "%{$search}%")
                     ->orWhere('a.code_supplier', 'like', "%{$search}%")
                     ->orWhere('a.name', 'like', "%{$search}%")
                     ->orWhere('a.description', 'like', "%{$search}%")
-                    ->orWhere('e.code', 'like', "%{$search}%");
+                    ->orWhere(function ($q2) use ($search, $excludedEmplacements) {
+                        $q2->where('e.code', 'like', "%{$search}%")
+                            ->whereNotIn('e.code', $excludedEmplacements);
+                    });
             });
         }
 
         /* =======================
-        FILTER BY DEPOT (multiple)
-        ======================= */
+    FILTER BY DEPOT (multiple)
+    ======================= */
         if (!empty($depotCodes)) {
-            // Supports both array (depot_code[]=A&depot_code[]=B)
-            // and comma-separated string (depot_code=A,B)
             if (is_string($depotCodes)) {
                 $depotCodes = explode(',', $depotCodes);
             }
@@ -654,22 +643,41 @@ class ArticleStockController extends Controller
         }
 
         /* =======================
-        FILTER BY EMPLACEMENT
-        ======================= */
+    FILTER BY EMPLACEMENT
+    ======================= */
         if (!empty($emplacement)) {
             $query->where('e.code', 'like', "%{$emplacement}%");
         }
 
         /* =======================
-        FILTER BY CATEGORY (STRING)
-        ======================= */
+    FILTER BY CATEGORY (STRING)
+    ======================= */
         if (!empty($category)) {
             $query->where('a.category', $category);
         }
 
         /* =======================
-        ORDER & PAGINATION
-        ======================= */
+    GROUPBY
+    ======================= */
+        $query->groupBy(
+            'e.id',
+            'e.code',
+            'a.id',
+            'a.code',
+            'a.code_supplier',
+            'a.category',
+            'a.name',
+            'a.description',
+            'a.width',
+            'a.height',
+            'a.depth',
+            'a.thickness',
+            'el.quantity'
+        );
+
+        /* =======================
+    ORDER & PAGINATION
+    ======================= */
         return $query
             ->orderBy('e.code')
             ->orderBy('a.code')

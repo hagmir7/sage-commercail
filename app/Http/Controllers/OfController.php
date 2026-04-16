@@ -26,11 +26,10 @@ class OfController extends Controller
 
         DB::beginTransaction();
 
-        $machine = Machine::where('ref_machine', $request->reference_machine)->first();
 
         try {
             $of = Of::create([
-                'reference'         => $this->generateReference($machine->machine_id),
+                'reference'         => $this->generateReference($request->reference_machine),
                 'date_lancement'    => $request->date_lancement,
                 'date_demarrage'    => $request->date_demarrage,
                 'reference_machine' => $request->reference_machine,
