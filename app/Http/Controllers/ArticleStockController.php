@@ -576,7 +576,7 @@ class ArticleStockController extends Controller
     public function stock(Request $request)
     {
         $search         = $request->input('search');
-        $depotCodes     = $request->input('depot_code', []);    // array of codes
+        $depotCodes     = $request->input('depot_code', []);  
         $category       = $request->input('category');
         $emplacement    = $request->input('emplacement');
 
@@ -608,6 +608,7 @@ class ArticleStockController extends Controller
                 'el.quantity as quantity_limit',
             ])
             ->where('category', '=', 'semi-fini')
+            ->where('p.type', '=', 'STOCK') 
             ->groupBy(
                 'e.id',
                 'e.code',
