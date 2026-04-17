@@ -48,6 +48,7 @@ use Carbon\Carbon;
 use App\Http\Controllers\QuoteComparisonController;
 use App\Http\Controllers\QuoteOfferController;
 use App\Http\Controllers\QuoteEvaluationController;
+use Dom\Document;
 use Illuminate\Support\Facades\Route;
  
 
@@ -75,6 +76,7 @@ Route::get('/download/purchase-file/{id}', [PurchaseDocumentController::class, '
     ->name('purchase.file.download');
 
 
+Route::get('traking', [DocumentController::class, 'traking']);
 
 
 Route::post('import-movements', function (Request $request) {

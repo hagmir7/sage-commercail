@@ -1050,4 +1050,27 @@ class DocumentController extends Controller
             ], 400);
         }
     }
+
+
+
+    public function traking(Request $request)
+    {
+        if ($request->code) {
+            $code = strtoupper($request->code);
+
+            if (str_contains($code, 'DE')) {
+                $document = Docligne::where('DL_PieceDE', $code)?->first()?->line?->document;
+            } elseif (str_contains($code, 'BC')) {
+                $document = Docligne::where('DL_PieceDE', $code)?->first()?->line?->document;
+            } elseif (str_contains($code, 'OR')) {
+                $document = Document::where('ref', $code);
+            } else {
+                return response()->json(['message' => "Le numéro de commande n'est pas valide."], 402);
+            }
+            if (!$document) {
+                return response()->json(['message' => "Le numéro de commande n'est pas valide."], 402);
+            }
+            return $document;
+        }
+    }
 }
