@@ -18,7 +18,7 @@ class RoleSeeder extends Seeder
     public function run(): void
     {
         $roles = [
-            ["name" => "supper_admin", 'guard_name' => "web"],
+            ["name" => "super_admin", 'guard_name' => "web"],
             ["name" => "admin", 'guard_name' => "web"],
             ["name" => "preparation", 'guard_name' => "web"],
             ["name" => "preparation_cuisine", 'guard_name' => "web"],
@@ -53,7 +53,7 @@ class RoleSeeder extends Seeder
             Permission::firstOrCreate($permissionData);
         }
 
-        $supperAdminRole = Role::where('name', 'supper_admin')->first();
+        $supperAdminRole = Role::where('name', 'super_admin')->first();
         $allPermissions = Permission::all();
         $supperAdminRole->syncPermissions($allPermissions);
     }

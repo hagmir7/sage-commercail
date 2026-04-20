@@ -22,7 +22,7 @@ class UserSeeder extends Seeder
                 'password' => Hash::make("password"),
                 'email_verified_at' => now(),
             ]);
-            $user->assignRole("supper_admin");
+            $user->assignRole("super_admin");
             $user->assignRole("commercial");
         }
 

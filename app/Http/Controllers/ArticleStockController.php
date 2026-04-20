@@ -29,9 +29,12 @@ class ArticleStockController extends Controller
         if ($request->filled('category') && $request->category !== 'tout') {
             $query->where('category', $request->category);
         }
+
         if ($request->filled('color') && $request->color !== 'tout') {
             $query->where('color', $request->color);
         }
+
+
         if ($request->filled('search')) {
             $search = $request->search;
             $query->where(function ($q) use ($search) {
@@ -574,14 +577,14 @@ class ArticleStockController extends Controller
     }
 
 
-
     public function stock(Request $request)
     {
         $search         = $request->input('search');
         $depotCodes     = $request->input('depot_code', []);
         $category       = $request->input('category');
         $emplacement    = $request->input('emplacement');
-
+        $sortBy         = $request->input('sort_by');         // 'quantity_limit'
+        $sortDir        = $request->input('sort_dir', 'asc'); // 'asc' or 'desc'
         $excludedEmplacements = ['K-4P', 'K-3P', 'K-4SP', 'K-2SP'];
 
         $query = DB::table('emplacements as e')
@@ -596,7 +599,6 @@ class ArticleStockController extends Controller
             ->select([
                 'e.id as emplacement_id',
                 'e.code as emplacement_code',
-
                 'a.id as article_stock_id',
                 'a.code as article_code',
                 'a.code_supplier',
@@ -607,7 +609,6 @@ class ArticleStockController extends Controller
                 'a.height',
                 'a.depth',
                 'a.thickness',
-
                 DB::raw('SUM(ap.quantity) as total_quantity'),
                 'el.quantity as quantity_limit',
             ])
@@ -680,9 +681,17 @@ class ArticleStockController extends Controller
         /* =======================
     ORDER & PAGINATION
     ======================= */
-        return $query
-            ->orderBy('e.code')
-            ->orderBy('a.code')
-            ->paginate(200);
+        $sortDir = in_array(strtolower($sortDir), ['asc', 'desc']) ? $sortDir : 'asc';
+
+        if ($sortBy === 'quantity_limit') {
+            // NULLs last regardless of direction
+            $query->orderByRaw("el.quantity IS NULL ASC")
+                ->orderBy('el.quantity', $sortDir);
+        } else {
+            $query->orderBy('e.code')
+                ->orderBy('a.code');
+        }
+
+        return $query->paginate(200);
     }
 }

@@ -20,6 +20,7 @@ use App\Models\Palette;
 use App\Models\StockMovement;
 use App\Services\StockMovementService;
 use App\Services\StockService;
+use Illuminate\Support\Facades\Auth;
 
 use function Symfony\Component\Clock\now;
 
@@ -37,7 +38,6 @@ class DocenteteController extends Controller
         $this->stockMovementService = $stockMovementService;
         $this->stockService = $stockService;
     }
-
 
 
     public function preparation(Request $request)
@@ -1529,5 +1529,72 @@ class DocenteteController extends Controller
                 'error' => $e->getMessage()
             ], 500);
         }
+    }
+
+
+
+    public function fullValidation(Request $request)
+    {
+        // Allow only super admin
+        if (!Auth::user() || !Auth::user()->hasRole('super_admin')) {
+            return response()->json([
+                'message' => 'Unauthorized'
+            ], 403);
+        }
+
+        // Validation
+        $validator = Validator::make($request->all(), [
+            'piece' => 'required|string|min:4|max:15',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                "message" => $validator->messages()->first(),
+                'error' => $validator->messages()
+            ], 422);
+        }
+
+        $piece = $request->piece;
+
+        $new_docentete = Docentete::where('DO_Piece', $piece)->first();
+
+        if (!$new_docentete) {
+            return response()->json([
+                'message' => 'Document not found'
+            ], 404);
+        }
+
+        foreach ($new_docentete->doclignes as $docligne) {
+            $docligne->update([
+                "DL_QteBL" => $docligne->DL_Qte,
+            ]);
+
+            $docligne?->line->update([
+                'status_id' => 11,
+            ]);
+        }
+
+        $document = Document::where('piece', $piece)?->first();
+
+        $document?->update([
+            'status_id' => 11
+        ]);
+
+
+        foreach($document?->companies as $company){
+            $company?->update([
+                'status_id' => 11
+            ]);
+        }
+
+        app(SellController::class)->calculator($new_docentete->DO_Piece);
+
+        $new_docentete->update([
+            'DO_Statut' => 2
+        ]);
+
+        return response()->json([
+            'message' => 'Validation completed successfully'
+        ]);
     }
 }

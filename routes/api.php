@@ -326,6 +326,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('palettes/validate/{piece}', 'validate');
         Route::post('palettes/validate-partial/{piece}', 'validatePartial');
         Route::get("duplicate/{piece}", 'duplicate');
+        Route::post("validate-full", 'fullValidation');
         Route::get("{id}", 'show');
     });
 

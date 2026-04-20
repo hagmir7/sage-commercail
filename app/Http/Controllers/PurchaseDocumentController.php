@@ -29,7 +29,7 @@ class PurchaseDocumentController extends Controller
             ->withCount('lines');
 
         /* ---------------- Role-based visibility ---------------- */
-        if ($user->hasRole(['admin', 'supper_admin', 'dg'])) {
+        if ($user->hasRole(['admin', 'super_admin', 'dg'])) {
             // See all
         } elseif ($user->hasRole('chef_service')) {
             $query->where(function ($q) use ($user) {

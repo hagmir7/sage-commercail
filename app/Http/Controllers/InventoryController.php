@@ -44,7 +44,7 @@ class InventoryController extends Controller
             ->with(['user:id,full_name'])
             ->when($types, fn($q) => $q->whereIn('type', $types));
 
-        if (!auth()->user()->hasRole('admin') || !auth()->user()->hasRole('supper_admin')) {
+        if (!auth()->user()->hasRole('admin') || !auth()->user()->hasRole('super_admin')) {
             $movements->where("user_id", auth()->id());
         }
 
@@ -704,7 +704,7 @@ public function insert(Request $request, Inventory $inventory)
 
         public function resetToStock(Inventory $inventory)
         {
-            if(!auth()->user()->hasRole('supper_admin')){
+            if(!auth()->user()->hasRole('super_admin')){
                 return response()->json([
                     'message' => 'Non autorisé. Vous n\'avez pas les permissions nécessaires.'
                 ], 403);
