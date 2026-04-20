@@ -38,6 +38,8 @@ class ArticleStockController extends Controller
                 $q->where('code', 'like', "%{$search}%")
                     ->orWhere('name', 'like', "%{$search}%")
                     ->orWhere('description', 'like', "%{$search}%")
+                    ->orWhere('code_supplier', 'like', "%{$search}%")
+                    ->orWhere('code_supplier_2', 'like', "%{$search}%")
                     ->orWhere('color', 'like', "%{$search}%");
             });
         }
