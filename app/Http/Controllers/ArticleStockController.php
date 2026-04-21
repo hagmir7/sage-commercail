@@ -47,6 +47,8 @@ class ArticleStockController extends Controller
             });
         }
 
+        
+
         // ── DB-level sort (only for real DB columns) ──────────────────────────────
         $allowedDbSorts = ['code', 'name', 'stock_min'];
         $computedSorts  = ['urgency_level', 'stock', 'ecart'];
@@ -579,12 +581,14 @@ class ArticleStockController extends Controller
 
     public function stock(Request $request)
     {
-        $search         = $request->input('search');
-        $depotCodes     = $request->input('depot_code', []);
-        $category       = $request->input('category');
-        $emplacement    = $request->input('emplacement');
-        $sortBy         = $request->input('sort_by');         // 'quantity_limit'
-        $sortDir        = $request->input('sort_dir', 'asc'); // 'asc' or 'desc'
+        $search               = $request->input('search');
+        $depotCodes           = $request->input('depot_code', []);
+        $category             = $request->input('category');
+        $emplacement          = $request->input('emplacement');
+        $sortBy               = $request->input('sort_by');
+        $sortDir              = in_array(strtolower($request->input('sort_dir', 'asc')), ['asc', 'desc'])
+            ? $request->input('sort_dir', 'asc')
+            : 'asc';
         $excludedEmplacements = ['K-4P', 'K-3P', 'K-4SP', 'K-2SP'];
 
         $query = DB::table('emplacements as e')
@@ -617,7 +621,7 @@ class ArticleStockController extends Controller
             ->whereNotIn('e.code', $excludedEmplacements);
 
         /* =======================
-    SEARCH
+       SEARCH
     ======================= */
         if (!empty($search)) {
             $query->where(function ($q) use ($search, $excludedEmplacements) {
@@ -633,7 +637,7 @@ class ArticleStockController extends Controller
         }
 
         /* =======================
-    FILTER BY DEPOT (multiple)
+       FILTER BY DEPOT (multiple)
     ======================= */
         if (!empty($depotCodes)) {
             if (is_string($depotCodes)) {
@@ -646,21 +650,21 @@ class ArticleStockController extends Controller
         }
 
         /* =======================
-    FILTER BY EMPLACEMENT
+       FILTER BY EMPLACEMENT
     ======================= */
         if (!empty($emplacement)) {
             $query->where('e.code', 'like', "%{$emplacement}%");
         }
 
         /* =======================
-    FILTER BY CATEGORY (STRING)
+       FILTER BY CATEGORY
     ======================= */
         if (!empty($category)) {
             $query->where('a.category', $category);
         }
 
         /* =======================
-    GROUPBY
+       GROUP BY
     ======================= */
         $query->groupBy(
             'e.id',
@@ -679,14 +683,10 @@ class ArticleStockController extends Controller
         );
 
         /* =======================
-    ORDER & PAGINATION
+       ORDER & PAGINATION
     ======================= */
-        $sortDir = in_array(strtolower($sortDir), ['asc', 'desc']) ? $sortDir : 'asc';
-
-        if ($sortBy === 'quantity_limit') {
-            // NULLs last regardless of direction
-            $query->orderByRaw("el.quantity IS NULL ASC")
-                ->orderBy('el.quantity', $sortDir);
+        if ($sortBy === 'ecart') {
+            $query->orderByRaw("(COALESCE(el.quantity, 0) - SUM(ap.quantity)) {$sortDir}");
         } else {
             $query->orderBy('e.code')
                 ->orderBy('a.code');
