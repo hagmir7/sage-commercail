@@ -1569,22 +1569,26 @@ class DocenteteController extends Controller
                 "DL_QteBL" => $docligne->DL_Qte,
             ]);
 
-            $docligne?->line->update([
-                'status_id' => 11,
-            ]);
+
+            if ($docligne?->line) {
+                $docligne?->line->update([
+                    'status_id' => 11,
+                ]);
+            }
         }
 
         $document = Document::where('piece', $piece)?->first();
 
-        $document?->update([
-            'status_id' => 11
-        ]);
-
-
-        foreach($document?->companies as $company){
-            $company?->update([
+        if ($document) {
+            $document?->update([
                 'status_id' => 11
             ]);
+
+            foreach ($document?->companies as $company) {
+                $company?->update([
+                    'status_id' => 11
+                ]);
+            }
         }
 
         app(SellController::class)->calculator($new_docentete->DO_Piece);
