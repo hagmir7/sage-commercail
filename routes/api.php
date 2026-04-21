@@ -165,7 +165,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/',    [SupplierNonConformityController::class, 'index']);
         Route::post('/',   [SupplierNonConformityController::class, 'store']);
         Route::get('/{id}',    [SupplierNonConformityController::class, 'show']);
-        Route::get('/download/{id}',    [SupplierNonConformityController::class, 'download']);
+        Route::get('/download/{ncf:id}',    [SupplierNonConformityController::class, 'download']);
         Route::delete('/{id}', [SupplierNonConformityController::class, 'destroy']);
     
         // Step-based updates
