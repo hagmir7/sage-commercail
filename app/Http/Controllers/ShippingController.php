@@ -6,6 +6,7 @@ use App\Models\Shipping;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
+use Spatie\LaravelPdf\Facades\Pdf as FacadesPdf;
 
 class ShippingController extends Controller
 {
@@ -72,4 +73,28 @@ class ShippingController extends Controller
             ], 500);
         }
     }
+
+
+    public function print(Shipping $shipping)
+    {
+        $shipping->load('criteria.shippingCriteria', 'document', 'user');
+
+        return FacadesPdf::view('pdfs.check-list', compact('shipping'))
+            ->format('a4')
+            ->margins(10, 10, 10, 10)
+            ->footerHtml('
+                <div style="
+                    font-size: 15px;
+                    text-align: center;
+                    width: 100%;
+                    color: #555;
+                ">
+                    © Ce document ne doit être ni reproduit ni communiqué sans l\'autorisation d\'INTERCOCINA
+                </div>
+            ')
+            ->name("ncf_{$shipping->code}.pdf")
+            ->download();
+    }
+
+
 }

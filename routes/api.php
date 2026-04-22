@@ -271,6 +271,7 @@ Route::middleware('auth:sanctum')->group(function () {
 
 
     Route::post('shippings', [ShippingController::class, 'store']);
+    Route::get('shippings/{shipping:id}/print', [ShippingController::class, 'print']);
     Route::apiResource('shipping-criteria', ShippingCriteriaController::class);
 
 
