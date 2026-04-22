@@ -79,6 +79,11 @@ class Document extends Model
     }
 
 
+    public function shipping(){
+        return $this->hasOne(Shipping::class);
+    }
+
+
 
     public function receptions()
     {

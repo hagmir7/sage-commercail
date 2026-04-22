@@ -249,19 +249,15 @@ class ArticleStockController extends Controller
         ]);
 
         try {
-            ini_set('max_execution_time', 7200); // 2 hours
-            ini_set('memory_limit', '4G'); // 1GB memory
+            ini_set('max_execution_time', 7200);
+            ini_set('memory_limit', '4G');
 
-            Excel::import(new ArticleStockImport, $request->file('file'));
+            $import = new ArticleStockImport();
+            $import->import($request->file('file')->getPathname());
 
             return response()->json([
                 'message' => "Fichier importé avec succès"
             ], 200);
-        } catch (\Maatwebsite\Excel\Validators\ValidationException $e) {
-            return response()->json([
-                'message' => 'Erreur de validation',
-                'errors' => $e->failures()
-            ], 422);
         } catch (\Exception $e) {
             \Log::error('Import failed: ' . $e->getMessage());
 

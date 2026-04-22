@@ -6,5 +6,5 @@ use Illuminate\Database\Eloquent\Relations\Pivot;
 
 class ShippingCriteriaValue extends Pivot
 {
-     protected $fillable = ['shipping_criteria_id', 'status', 'note'];
+     protected $fillable = [ 'shipping_id', 'shipping_criteria_id', 'status', 'note'];
 }

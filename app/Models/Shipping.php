@@ -9,16 +9,18 @@ class Shipping extends Model
     protected $fillable = ['code', 'shipping_date', 'document_id', 'user_id', 'validation_date'];
 
 
-    public function document(){
+    public function document()
+    {
         return $this->belongsTo(Document::class);
     }
 
-    public function user(){
+    public function user()
+    {
         return $this->belongsTo(User::class);
     }
 
-
-    public function criteria(){
-        return $this->hasMany(ShippingCriteriaValue::class);
+    public function criteria()
+    {
+        return $this->hasMany(ShippingCriteriaValue::class, 'shipping_id');
     }
 }

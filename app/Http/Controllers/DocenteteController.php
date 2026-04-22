@@ -683,7 +683,7 @@ class DocenteteController extends Controller
 
 
         try {
-            $docentete = Docentete::with(['document.status', 'document.companies', 'document.palettes'])
+            $docentete = Docentete::with(['document.status', 'document.companies', 'document.palettes', 'document.shipping'])
                 ->select(
                     "DO_Piece",
                     "DO_Ref",

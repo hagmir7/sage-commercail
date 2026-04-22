@@ -235,7 +235,7 @@ class DocumentController extends Controller
         $query = Document::query()
             ->with([
                 'companies',
-                'docentete:cbMarq,DO_Date,DO_DateLivr,DO_Reliquat,DO_Piece,cbCreation'
+                'docentete:cbMarq,DO_Date,DO_DateLivr,DO_Reliquat,DO_Piece,cbCreation',
             ])
             ->join('document_companies as dc', function ($join) use ($user) {
                 $join->on('documents.id', '=', 'dc.document_id')

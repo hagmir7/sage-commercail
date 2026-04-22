@@ -48,6 +48,8 @@ use Carbon\Carbon;
 use App\Http\Controllers\QuoteComparisonController;
 use App\Http\Controllers\QuoteOfferController;
 use App\Http\Controllers\QuoteEvaluationController;
+use App\Http\Controllers\ShippingController;
+use App\Http\Controllers\ShippingCriteriaController;
 use Dom\Document;
 use Illuminate\Support\Facades\Route;
  
@@ -266,6 +268,10 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('', 'index');
         Route::post('store', 'store');
     });
+
+
+    Route::post('shippings', [ShippingController::class, 'store']);
+    Route::apiResource('shipping-criteria', ShippingCriteriaController::class);
 
 
     Route::prefix('palettes')->controller(PaletteController::class)->group(function () {
