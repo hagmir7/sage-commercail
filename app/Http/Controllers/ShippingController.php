@@ -21,58 +21,68 @@ class ShippingController extends Controller
     }
 
 
-    public function store(Request $request)
-    {
-        $validator = Validator::make($request->all(), [
-            'shipping_date'   => 'required|date',
-            'document_id'     => 'required|exists:documents,id',
-            'user_id'         => 'required|exists:users,id',
-            'criteria'                        => 'nullable|array',
-            'criteria.*.shipping_criteria_id' => 'required_with:criteria|exists:shipping_criterias,id',
-            'criteria.*.status'               => 'required_with:criteria|string',
-            'criteria.*.note'                 => 'nullable|string',
+public function store(Request $request)
+{
+    $validator = Validator::make($request->all(), [
+        'shipping_date'                   => 'required|date',
+        'document_id'                     => 'required|exists:documents,id',
+        'user_id'                         => 'required|exists:users,id',
+        'criteria'                        => 'nullable|array',
+        'criteria.*.shipping_criteria_id' => 'required_with:criteria|exists:shipping_criterias,id',
+        'criteria.*.status'               => 'required_with:criteria|string',
+        'criteria.*.note'                 => 'nullable|string',
+    ]);
+
+    if ($validator->fails()) {
+        return response()->json([
+            'message' => 'Validation failed.',
+            'errors'  => $validator->errors(),
+        ], 422);
+    }
+
+    $validated = $validator->validated();
+
+    DB::beginTransaction();
+
+    try {
+        $shipping = Shipping::create([
+            'code'            => $this->generateReference(),
+            'shipping_date'   => $validated['shipping_date'],
+            'document_id'     => $validated['document_id'],
+            'user_id'         => $validated['user_id'],
+            'validation_date' => now(),
         ]);
 
-        if ($validator->fails()) {
-            return response()->json([
-                'message' => 'Validation failed.',
-                'errors'  => $validator->errors(),
-            ], 422);
+        if (!empty($validated['criteria'])) {
+            $shipping->criteria()->createMany($validated['criteria']);
         }
 
-        $validated = $validator->validated();
+        DB::table('document_companies')
+            ->where('document_id', $shipping->document_id)
+            ->where('company_id', auth()->user()->company_id)
+            ->update(['status_id' => 14]);
+        
+        DB::table('lines')
+            ->where('document_id', $shipping->document_id)
+            ->where('company_id', auth()->user()->company_id)
+            ->update(['status_id' => 14]);
 
-        DB::beginTransaction();
+        DB::commit();
 
-        try {
-            $shipping = Shipping::create([
-                'code'            => $this->generateReference( ),
-                'shipping_date'   => $validated['shipping_date'],
-                'document_id'     => $validated['document_id'],
-                'user_id'         => $validated['user_id'],
-                'validation_date' => now(),
-            ]);
+        return response()->json([
+            'message'  => 'Shipping created successfully.',
+            'shipping' => $shipping->load('criteria', 'document', 'user'),
+        ], 201);
 
-            if (!empty($validated['criteria'])) {
-                $shipping->criteria()->createMany($validated['criteria']);
-            }
+    } catch (\Exception $e) {
+        DB::rollBack();
 
-            DB::commit();
-
-            return response()->json([
-                'message'  => 'Shipping created successfully.',
-                'shipping' => $shipping->load('criteria', 'document', 'user'),
-            ], 201);
-
-        } catch (\Exception $e) {
-            DB::rollBack();
-
-            return response()->json([
-                'message' => 'Failed to create shipping.',
-                'error'   => $e->getMessage(),
-            ], 500);
-        }
+        return response()->json([
+            'message' => 'Failed to create shipping.',
+            'error'   => $e->getMessage(),
+        ], 500);
     }
+}
 
 
     public function print(Shipping $shipping)
@@ -95,6 +105,4 @@ class ShippingController extends Controller
             ->name("ncf_{$shipping->code}.pdf")
             ->download();
     }
-
-
 }

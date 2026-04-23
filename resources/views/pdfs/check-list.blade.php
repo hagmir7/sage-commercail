@@ -41,8 +41,8 @@
       </td>
     </tr>
     <tr>
-      <td rowspan="2" class="border border-black px-4 py-2.5 text-center align-middle bg-white">
-        <span class="text-[11pt] font-bold text-[#002060]">Check-list expédition</span>
+      <td rowspan="2" class="border border-black px-4 py-2 text-center align-middle bg-white">
+        <span class="text-[15pt] font-bold text-[#002060]">Check-list expédition</span>
       </td>
       <td class="border border-black px-3 py-1.5 text-center">
         <span class="text-[9pt] text-gray-600 font-medium">Version : 1.0</span>
@@ -51,7 +51,7 @@
     <tr>
       <td class="border border-black px-3 py-1.5 text-center">
         <span class="text-[9pt] text-gray-600 font-medium">
-          Page <span class="pageNumber"></span> | <span class="totalPages"></span>
+          Page <span class="pageNumber">1</span> | <span class="totalPages">1</span>
         </span>
       </td>
     </tr>
@@ -80,8 +80,8 @@
 
     $expedCode     = $shipping->document->expedition ?? null;
     $expedLabel    = $expedMap[$expedCode] ?? 'N/A';
-    $isExWork      = $expedCode === 1;
-    $isIntercocina = $expedCode === null; // no carrier = handled internally
+    $isExWork      = $expedCode == 1;
+    $isIntercocina = $expedCode === null;
     $isExternal    = !$isExWork && !$isIntercocina && $expedCode !== null;
 @endphp
 
@@ -101,7 +101,9 @@
         <td class="bg-gold font-bold text-[9pt] p-1.5 border border-black">Adresse de livraison</td>
         <td class="p-1.5 border border-black">{{ ($shipping->document->docentete->compt->CT_Adresse ?? '') . ' ' . ($shipping->document->docentete->compt->CT_Ville ?? '') }}</td>
         <td class="bg-gold font-bold text-[9pt] p-1.5 border border-black">Date de chargement</td>
-        <td class="p-1.5 border border-black">{{ $shipping->shipping_date }}</td>
+        <td class="p-1.5 border border-black">
+            {{ $shipping->shipping_date ? \Carbon\Carbon::parse($shipping->shipping_date)->format('d/m/Y') : '' }}
+        </td>
     </tr>
     <tr>
         <td class="bg-gold font-bold text-[9pt] p-1.5 border border-black">Mode d'expédition</td>
@@ -190,7 +192,7 @@
     </tr>
     <tr>
         <td class="bg-gold font-bold text-[9pt] p-1.5 border border-black w-[200px]">Nom &amp; Prénom</td>
-        <td class="p-1.5 border border-black">{{ $shipping->user->name ?? '' }}</td>
+        <td class="p-1.5 border border-black">{{ $shipping->user->full_name ?? '' }}</td>
     </tr>
     <tr>
         <td class="bg-gold font-bold text-[9pt] p-1.5 border border-black">Fonction</td>
@@ -198,7 +200,9 @@
     </tr>
     <tr>
         <td class="bg-gold font-bold text-[9pt] p-1.5 border border-black">Date</td>
-        <td class="p-1.5 border border-black">{{ $shipping->validation_date }}</td>
+        <td class="p-1.5 border border-black">
+            {{ $shipping->validation_date ? \Carbon\Carbon::parse($shipping->validation_date)->format('d/m/Y') : '' }}
+        </td>
     </tr>
     <tr>
         <td class="bg-gold font-bold text-[9pt] p-1.5 border border-black">Visa</td>
