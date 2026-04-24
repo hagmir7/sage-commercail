@@ -164,21 +164,6 @@
         </td>
     </tr>
     @endforelse
-
-    {{-- Oui Pour Tout summary row --}}
-    @php
-        $allOui = $shipping->criteria->isNotEmpty() &&
-                  $shipping->criteria->every(fn($c) => $c->status === 'Oui');
-    @endphp
-    <tr>
-        <td colspan="2" class="bg-gold font-bold text-[9pt] p-1.5 border border-black">
-            Oui Pour Tout
-        </td>
-        <td class="p-1.5 border border-black text-center">
-            <span class="mr-4">@if($allOui) ☑ @else ☐ @endif Oui</span>
-            <span>@if(!$allOui) ☑ @else ☐ @endif Non</span>
-        </td>
-    </tr>
 </table>
 
 {{-- ═══════════════════════════════════════════════════════ --}}
