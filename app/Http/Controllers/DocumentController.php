@@ -247,8 +247,7 @@ class DocumentController extends Controller
                     ->whereIn('DO_Type', [1, 2]);
             })
             ->whereHas('lines', function ($q) use ($user_roles, $user) {
-                $q->where('company_id', (string) $user->company_id)
-                    ->whereHas('docligne');
+                $q->where('company_id', (string) $user->company_id);
 
                 $common = array_intersect(
                     $user_roles->toArray(),
@@ -263,6 +262,7 @@ class DocumentController extends Controller
 
                 if (!empty($common)) {
                     $q->whereIn('role_id', $user_roles->keys());
+                    // ->whereHas('docligne');
                 }
             })
             ->addSelect([
