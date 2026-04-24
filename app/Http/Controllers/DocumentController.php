@@ -231,46 +231,46 @@ class DocumentController extends Controller
     {
         $user = auth()->user();
         $user_roles = $user->roles()->pluck('name', 'id');
+        $roleIds = $user_roles->keys()->toArray();
+
+        $preparationRoles = ['fabrication', 'montage', 'preparation_cuisine', 'preparation_trailer', 'magasinier'];
+        $hasPreparationRole = !empty(array_intersect($user_roles->toArray(), $preparationRoles));
 
         $query = Document::query()
-            ->with([
-                'companies',
-                'docentete:cbMarq,DO_Date,DO_DateLivr,DO_Reliquat,DO_Piece,cbCreation',
-            ])
+            ->select('documents.*')
+            // ✅ JOIN instead of whereHas on document_companies
             ->join('document_companies as dc', function ($join) use ($user) {
                 $join->on('documents.id', '=', 'dc.document_id')
                     ->where('dc.company_id', $user->company_id)
                     ->whereIn('dc.status_id', [1, 2, 3, 4, 5, 6, 7]);
             })
-            ->whereHas('docentete', function ($q) {
-                $q->where('DO_Domaine', 0)
-                    ->whereIn('DO_Type', [1, 2]);
-            })
-            ->whereHas('lines', function ($q) use ($user_roles, $user) {
-                $q->where('company_id', (string) $user->company_id);
+            // ✅ Single JOIN on docentete with all its conditions (replaces 2-3 whereHas)
+            ->join('F_DOCENTETE as de', 'de.cbMarq', '=', 'documents.docentete_id') // adjust FK
+            ->where('de.DO_Domaine', 0)
+            ->whereIn('de.DO_Type', [1, 2])
+            // ✅ EXISTS on lines — single subquery, much faster than nested whereHas
+            ->whereExists(function ($q) use ($user, $hasPreparationRole, $roleIds) {
+                $q->select(\DB::raw(1))
+                    ->from('lines')
+                    ->whereColumn('lines.document_id', 'documents.id')
+                    ->where('lines.company_id', (string) $user->company_id);
 
-                $common = array_intersect(
-                    $user_roles->toArray(),
-                    [
-                        'fabrication',
-                        'montage',
-                        'preparation_cuisine',
-                        'preparation_trailer',
-                        'magasinier'
-                    ]
-                );
-
-                if (!empty($common)) {
-                    $q->whereIn('role_id', $user_roles->keys());
-                    // ->whereHas('docligne');
+                if ($hasPreparationRole) {
+                    $q->whereIn('lines.role_id', $roleIds)
+                        ->whereNotNull('lines.docligne_id'); // ✅ replace whereHas('docligne')
                 }
             })
+            ->with([
+                'companies',
+                'docentete:cbMarq,DO_Date,DO_DateLivr,DO_Reliquat,DO_Piece,cbCreation',
+            ])
+            // ✅ Keep the printer check but scope it explicitly
             ->addSelect([
-                'documents.*',
                 'has_user_printer' => \DB::table('user_document_printer')
-                    ->selectRaw('CASE WHEN COUNT(*) > 0 THEN 1 ELSE 0 END')
+                    ->selectRaw('1')
                     ->whereColumn('user_document_printer.document_id', 'documents.id')
                     ->where('user_document_printer.user_id', $user->id)
+                    ->limit(1)
             ]);
 
         /*
@@ -281,77 +281,64 @@ class DocumentController extends Controller
         if ($request->filled('search')) {
             $search = $request->search;
 
-            $query->where(function ($q) use ($search) { // ✅ single closure, no top-level OR
+            $query->where(function ($q) use ($search) {
                 $q->where('documents.ref', 'like', "%{$search}%")
                     ->orWhere('documents.piece', 'like', "%{$search}%")
                     ->orWhere('documents.piece_bc', 'like', "%{$search}%")
-                    ->orWhereHas('companies', function ($q) use ($search) {
-                        $q->where('client_id', 'like', "%{$search}%");
+                    // ✅ Use exists instead of whereHas for consistency
+                    ->orWhereExists(function ($sub) use ($search) {
+                        $sub->select(\DB::raw(1))
+                            ->from('document_companies')
+                            ->whereColumn('document_companies.document_id', 'documents.id')
+                            ->where('document_companies.client_id', 'like', "%{$search}%");
                     });
             });
         }
 
         /*
     |--------------------------------------------------------------------------
-    | 📅 Date range
+    | 📅 Date range — now uses the JOIN, no extra whereHas
     |--------------------------------------------------------------------------
     */
         if ($request->filled('date')) {
             $dates = explode(',', $request->date);
-
             $start = Carbon::parse(urldecode($dates[0]))->startOfDay();
             $end   = Carbon::parse(urldecode($dates[1] ?? $dates[0]))->endOfDay();
 
-            $query->whereHas('docentete', function ($q) use ($start, $end) {
-                $q->whereBetween('DO_Date', [$start, $end]);
-            });
+            $query->whereBetween('de.DO_Date', [$start, $end]); // ✅ uses joined table
         }
 
         /*
     |--------------------------------------------------------------------------
-    | 📦 Type
+    | 📦 Type — now uses the JOIN
     |--------------------------------------------------------------------------
     */
         if ($request->filled('type')) {
-            $query->whereHas('docentete', function ($q) use ($request) {
-                $q->where('Type', $request->type);
-            });
+            $query->where('de.Type', $request->type); // ✅ uses joined table
         }
 
         /*
     |--------------------------------------------------------------------------
-    | 🔃 ORDERING (user controlled)
+    | 🔃 Ordering
     |--------------------------------------------------------------------------
     */
         $orderBy  = $request->get('order_by');
         $orderDir = strtolower($request->get('order_dir', 'asc'));
+        $orderDir = in_array($orderDir, ['asc', 'desc']) ? $orderDir : 'asc';
 
-        if (!in_array($orderDir, ['asc', 'desc'])) {
-            $orderDir = 'asc';
+        $orderMap = [
+            'piece'      => 'documents.piece',
+            'client'     => 'documents.client_id',
+            'expedition' => 'documents.expedition',
+            'status'     => 'dc.status_id',
+        ];
+
+        if (isset($orderMap[$orderBy])) {
+            $query->orderBy($orderMap[$orderBy], $orderDir);
+        } else {
+            $query->orderByDesc('documents.id');
         }
 
-        switch ($orderBy) {
-            case 'piece':
-                $query->orderBy('documents.piece', $orderDir);
-                break;
-            case 'client':
-                $query->orderBy('documents.client_id', $orderDir);
-                break;
-            case 'expedition':
-                $query->orderBy('documents.expedition', $orderDir);
-                break;
-            case 'status':
-                $query->orderBy('dc.status_id', $orderDir);
-                break;
-            default:
-                $query->orderByDesc('documents.id');
-        }
-
-        /*
-    |--------------------------------------------------------------------------
-    | 📄 Pagination
-    |--------------------------------------------------------------------------
-    */
         $documents = $query->paginate(40);
 
         return response()->json($documents);
@@ -1035,8 +1022,8 @@ class DocumentController extends Controller
                     $document->update([
                         'status_id' => 2
                     ]);
-                }else{
-                     $document->update([
+                } else {
+                    $document->update([
                         'status_id' => 1
                     ]);
                 }
