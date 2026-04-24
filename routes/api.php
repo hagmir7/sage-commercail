@@ -78,7 +78,7 @@ Route::get('/download/purchase-file/{id}', [PurchaseDocumentController::class, '
     ->name('purchase.file.download');
 
 
-Route::get('traking', [DocumentController::class, 'traking']);
+Route::get('tracking', [DocumentController::class, 'traking']);
 
 
 Route::post('import-movements', function (Request $request) {
