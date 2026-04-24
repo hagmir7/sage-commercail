@@ -247,7 +247,8 @@ class DocumentController extends Controller
                     ->whereIn('DO_Type', [1, 2]);
             })
             ->whereHas('lines', function ($q) use ($user_roles, $user) {
-                $q->where('company_id', (string) $user->company_id);
+                $q->where('company_id', (string) $user->company_id)
+                    ->whereHas('docligne');
 
                 $common = array_intersect(
                     $user_roles->toArray(),
