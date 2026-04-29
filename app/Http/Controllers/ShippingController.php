@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Document;
 use App\Models\Shipping;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -25,7 +26,7 @@ public function store(Request $request)
 {
     $validator = Validator::make($request->all(), [
         'shipping_date'                   => 'required|date',
-        'document_id'                     => 'required|exists:documents,id',
+        'document_id'                     => 'required',
         'user_id'                         => 'required|exists:users,id',
         'criteria'                        => 'nullable|array',
         'criteria.*.shipping_criteria_id' => 'required_with:criteria|exists:shipping_criterias,id',
@@ -44,11 +45,16 @@ public function store(Request $request)
 
     DB::beginTransaction();
 
+    $documentId = str_contains($validated['document_id'], 'PL')
+        ? Document::where('piece', $validated['document_id'])->value('id')
+        : $validated['document_id'];
+
+        
     try {
         $shipping = Shipping::create([
             'code'            => $this->generateReference(),
             'shipping_date'   => $validated['shipping_date'],
-            'document_id'     => $validated['document_id'],
+            'document_id'     => $documentId,
             'user_id'         => $validated['user_id'],
             'validation_date' => now(),
         ]);

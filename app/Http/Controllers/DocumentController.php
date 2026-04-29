@@ -357,7 +357,7 @@ if ($request->filled('search')) {
             ], 404);
         }
 
-        $document->load([
+        $document->load(['shipping',
             'lines' => fn($q) =>
             $q->join('F_DOCLIGNE', 'lines.docligne_id', '=', 'F_DOCLIGNE.cbMarq')
                 ->orderBy('F_DOCLIGNE.DL_Ligne')
@@ -370,6 +370,7 @@ if ($request->filled('search')) {
             'lines.palettes',
 
             'lines.docligne:DO_Domaine,DO_Type,CT_Num,DO_Piece,DL_Ligne,DL_Design,DO_Ref,DL_PieceDE,DL_PieceBC,DL_PiecePL,DL_PieceBL,DL_Qte,AR_Ref,cbMarq,Nom,Hauteur,Largeur,Profondeur,Langeur,Couleur,Chant,Episseur,Description,Poignée,Rotation,DL_QteBL,EU_Qte',
+            
         ]);
 
         $lines = $document->lines
