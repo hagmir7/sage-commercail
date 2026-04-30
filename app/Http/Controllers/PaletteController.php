@@ -360,7 +360,7 @@ class PaletteController extends Controller
                 // Stock Out
                 $this->stockService->stockOut(
                     $emplacement,
-                    $line->article_stock,
+                    $line->article_stock, 
                     $line->docligne->DL_Qte,
                     'Livraison'
                 );

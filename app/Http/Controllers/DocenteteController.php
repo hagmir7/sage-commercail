@@ -993,6 +993,10 @@ class DocenteteController extends Controller
 
 
 
+
+            $docentete->update([
+                'DO_Statut' => 0
+            ]);
             if (!$document && !$document_piece) {
                 $piece = str_contains($docentete->DO_Piece, 'BC')
                     ? $this->generatePiece(2, $docentete->DO_Souche)
@@ -1073,9 +1077,6 @@ class DocenteteController extends Controller
                         'piece_bc' => $docentete->DO_Piece,
                         'piece_pl' => $document->piece,
                         'status_id' => 1,
-
-
-                        // 'status_id' => in_array($article->code, $urgant_articles) ? 11 : 1
                     ]
                 );
 
@@ -1085,10 +1086,23 @@ class DocenteteController extends Controller
             }
 
 
+         
+
+
+
             // Update piece only if document was just created AND DO_Piece contains 'BC'
             if ($document->wasRecentlyCreated && str_contains($docentete->DO_Piece, 'BC')) {
                 DB::statement('EXEC Update_DO_Piece ?, ?, ?', [$docentete->DO_Piece, $document->piece, 2]);
+
+                // Use new piece to find the renamed record directly
+               
             }
+
+
+            // if (str_contains($docentete->DO_Piece, 'BC')) {
+            //     DB::statement('EXEC Update_DO_Piece ?, ?, ?', [$docentete->DO_Piece, $document->piece, 2]);
+            //     $docentete->update(['DO_Statut' => 1]);
+            // }
 
             if ($request->urgent) {
                 $new_docentete = Docentete::where('DO_Piece', $document->piece)->first();
@@ -1106,6 +1120,13 @@ class DocenteteController extends Controller
                     'DO_Statut' => 2
                 ]);
             }
+
+             DB::table('F_DOCENTETE')
+                    ->where('DO_Piece', $document->piece)
+                    ->update(['DO_Statut' => 1]);
+
+           
+
 
             DB::commit();
 
