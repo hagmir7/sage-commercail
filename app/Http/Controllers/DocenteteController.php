@@ -994,9 +994,8 @@ class DocenteteController extends Controller
 
 
 
-            $docentete->update([
-                'DO_Statut' => 0
-            ]);
+            DB::statement('DISABLE TRIGGER TRG_LOCK_F_DOCLIGNE ON F_DOCLIGNE');
+
             if (!$document && !$document_piece) {
                 $piece = str_contains($docentete->DO_Piece, 'BC')
                     ? $this->generatePiece(2, $docentete->DO_Souche)
@@ -1098,6 +1097,15 @@ class DocenteteController extends Controller
                
             }
 
+            $triggers = DB::select("
+                SELECT t.name AS trigger_name, o.name AS table_name
+                FROM sys.triggers t
+                JOIN sys.objects o ON t.parent_id = o.object_id
+                WHERE o.name = 'F_DOCENTETE'
+            ");
+
+            \Log::alert($triggers);
+
 
             // if (str_contains($docentete->DO_Piece, 'BC')) {
             //     DB::statement('EXEC Update_DO_Piece ?, ?, ?', [$docentete->DO_Piece, $document->piece, 2]);
@@ -1121,9 +1129,11 @@ class DocenteteController extends Controller
                 ]);
             }
 
-             DB::table('F_DOCENTETE')
-                    ->where('DO_Piece', $document->piece)
-                    ->update(['DO_Statut' => 1]);
+            DB::statement('ENABLE TRIGGER TRG_LOCK_F_DOCLIGNE ON F_DOCLIGNE');
+
+            //  DB::table('F_DOCENTETE')
+            //         ->where('DO_Piece', $document->piece)
+            //         ->update(['DO_Statut' => 1]);
 
            
 
