@@ -101,10 +101,19 @@ class OfController extends Controller
 
     private function generateReference($machine_id): string
     {
-        $year    = now()->year;
-        $last    = Of::whereYear('created_at', $year)->lockForUpdate()->count();
-        $counter = str_pad($last + 1, 4, '0', STR_PAD_LEFT);
-        return "OF-{$machine_id}-{$counter}";
+        $lastOf = Of::where('reference_machine', $machine_id)
+            ->where('reference', 'like', "OF-{$machine_id}-%")
+            ->lockForUpdate()
+            ->orderByDesc('id')
+            ->first();
+
+        $next = 1;
+
+        if ($lastOf && preg_match('/(\d+)$/', $lastOf->reference, $matches)) {
+            $next = (int) $matches[1] + 1;
+        }
+
+        return 'OF-' . $machine_id . '-' . str_pad($next, 4, '0', STR_PAD_LEFT);
     }
 
 
@@ -125,14 +134,22 @@ class OfController extends Controller
 
     public function duplicate(Request $request, $id)
     {
+        $request->validate([
+            'reference_machine'     => 'nullable|string',
+            'date_lancement_prevue' => 'required|date_format:Y-m-d',
+            'date_demarrage'        => 'nullable|date_format:Y-m-d',
+        ]);
+
         $original = Of::with('lines')->findOrFail($id);
 
-        $referenceMachine = $request->query('reference_machine', $original->reference_machine);
+        $referenceMachine = $request->input('reference_machine', $original->reference_machine);
 
         $newOf = $original->replicate();
-        $newOf->reference_machine = $referenceMachine;
-        $newOf->reference = $this->generateReference($referenceMachine);
-        $newOf->statut = 'brouillon';
+        $newOf->reference_machine     = $referenceMachine;
+        $newOf->reference             = $this->generateReference($referenceMachine);
+        $newOf->statut                = 'brouillon';
+        $newOf->date_lancement = $request->input('date_lancement_prevue');
+        $newOf->date_demarrage        = $request->input('date_demarrage');
         $newOf->save();
 
         foreach ($original->lines as $line) {
@@ -141,7 +158,7 @@ class OfController extends Controller
             $newLine->save();
         }
 
-        return ['message' => "OF dupliqué avec succès"];
+        return response()->json(['message' => 'OF dupliqué avec succès'], 201);
     }
 
     public function destroy($id)
@@ -203,10 +220,20 @@ class OfController extends Controller
             'articles.*.quantity' => 'nullable|numeric|min:0.01',
         ]);
 
-        $existingCodes = $of->lines()->pluck('article_code')->toArray();
+        $existingCodes = $of->lines()
+            ->where('article_code', '!=', 'SP000001') // ignore SP00000 in duplicate check
+            ->pluck('article_code')
+            ->toArray();
 
         $newArticles = collect($request->articles)
-            ->filter(fn($a) => !in_array($a['code'], $existingCodes))
+            ->filter(function ($a) use ($existingCodes) {
+                // allow duplicates only for SP00000
+                if ($a['code'] === 'SP000001') {
+                    return true;
+                }
+
+                return !in_array($a['code'], $existingCodes);
+            })
             ->values();
 
         if ($newArticles->isEmpty()) {
@@ -216,7 +243,7 @@ class OfController extends Controller
             ], 422);
         }
 
-        $nextPosition = $of->lines()->max('position') + 1;
+        $nextPosition = ($of->lines()->max('position') ?? 0) + 1;
 
         $lines = $newArticles->map(function ($article, $i) use ($of, $nextPosition) {
             $articleStock = \App\Models\ArticleStock::where('code', $article['code'])->firstOrFail();
@@ -230,9 +257,16 @@ class OfController extends Controller
         })->each->load('article');
 
         $skipped = count($request->articles) - $newArticles->count();
-        $msg = "{$lines->count()} article(s) ajouté(s) avec succès";
-        if ($skipped > 0) $msg .= ", {$skipped} ignoré(s) (déjà présent(s))";
 
-        return response()->json(['message' => $msg, 'data' => $lines], 201);
+        $msg = "{$lines->count()} article(s) ajouté(s) avec succès";
+
+        if ($skipped > 0) {
+            $msg .= ", {$skipped} ignoré(s) (déjà présent(s))";
+        }
+
+        return response()->json([
+            'message' => $msg,
+            'data'    => $lines,
+        ], 201);
     }
 }

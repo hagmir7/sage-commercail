@@ -250,7 +250,7 @@ Route::middleware('auth:sanctum')->group(function () {
 
 
     Route::apiResource('ordres-fabrication', OfController::class);
-    Route::get('ordres-fabrication/{id}/duplicate', [OfController::class, 'duplicate']);
+    Route::post('ordres-fabrication/{id}/duplicate', [OfController::class, 'duplicate']);
     Route::delete('of-line/{id}', [OfController::class, 'destroyOfLine']);
     Route::put('of-line/{id}', [OfController::class, 'updateOfLine']);
     Route::put('ordres-fabrication/{of}/reorder', [OFController::class, 'reorder']);
