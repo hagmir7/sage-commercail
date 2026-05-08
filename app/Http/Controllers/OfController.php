@@ -63,7 +63,11 @@ class OfController extends Controller
 
     public function index(Request $request)
     {
-        $query = Of::with(['lines.article', 'user'])->latest();
+        $query = Of::with([
+            'lines'         => fn($q) => $q->orderBy('position'),
+            'lines.article',
+            'user'
+        ])->latest();
 
         // Search by reference
         if ($request->filled('reference')) {
@@ -72,7 +76,7 @@ class OfController extends Controller
 
         // Filter by statut
 
-    
+
         if ($request->filled('statut')) {
             $query->where('statut', $request->statut);
         }
@@ -171,5 +175,64 @@ class OfController extends Controller
         ]);
 
         return ['message' => "Quantité mise à jour avec succès"];
+    }
+
+    public function reorder(Request $request, Of $of)
+    {
+        $request->validate([
+            'lines'          => 'required|array',
+            'lines.*.id'     => 'required|integer|exists:of_lines,id',
+            'lines.*.position' => 'required|integer|min:1',
+        ]);
+
+        foreach ($request->lines as $item) {
+            OfLine::where('id', $item['id'])
+                ->where('of_id', $of->id)  // security: ensure line belongs to this OF
+                ->update(['position' => $item['position']]);
+        }
+
+        return response()->json(['message' => 'Ordre mis à jour avec succès']);
+    }
+
+
+    public function addOfLine(Request $request, Of $of)
+    {
+        $request->validate([
+            'articles'            => 'required|array|min:1',
+            'articles.*.code'     => 'required|string|exists:article_stocks,code',
+            'articles.*.quantity' => 'nullable|numeric|min:0.01',
+        ]);
+
+        $existingCodes = $of->lines()->pluck('article_code')->toArray();
+
+        $newArticles = collect($request->articles)
+            ->filter(fn($a) => !in_array($a['code'], $existingCodes))
+            ->values();
+
+        if ($newArticles->isEmpty()) {
+            return response()->json([
+                'message' => 'Tous les articles sélectionnés existent déjà dans cet OF',
+                'data'    => [],
+            ], 422);
+        }
+
+        $nextPosition = $of->lines()->max('position') + 1;
+
+        $lines = $newArticles->map(function ($article, $i) use ($of, $nextPosition) {
+            $articleStock = \App\Models\ArticleStock::where('code', $article['code'])->firstOrFail();
+
+            return $of->lines()->create([
+                'article_stock_id' => $articleStock->id,
+                'article_code'     => $article['code'],
+                'quantity'         => $article['quantity'] ?? 1,
+                'position'         => $nextPosition + $i,
+            ]);
+        })->each->load('article');
+
+        $skipped = count($request->articles) - $newArticles->count();
+        $msg = "{$lines->count()} article(s) ajouté(s) avec succès";
+        if ($skipped > 0) $msg .= ", {$skipped} ignoré(s) (déjà présent(s))";
+
+        return response()->json(['message' => $msg, 'data' => $lines], 201);
     }
 }

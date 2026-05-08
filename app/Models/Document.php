@@ -28,7 +28,8 @@ class Document extends Model
         'delivery_date',
         'created_at',
         'complation_date',
-        'date'
+        'date',
+        'code'
     ];
 
     // protected $dateFormat = 'Y-d-m H:i:s.v';

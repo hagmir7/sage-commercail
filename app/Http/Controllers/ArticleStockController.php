@@ -562,11 +562,14 @@ class ArticleStockController extends Controller
     {
         $query = $request->input('q');
 
-        $articles = ArticleStock::select('code', 'description')
+        $articles = ArticleStock::select('code', 'description', 'name', 'height', 'width', 'depth')
             ->when($query, function ($q) use ($query) {
                 $q->where(function ($subQuery) use ($query) {
                     $subQuery->where('code', 'like', $query . '%')
-                        ->orWhere('description', 'like', '%' . $query . '%');
+                        ->orWhere('description', 'like', '%' . $query . '%')
+                        ->orWhere('code_supplier', 'like', "%{$query}%")
+                        ->orWhere('name', 'like', "%{$query}%")
+                        ->orWhere('description', 'like', "%{$query}%");
                 });
             })
             ->paginate(100);
@@ -577,6 +580,7 @@ class ArticleStockController extends Controller
 
     public function stock(Request $request)
     {
+
         $search               = $request->input('search');
         $depotCodes           = $request->input('depot_code', []);
         $category             = $request->input('category');
@@ -620,6 +624,7 @@ class ArticleStockController extends Controller
        SEARCH
     ======================= */
         if (!empty($search)) {
+            
             $query->where(function ($q) use ($search, $excludedEmplacements) {
                 $q->where('a.code', 'like', "%{$search}%")
                     ->orWhere('a.code_supplier', 'like', "%{$search}%")

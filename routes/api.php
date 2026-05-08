@@ -253,6 +253,8 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('ordres-fabrication/{id}/duplicate', [OfController::class, 'duplicate']);
     Route::delete('of-line/{id}', [OfController::class, 'destroyOfLine']);
     Route::put('of-line/{id}', [OfController::class, 'updateOfLine']);
+    Route::put('ordres-fabrication/{of}/reorder', [OFController::class, 'reorder']);
+    Route::post('ordres-fabrication/{of}/lines', [OfController::class, 'addOfLine']);
 
 
     Route::prefix('emplacement')->controller(EmplacementController::class)->group(function () {

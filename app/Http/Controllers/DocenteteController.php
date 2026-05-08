@@ -990,10 +990,6 @@ class DocenteteController extends Controller
             $document = Document::where('docentete_id', $docentete->cbMarq)->first();
             $document_piece = Document::where('piece', $docentete->DO_Piece)->first();
 
-
-
-
-
             // DB::statement('DISABLE TRIGGER TRG_LOCK_F_DOCLIGNE ON F_DOCLIGNE');
 
             if (!$document && !$document_piece) {

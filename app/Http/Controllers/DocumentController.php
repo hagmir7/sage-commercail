@@ -227,119 +227,120 @@ class DocumentController extends Controller
     }
 
 
-public function preparationList(Request $request)
-{
-    $user = auth()->user();
-    $user_roles = $user->roles()->pluck('name', 'id');
-    $roleIds = $user_roles->keys()->toArray();
+    public function preparationList(Request $request)
+    {
+        $user = auth()->user();
+        $user_roles = $user->roles()->pluck('name', 'id');
+        $roleIds = $user_roles->keys()->toArray();
 
-    $preparationRoles = ['fabrication', 'montage', 'preparation_cuisine', 'preparation_trailer', 'magasinier'];
-    $hasPreparationRole = !empty(array_intersect($user_roles->toArray(), $preparationRoles));
+        $preparationRoles = ['fabrication', 'montage', 'preparation_cuisine', 'preparation_trailer', 'magasinier'];
+        $hasPreparationRole = !empty(array_intersect($user_roles->toArray(), $preparationRoles));
 
-    $query = Document::query()
-        ->select('documents.*')
-        ->join('document_companies as dc', function ($join) use ($user) {
-            $join->on('documents.id', '=', 'dc.document_id')
-                ->where('dc.company_id', $user->company_id)
-                ->whereIn('dc.status_id', [1, 2, 3, 4, 5, 6, 7]);
-        })
-        ->join('F_DOCENTETE as de', 'de.cbMarq', '=', 'documents.docentete_id')
-        ->where('de.DO_Domaine', 0)
-        ->whereIn('de.DO_Type', [1, 2])
-        ->whereExists(function ($q) use ($user, $hasPreparationRole, $roleIds) {
-            $q->select(\DB::raw(1))
-                ->from('lines')
-                ->whereColumn('lines.document_id', 'documents.id')
-                ->where('lines.company_id', (string) $user->company_id);
+        $query = Document::query()
+            ->select('documents.*')
+            ->join('document_companies as dc', function ($join) use ($user) {
+                $join->on('documents.id', '=', 'dc.document_id')
+                    ->where('dc.company_id', $user->company_id)
+                    ->whereIn('dc.status_id', [1, 2, 3, 4, 5, 6, 7]);
+            })
+            ->join('F_DOCENTETE as de', 'de.cbMarq', '=', 'documents.docentete_id')
+            ->where('de.DO_Domaine', 0)
+            ->whereIn('de.DO_Type', [1, 2])
+            ->whereExists(function ($q) use ($user, $hasPreparationRole, $roleIds) {
+                $q->select(\DB::raw(1))
+                    ->from('lines')
+                    ->whereColumn('lines.document_id', 'documents.id')
+                    ->where('lines.company_id', (string) $user->company_id);
 
-            if ($hasPreparationRole) {
-                $q->whereIn('lines.role_id', $roleIds)
-                  ->whereNotNull('lines.docligne_id');
-            }
-        })
-        ->with([
-            'companies',
-            'docentete:cbMarq,DO_Date,DO_DateLivr,DO_Reliquat,DO_Piece,cbCreation',
-        ])
-        ->addSelect([
-            'has_user_printer' => \DB::table('user_document_printer')
-                ->selectRaw('1')
-                ->whereColumn('user_document_printer.document_id', 'documents.id')
-                ->where('user_document_printer.user_id', $user->id)
-                ->limit(1)
-        ]);
+                if ($hasPreparationRole) {
+                    $q->whereIn('lines.role_id', $roleIds)
+                        ->whereNotNull('lines.docligne_id');
+                }
+            })
+            ->with([
+                'companies',
+                'docentete:cbMarq,DO_Date,DO_DateLivr,DO_Reliquat,DO_Piece,cbCreation',
+            ])
+            ->addSelect([
+                'has_user_printer' => \DB::table('user_document_printer')
+                    ->selectRaw('1')
+                    ->whereColumn('user_document_printer.document_id', 'documents.id')
+                    ->where('user_document_printer.user_id', $user->id)
+                    ->limit(1)
+            ]);
 
-    /*
+        /*
     |--------------------------------------------------------------------------
     | 🔍 Search
     |--------------------------------------------------------------------------
     */
-if ($request->filled('search')) {
-    $search = trim($request->search);
+        if ($request->filled('search')) {
+            $search = trim($request->search);
 
-    $query->where(function ($q) use ($search) {
-        $q->where('documents.ref', 'like', "%{$search}%")
-            ->orWhere('documents.piece', 'like', "%{$search}%")
-            ->orWhere('documents.piece_bc', 'like', "%{$search}%")
-            ->orWhere('documents.piece_bl', 'like', "%{$search}%")
-            ->orWhere('documents.piece_fa', 'like', "%{$search}%")
-            ->orWhere('documents.client_id', 'like', "%{$search}%");
-    });
-}
+            $query->where(function ($q) use ($search) {
+                $q->where('documents.ref', 'like', "%{$search}%")
+                    ->orWhere('documents.piece', 'like', "%{$search}%")
+                    ->orWhere('documents.piece_bc', 'like', "%{$search}%")
+                    ->orWhere('documents.piece_bl', 'like', "%{$search}%")
+                    ->orWhere('documents.piece_fa', 'like', "%{$search}%")
+                    ->orWhere('documents.code', 'like', "%{$search}%")
+                    ->orWhere('documents.client_id', 'like', "%{$search}%");
+            });
+        }
 
-    /*
+        /*
     |--------------------------------------------------------------------------
     | 📅 Date range
     |--------------------------------------------------------------------------
     */
-    if ($request->filled('date')) {
-        $dates = explode(',', $request->date);
-        $start = Carbon::parse(urldecode($dates[0]))->startOfDay();
-        $end   = Carbon::parse(urldecode($dates[1] ?? $dates[0]))->endOfDay();
+        if ($request->filled('date')) {
+            $dates = explode(',', $request->date);
+            $start = Carbon::parse(urldecode($dates[0]))->startOfDay();
+            $end   = Carbon::parse(urldecode($dates[1] ?? $dates[0]))->endOfDay();
 
-        $query->whereBetween('de.DO_Date', [$start, $end]);
-    }
+            $query->whereBetween('de.DO_Date', [$start, $end]);
+        }
 
-    /*
+        /*
     |--------------------------------------------------------------------------
     | 📦 Type
     |--------------------------------------------------------------------------
     */
-    if ($request->filled('type')) {
-        $query->where('de.Type', $request->type);
-    }
+        if ($request->filled('type')) {
+            $query->where('de.Type', $request->type);
+        }
 
-    /*
+        /*
     |--------------------------------------------------------------------------
     | 🔃 Ordering
     |--------------------------------------------------------------------------
     */
-    $orderBy  = $request->get('order_by');
-    $orderDir = strtolower($request->get('order_dir', 'asc'));
-    $orderDir = in_array($orderDir, ['asc', 'desc']) ? $orderDir : 'asc';
+        $orderBy  = $request->get('order_by');
+        $orderDir = strtolower($request->get('order_dir', 'asc'));
+        $orderDir = in_array($orderDir, ['asc', 'desc']) ? $orderDir : 'asc';
 
-    $orderMap = [
-        'piece'      => 'documents.piece',
-        'client'     => 'documents.client',
-        'expedition' => 'documents.expedition',
-        'status'     => 'dc.status_id',
-    ];
+        $orderMap = [
+            'piece'      => 'documents.piece',
+            'client'     => 'documents.client',
+            'expedition' => 'documents.expedition',
+            'status'     => 'dc.status_id',
+        ];
 
-    if (isset($orderMap[$orderBy])) {
-        $query->orderBy($orderMap[$orderBy], $orderDir);
-    } else {
-        $query->orderByDesc('documents.id');
-    }
+        if (isset($orderMap[$orderBy])) {
+            $query->orderBy($orderMap[$orderBy], $orderDir);
+        } else {
+            $query->orderByDesc('documents.id');
+        }
 
-    /*
+        /*
     |--------------------------------------------------------------------------
     | 📄 Pagination
     |--------------------------------------------------------------------------
     */
-    $documents = $query->paginate(40);
+        $documents = $query->paginate(40);
 
-    return response()->json($documents);
-}
+        return response()->json($documents);
+    }
 
     /**
      * Show single document with progress
@@ -357,7 +358,8 @@ if ($request->filled('search')) {
             ], 404);
         }
 
-        $document->load(['shipping',
+        $document->load([
+            'shipping',
             'lines' => fn($q) =>
             $q->join('F_DOCLIGNE', 'lines.docligne_id', '=', 'F_DOCLIGNE.cbMarq')
                 ->orderBy('F_DOCLIGNE.DL_Ligne')
@@ -370,7 +372,7 @@ if ($request->filled('search')) {
             'lines.palettes',
 
             'lines.docligne:DO_Domaine,DO_Type,CT_Num,DO_Piece,DL_Ligne,DL_Design,DO_Ref,DL_PieceDE,DL_PieceBC,DL_PiecePL,DL_PieceBL,DL_Qte,AR_Ref,cbMarq,Nom,Hauteur,Largeur,Profondeur,Langeur,Couleur,Chant,Episseur,Description,Poignée,Rotation,DL_QteBL,EU_Qte',
-            
+
         ]);
 
         $lines = $document->lines
@@ -781,11 +783,13 @@ if ($request->filled('search')) {
                 $q->whereNotNull('fabricated_by');
             });
         } elseif (auth()->user()->hasRole('commercial')) {
+
             $query = Document::with([
                 'docentete:DO_Domaine,DO_Type,DO_Piece,DO_Date,DO_Ref,DO_Tiers,DO_Statut,cbMarq,cbCreation,DO_DateLivr,DO_Expedit',
                 'status'
             ]);
         } else {
+
             $userCompanyId = auth()->user()->company_id;
             $query = Document::with([
                 'docentete:cbMarq,DO_Domaine,DO_Type,DO_Piece,DO_Date,DO_Ref,DO_Tiers,DO_Statut,cbCreation,DO_DateLivr,DO_Expedit',
@@ -804,8 +808,6 @@ if ($request->filled('search')) {
             $query->whereBetween('created_at', [$start, $end]);
         }
 
-
-
         $query->when($request->filled('type'), function ($q) use ($request) {
             if ($request->type == 2) {
                 $q->where(function ($q2) {
@@ -815,7 +817,6 @@ if ($request->filled('search')) {
             }
         });
 
-
         if ($request->filled('search')) {
             $search = $request->search;
 
@@ -823,16 +824,47 @@ if ($request->filled('search')) {
                 $q->where('piece_fa', 'like', "%$search%")
                     ->orWhere('piece', 'like', "%$search%")
                     ->orWhere('ref', 'like', "%$search%")
+                    ->orWhere('code', 'like', "%$search%")
                     ->orWhere('client_id', 'like', "%$search%");
             });
         }
+
+        // --- Counts (all filters applied, before pagination) ---
+
+        $totalCount = (clone $query)->count();
+
+        $onTimeCount = (clone $query)
+            ->whereHas('lines', function ($q) {
+                $q->whereNotNull('fabricated_at')
+                    ->whereRaw(
+                        'CAST(fabricated_at AS DATE) <= CAST(documents.complation_date AS DATE)'
+                    );
+            })
+            ->count();
+
+        $lateCount = (clone $query)
+            ->whereHas('lines', function ($q) {
+                $q->whereNotNull('fabricated_at')
+                    ->whereRaw(
+                        'CAST(fabricated_at AS DATE) > CAST(documents.complation_date AS DATE)'
+                    );
+            })
+            ->count();
+
+        // --------------------------------------------------------
 
         $documents = $query
             ->select('documents.*')
             ->orderByDesc('id')
             ->paginate(40);
 
-        return response()->json($documents, 200, [], JSON_UNESCAPED_UNICODE);
+        // Merge counts into the paginator response without breaking frontend
+        $result                = $documents->toArray();
+        $result['total_count'] = $totalCount;
+        $result['on_time']     = $onTimeCount;
+        $result['late']        = $lateCount;
+
+        return response()->json($result, 200, [], JSON_UNESCAPED_UNICODE);
     }
 
 

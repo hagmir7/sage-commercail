@@ -15,6 +15,7 @@ class OfLine extends Model
         'quantity',
         'quantity_produite',
         'statut',
+        'position'
     ];
 
     protected $casts = [
