@@ -337,7 +337,7 @@ class DocumentController extends Controller
     | 📄 Pagination
     |--------------------------------------------------------------------------
     */
-        $documents = $query->paginate(40);
+        $documents = $query->paginate(70);
 
         return response()->json($documents);
     }
@@ -856,7 +856,7 @@ class DocumentController extends Controller
         $documents = $query
             ->select('documents.*')
             ->orderByDesc('id')
-            ->paginate(40);
+            ->paginate(70);
 
         // Merge counts into the paginator response without breaking frontend
         $result                = $documents->toArray();

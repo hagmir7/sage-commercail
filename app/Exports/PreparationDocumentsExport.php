@@ -34,9 +34,11 @@ class PreparationDocumentsExport implements FromQuery, WithHeadings, WithMapping
         $query = Document::query()
             ->with(['companies', 'docentete'])
             ->join('document_companies as dc', function ($join) use ($user) {
-                $join->on('documents.id', '=', 'dc.document_id')
-                    ->where('dc.company_id', $user->company_id)
-                    ->whereIn('dc.status_id', [1,2,3,4,5,6,7]);
+                $join->on('documents.id', '=', 'dc.document_id');
+                    if(!auth()->user()->hasRole('commercial')){
+                        $join->where('dc.company_id', $user->company_id);
+                    }
+                    $join->whereIn('dc.status_id', [1,2,3,4,5,6,7]);
             })
             ->whereHas('docentete', function ($q) {
                 $q->where('DO_Domaine', 0)
