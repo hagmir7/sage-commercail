@@ -320,10 +320,13 @@ class DocumentController extends Controller
         $orderDir = in_array($orderDir, ['asc', 'desc']) ? $orderDir : 'asc';
 
         $orderMap = [
-            'piece'      => 'documents.piece',
-            'client'     => 'documents.client',
+            'piece'      => auth()->user()->hasRole("fabrication") ? 'documents.code' : 'documents.piece',
+            'client_id'     => 'documents.client_id',
             'expedition' => 'documents.expedition',
+            'date' => 'documents.created_at',
             'status'     => 'dc.status_id',
+            'complation_date'     => 'documents.complation_date',
+            'DO_DateLivr' => 'de.DO_DateLivr'
         ];
 
         if (isset($orderMap[$orderBy])) {
