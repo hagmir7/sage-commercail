@@ -25,7 +25,6 @@ class ArticleStockController extends Controller
     {
         $query = ArticleStock::query();
 
-        // ── Filters ───────────────────────────────────────────────────────────────
         if ($request->filled('category') && $request->category !== 'tout') {
             $query->where('category', $request->category);
         }
@@ -33,7 +32,6 @@ class ArticleStockController extends Controller
         if ($request->filled('color') && $request->color !== 'tout') {
             $query->where('color', $request->color);
         }
-
 
         if ($request->filled('search')) {
             $search = $request->search;
@@ -47,9 +45,6 @@ class ArticleStockController extends Controller
             });
         }
 
-        
-
-        // ── DB-level sort (only for real DB columns) ──────────────────────────────
         $allowedDbSorts = ['code', 'name', 'stock_min'];
         $computedSorts  = ['urgency_level', 'stock', 'ecart'];
         $sortBy         = $request->get('sort_by', 'code');
@@ -61,27 +56,21 @@ class ArticleStockController extends Controller
 
         $company = $request->filled('company') ? $request->company : null;
 
-        // ── Fetch ALL matching records (no paginate yet) ──────────────────────────
-        $all  = $query->get();
-        $ids  = $all->pluck('id')->all();
+
+        $all   = $query->get();
+        $ids   = $all->pluck('id')->all();
         $codes = $all->pluck('code')->all();
 
-        // ══════════════════════════════════════════════════════════════════════════
-        // BATCH QUERY 1 — Stock per article
-        // ══════════════════════════════════════════════════════════════════════════
         $stockQuery = DB::table('article_palette as ap')
             ->join('palettes as p', 'p.id', '=', 'ap.palette_id')
+            ->join('emplacements as e', 'e.id', '=', 'p.emplacement_id')
+            ->join('depots as d', 'd.id', '=', 'e.depot_id')
             ->where('p.type', 'Stock')
-            ->whereNotExists(function ($q) {
-                $q->select(DB::raw(1))
-                    ->from('emplacements as e')
-                    ->whereColumn('e.id', 'p.emplacement_id')
-                    ->whereIn('e.code', ['K-3P', 'K-4P', 'K-4SP', 'K-3SP']);
-            })
+            ->whereNotIn('e.code', ['K-3P', 'K-4P', 'K-4SP', 'K-3SP', 'ZONE-Q'])
             ->whereIn('ap.article_stock_id', $ids);
 
         if ($company) {
-            $stockQuery->where('p.company_id', $company);
+            $stockQuery->where('d.company_id', $company);
         }
 
         $stockMap = $stockQuery
@@ -89,17 +78,14 @@ class ArticleStockController extends Controller
             ->select('ap.article_stock_id', DB::raw('SUM(ap.quantity) as total'))
             ->pluck('total', 'ap.article_stock_id');
 
-        // ══════════════════════════════════════════════════════════════════════════
-        // BATCH QUERY 2 — EmplacementLimit totals
-        // ══════════════════════════════════════════════════════════════════════════
+
+        // ── Limit Map ─────────────────────────────────────────────────────────────
         $limitMap = EmplacementLimit::whereIn('article_stock_id', $ids)
             ->groupBy('article_stock_id')
             ->selectRaw('article_stock_id, SUM(quantity) as total')
             ->pluck('total', 'article_stock_id');
 
-        // ══════════════════════════════════════════════════════════════════════════
-        // BATCH QUERY 3 — Stock preparation
-        // ══════════════════════════════════════════════════════════════════════════
+        // ── Prep Map ──────────────────────────────────────────────────────────────
         $prepMap = Docligne::whereIn('AR_Ref', $codes)
             ->whereIn('DO_Type', [1, 2, 3])
             ->whereColumn('DL_Qte', '>', 'DL_QteBL')
@@ -107,23 +93,19 @@ class ArticleStockController extends Controller
             ->selectRaw('AR_Ref, SUM(DL_Qte) as total')
             ->pluck('total', 'AR_Ref');
 
-        // ══════════════════════════════════════════════════════════════════════════
-        // BATCH QUERY 4 — Zone preparation
-        // ══════════════════════════════════════════════════════════════════════════
+        // ── Zone Map ──────────────────────────────────────────────────────────────
         $zoneMap = Docligne::whereIn('AR_Ref', $codes)
             ->whereIn('DO_Type', [1, 2, 3])
             ->groupBy('AR_Ref')
             ->selectRaw('AR_Ref, SUM(DL_QteBL) as total')
             ->pluck('total', 'AR_Ref');
 
-        // ══════════════════════════════════════════════════════════════════════════
-        // ENRICH — O(n) map lookups, zero extra queries
-        // ══════════════════════════════════════════════════════════════════════════
+        // ── Enrich each article ───────────────────────────────────────────────────
         $all->transform(function ($article) use ($stockMap, $limitMap, $prepMap, $zoneMap) {
-            $article->stock_prepare    = (float) ($prepMap[$article->code]  ?? 0);
-            $article->stock_prepartion = (float) ($zoneMap[$article->code]  ?? 0);
-            $article->stock            = (float) ($stockMap[$article->id]   ?? 0);
-            $article->max              = (float) ($limitMap[$article->id]   ?? 0);
+            $article->stock_prepare    = (float) ($prepMap[$article->code] ?? 0);
+            $article->stock_prepartion = (float) ($zoneMap[$article->code] ?? 0);
+            $article->stock            = (float) ($stockMap[$article->id]  ?? 0);
+            $article->max              = (float) ($limitMap[$article->id]  ?? 0);
 
             $stock   = floor($article->stock * 100) / 100;
             $max     = $article->max;
@@ -131,10 +113,10 @@ class ArticleStockController extends Controller
             $moyenne = $max / 2;
 
             $article->urgency_level = match (true) {
-                $stock < $min                           => 1,
-                $stock >= $min && $stock < $moyenne     => 2,
-                $stock >= $moyenne && $stock < $max     => 3,
-                default                                 => 4,
+                $stock < $min                         => 1,
+                $stock >= $min && $stock < $moyenne   => 2,
+                $stock >= $moyenne && $stock < $max   => 3,
+                default                               => 4,
             };
 
             $article->ecart = $max - $stock;
@@ -142,7 +124,7 @@ class ArticleStockController extends Controller
             return $article;
         });
 
-        // ── Sort by computed field (across ALL records) ───────────────────────────
+        // ── Sort by computed field ────────────────────────────────────────────────
         if (in_array($sortBy, $computedSorts)) {
             $all = $all->sortBy(
                 fn($a) => $a->{$sortBy},
@@ -157,7 +139,7 @@ class ArticleStockController extends Controller
             $all   = $all->filter(fn($a) => $a->urgency_level === $level)->values();
         }
 
-        // ── Manual pagination over the fully sorted+filtered collection ───────────
+        // ── Manual pagination ─────────────────────────────────────────────────────
         $perPage     = (int) $request->get('per_page', 100);
         $currentPage = (int) $request->get('page', 1);
         $total       = $all->count();
@@ -203,7 +185,7 @@ class ArticleStockController extends Controller
         $query = $article->palettes()
             ->where('type', 'Stock')
             ->whereDoesntHave('emplacement', function ($q) {
-                $q->whereIn('code', ['K-3P', 'K-4P', 'K-4SP', 'K-3SP']);
+                $q->whereIn('code', ['K-3P', 'K-4P', 'K-4SP', 'K-3SP', 'ZONE-Q']);
             });
 
         if ($company_id) {

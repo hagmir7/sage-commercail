@@ -432,6 +432,7 @@ class PaletteController extends Controller
         $destinationCode = auth()->user()->company_id == 1 ? 'K-4P' : 'K-4SP';
 
         $destination = Emplacement::where('code', $destinationCode)->first();
+        
         if (!$destination) {
             return response()->json(['message' => 'Emplacement destination introuvable.'], 404);
         }

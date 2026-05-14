@@ -32,7 +32,7 @@ class ArticleController extends Controller
             ?->palettes()
             ->where('type', 'Stock')
             ->whereDoesntHave('emplacement', function ($q) {
-                $q->whereIn('code', ['K-3P', 'K-4P', 'K-4SP', 'K-3SP']);
+                $q->whereIn('code', ['K-3P', 'K-4P', 'K-4SP', 'K-3SP', 'ZONE-Q']);
             })
             ->sum('article_palette.quantity') ?? 0;
 
