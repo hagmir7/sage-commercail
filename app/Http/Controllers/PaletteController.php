@@ -601,6 +601,7 @@ class PaletteController extends Controller
                 $maxQty = (float) $docligne?->EU_Qte * ($ctValue || 1);
                 $currentQty = (float) $docligne?->DL_QteBL + (float) $request->quantity;
 
+        
                 if ($maxQty < $currentQty & !$document->urgent) {
                     throw new \Exception("La quantité n'est pas valide", 422);
                 }
@@ -609,7 +610,6 @@ class PaletteController extends Controller
                     throw new \Exception("Le document ne correspond pas", 404);
                 }
 
-                // ✅ Attach palette to line
                 $line->palettes()->attach($palette->id, ['quantity' => $request->quantity]);
 
                 if($document->urgent){
@@ -644,7 +644,7 @@ class PaletteController extends Controller
                         'emplacement_id'   => $emplacement?->id,
                         'movement_type'    => $document->urgent ? "OUT" : "TRANSFER",
                         'article_stock_id' => $article_stock->id,
-                        'quantity'         => floatval($request->quantity),
+                        'quantity'         => floatval($currentQty * $ctValue),
                         'moved_by'         => auth()->id(),
                         'company_id'       => auth()->user()->company_id,
                         'to_company_id'    => null,
@@ -653,9 +653,9 @@ class PaletteController extends Controller
                     ]);
 
                     if($document->urgent){
-                        $this->stockService->stockOut($emplacement, $article_stock, $request->quantity);
+                        $this->stockService->stockOut($emplacement, $article_stock, ($currentQty * $ctValue));
                     }else{
-                        $this->stockService->transfer($emplacement, $new_emplacement, $article_stock, $request->quantity);
+                        $this->stockService->transfer($emplacement, $new_emplacement, $article_stock, ($currentQty * $ctValue));
                     }
                    
                 } else {

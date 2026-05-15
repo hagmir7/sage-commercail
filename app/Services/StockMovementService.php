@@ -43,12 +43,11 @@ class StockMovementService
             fn($palette) => $palette->articles->first()?->pivot->quantity ?? 0
         );
 
-        if ($availableQuantity < $quantity) {
+        if ((int) round($availableQuantity * 1000) < (int) round($quantity * 1000)) {
             throw new RuntimeException(
                 "Stock insuffisant dans l'emplacement {$emplacement->code}."
             );
         }
-
         $remaining = $quantity;
 
         foreach ($palettes as $palette) {

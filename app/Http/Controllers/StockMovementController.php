@@ -235,14 +235,13 @@ class StockMovementController extends Controller
             $conditionMultiplier = $request->condition ? (float) $request->condition : 1.0;
 
             DB::transaction(function () use ($article, $request, $conditionMultiplier, $emplacement, $companyId) {
-                // ✅ Log stock movement
                 StockMovement::create([
                     'code_article'     => $request->code_article,
                     'designation'      => $article->description,
                     'emplacement_id'   => $emplacement->id,
                     'movement_type'    => request()->is('*return*') ? "RETURN" : "IN",
                     'article_stock_id' => $article->id,
-                    'quantity'         => $request->quantity,
+                    'quantity'         => round(floatval($request->quantity * $conditionMultiplier) * 1000),
                     'moved_by'         => auth()->id(),
                     'company_id'       => $companyId,
                     'movement_date'    => now(),
@@ -251,7 +250,7 @@ class StockMovementController extends Controller
                 $this->stockService->stockInsert(
                     $emplacement,
                     $article,
-                    $request->quantity,
+                    round(floatval($request->quantity * $conditionMultiplier) * 1000),
                     $conditionMultiplier,
                     $request->type_colis,
                     intval($request->quantity),
