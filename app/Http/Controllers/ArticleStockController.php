@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Exports\ArticleStockExport;
 use App\Http\Controllers\Controller;
 use App\Imports\ArticleStockImport;
 use App\Models\ArticleStock;
@@ -156,6 +157,97 @@ class ArticleStockController extends Controller
 
         return response()->json($paginator);
     }
+
+
+public function export(Request $request)
+{
+    // ── Base query ────────────────────────────────────────────────────────
+    $query = ArticleStock::query();
+
+    if ($request->filled('category') && $request->category !== 'tout') {
+        $query->where('category', $request->category);
+    }
+
+    $company = $request->filled('company') ? $request->company : null;
+
+    $all   = $query->get();
+    $ids   = $all->pluck('id')->all();
+    $codes = $all->pluck('code')->all();
+
+    // ── Stock Map ─────────────────────────────────────────────────────────
+    $stockQuery = DB::table('article_palette as ap')
+        ->join('palettes as p',      'p.id',  '=', 'ap.palette_id')
+        ->join('emplacements as e',  'e.id',  '=', 'p.emplacement_id')
+        ->join('depots as d',        'd.id',  '=', 'e.depot_id')
+        ->where('p.type', 'Stock')
+        ->whereNotIn('e.code', ['K-3P', 'K-4P', 'K-4SP', 'K-3SP', 'ZONE-Q'])
+        ->whereIn('ap.article_stock_id', $ids);
+
+    if ($company) {
+        $stockQuery->where('d.company_id', $company);
+    }
+
+    $stockMap = $stockQuery
+        ->groupBy('ap.article_stock_id')
+        ->select('ap.article_stock_id', DB::raw('SUM(ap.quantity) as total'))
+        ->pluck('total', 'ap.article_stock_id');
+
+    // ── Limit Map ─────────────────────────────────────────────────────────
+    $limitMap = EmplacementLimit::whereIn('article_stock_id', $ids)
+        ->groupBy('article_stock_id')
+        ->selectRaw('article_stock_id, SUM(quantity) as total')
+        ->pluck('total', 'article_stock_id');
+
+    // ── Prep Map ──────────────────────────────────────────────────────────
+    $prepMap = Docligne::whereIn('AR_Ref', $codes)
+        ->whereIn('DO_Type', [1, 2, 3])
+        ->whereColumn('DL_Qte', '>', 'DL_QteBL')
+        ->groupBy('AR_Ref')
+        ->selectRaw('AR_Ref, SUM(DL_Qte) as total')
+        ->pluck('total', 'AR_Ref');
+
+    // ── Zone Map ──────────────────────────────────────────────────────────
+    $zoneMap = Docligne::whereIn('AR_Ref', $codes)
+        ->whereIn('DO_Type', [1, 2, 3])
+        ->groupBy('AR_Ref')
+        ->selectRaw('AR_Ref, SUM(DL_QteBL) as total')
+        ->pluck('total', 'AR_Ref');
+
+    // ── Prix Map (F_ARTICLE) ──────────────────────────────────────────────
+    $prixMap = DB::table('F_ARTICLE')
+        ->whereIn('AR_Ref', $codes)
+        ->pluck('AR_PrixVen', 'AR_Ref');
+
+    // ── Enrich each article ───────────────────────────────────────────────
+    $all->transform(function ($article) use ($stockMap, $limitMap, $prepMap, $zoneMap, $prixMap) {
+        $article->stock_prepare    = (float) ($prepMap[$article->code]  ?? 0);
+        $article->stock_prepartion = (float) ($zoneMap[$article->code]  ?? 0);
+        $article->stock            = (float) ($stockMap[$article->id]   ?? 0);
+        $article->max              = (float) ($limitMap[$article->id]   ?? 0);
+        $article->prix             = (float) ($prixMap[$article->code]  ?? 0);
+
+        $stock   = floor($article->stock * 100) / 100;
+        $max     = $article->max;
+        $min     = (float) $article->stock_min;
+        $moyenne = $max / 2;
+
+        $article->urgency_level = match (true) {
+            $stock < $min                       => 1,
+            $stock >= $min && $stock < $moyenne => 2,
+            $stock >= $moyenne && $stock < $max => 3,
+            default                             => 4,
+        };
+
+        $article->ecart = $max - $stock;
+
+        return $article;
+    });
+
+    // ── Download ──────────────────────────────────────────────────────────
+    $filename = 'stock_' . now()->format('Ymd_His') . '.xlsx';
+
+    return Excel::download(new ArticleStockExport($all), $filename);
+}
 
     public function list(Request $request)
     {

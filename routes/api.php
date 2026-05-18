@@ -389,7 +389,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::prefix('articles')->controller(ArticleStockController::class)->group(function () {
         Route::get('stock', 'stock');
         Route::get('list', 'list');
-        Route::get('{article_stock:code}', 'show');
+        
         Route::delete('{article_stock:code}', 'destroy');
       
         Route::get('emplacements/{piece}', 'emplacements');
@@ -399,8 +399,10 @@ Route::middleware('auth:sanctum')->group(function () {
 
         Route::get('update/{article:code}', 'update');
         Route::post('import', 'import');
+        Route::get('export', 'export');
         Route::get('stock/search', 'search');
-       
+
+        Route::get('{article_stock:code}', 'show');
     });
 
     Route::post('articles/update-ref', [ArticleController::class, 'updateRef']);
