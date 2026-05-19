@@ -241,7 +241,7 @@ class StockMovementController extends Controller
                     'emplacement_id'   => $emplacement->id,
                     'movement_type'    => request()->is('*return*') ? "RETURN" : "IN",
                     'article_stock_id' => $article->id,
-                    'quantity'         => round(floatval($request->quantity * $conditionMultiplier) * 1000),
+                    'quantity'         => round(floatval($request->quantity * $conditionMultiplier), 3),
                     'moved_by'         => auth()->id(),
                     'company_id'       => $companyId,
                     'movement_date'    => now(),
@@ -250,7 +250,7 @@ class StockMovementController extends Controller
                 $this->stockService->stockInsert(
                     $emplacement,
                     $article,
-                    $request->quantity,
+                    round(floatval($request->quantity * $conditionMultiplier), 3),
                     $conditionMultiplier,
                     $request->type_colis,
                     intval($request->quantity),
