@@ -250,7 +250,7 @@ class StockMovementController extends Controller
                 $this->stockService->stockInsert(
                     $emplacement,
                     $article,
-                    round(floatval($request->quantity * $conditionMultiplier) * 1000),
+                    $request->quantity,
                     $conditionMultiplier,
                     $request->type_colis,
                     intval($request->quantity),
