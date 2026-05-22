@@ -39,7 +39,6 @@ use App\Http\Controllers\UserController;
 use App\Http\Controllers\UserPermissionController;
 use App\Http\Controllers\WhatsappController;
 use App\Imports\MovementImport;
-use App\Models\TravelDriver;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -50,20 +49,14 @@ use App\Http\Controllers\QuoteOfferController;
 use App\Http\Controllers\QuoteEvaluationController;
 use App\Http\Controllers\ShippingController;
 use App\Http\Controllers\ShippingCriteriaController;
-use Dom\Document;
 use Illuminate\Support\Facades\Route;
- 
-
-
-
-
 
 
 Route::get('/user', function (Request $request) {
     return $request->user();
 })->middleware('auth:sanctum');
 
-Route::get('login', function(){
+Route::get('login', function () {
     return [];
 })->name('login');
 
@@ -109,7 +102,6 @@ Route::prefix('client')->group(function () {
     Route::get("suppliers/{code}", [ClientController::class, 'showSupplier']);
     Route::get("{client}", [ClientController::class, 'show']);
     Route::put("{client}", [ClientController::class, 'update']);
-   
 });
 
 
@@ -163,20 +155,20 @@ Route::get("progress/{piece}", [DocenteteController::class, 'progress']);
 Route::middleware('auth:sanctum')->group(function () {
 
     Route::prefix('ncf')->group(function () {
-    
+
         Route::get('/',    [SupplierNonConformityController::class, 'index']);
         Route::post('/',   [SupplierNonConformityController::class, 'store']);
         Route::get('/{id}',    [SupplierNonConformityController::class, 'show']);
         Route::get('/download/{ncf:id}',    [SupplierNonConformityController::class, 'download']);
         Route::delete('/{id}', [SupplierNonConformityController::class, 'destroy']);
-    
+
         // Step-based updates
         Route::put('/{id}/step/2', [SupplierNonConformityController::class, 'updateStep2']);
         Route::put('/{id}/step/3', [SupplierNonConformityController::class, 'updateStep3']);
         Route::put('/{id}/step/4', [SupplierNonConformityController::class, 'updateStep4']);
         Route::put('/{id}/step/5', [SupplierNonConformityController::class, 'updateStep5']);
         Route::put('/{id}/step/6', [SupplierNonConformityController::class, 'updateStep6']);
-    
+
         // Attachments
         Route::post('/{id}/attachments',          [NcfAttachmentController::class, 'store']);
         Route::delete('/{id}/attachments/{attId}', [NcfAttachmentController::class, 'destroy']);
@@ -187,7 +179,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/logout', [AuthController::class, 'logout']);
     Route::get('/user', [AuthController::class, 'user']);
 
-    Route::prefix('user')->controller(UserController::class)->group(function(){
+    Route::prefix('user')->controller(UserController::class)->group(function () {
         Route::get('update-password', 'updatePassword');
         Route::post('{userId}/update-password', 'updateUserPassword');
         Route::delete('{user}/destroy', 'destroy');
@@ -202,7 +194,7 @@ Route::middleware('auth:sanctum')->group(function () {
 
     // Comparatifs des devis
     Route::apiResource('quote-comparisons', QuoteComparisonController::class);
-    
+
     // Offres & Évaluations (nested sous comparatif)
     Route::prefix('quote-comparisons/{quoteComparison}')->group(function () {
         Route::post('offers', [QuoteOfferController::class, 'store']);
@@ -211,7 +203,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('evaluations', [QuoteEvaluationController::class, 'storeOrUpdate']);
         Route::get('pdf', [QuoteComparisonController::class, 'download']);
     });
-    
+
 
 
 
@@ -237,7 +229,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('/create', 'create');
     });
 
-    Route::prefix('users')->controller(UserController::class)->group(function(){
+    Route::prefix('users')->controller(UserController::class)->group(function () {
         Route::get('documents', 'documents');
         Route::get('documents/{piece}', 'showDocument');
     });
@@ -289,7 +281,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('create', 'create');
 
         Route::delete('{code}/article/{article_id}/inventory/delete', 'detachArticleForInvenotry');
-       
+
         Route::put('{code}/article/{article_id}/update', 'updateArticleQuantity');
 
         Route::get('{code}', 'show');
@@ -298,15 +290,15 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('{code}/line/{lineId}', 'controller');
         Route::get('{code}/controlle-all', 'controlAll');
         Route::get('document/{piece}', 'documentPalettes');
-      
+
         Route::delete('{palette:code}', 'destroy');
         Route::post('import', 'import')->name('palettes.import');
     });
-    
+
 
     Route::apiResource('supplier-interviews', SupplierInterviewController::class);
 
-    Route::prefix('supplier-interviews')->controller(SupplierInterviewController::class)->group(function(){
+    Route::prefix('supplier-interviews')->controller(SupplierInterviewController::class)->group(function () {
         Route::post('{supplierInterview}/criteria', 'addCriteria');
         Route::post('{supplierInterview}/download', 'download');
     });
@@ -339,10 +331,10 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get("{id}", 'show');
     });
 
-    
 
 
-    Route::prefix('stock')->controller(StockMovementController::class)->group(function(){
+
+    Route::prefix('stock')->controller(StockMovementController::class)->group(function () {
         Route::post('in', 'in');
         Route::post('out', 'out');
         Route::post('return', 'in');
@@ -352,7 +344,6 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('movements/{company}', 'list');
         Route::delete('movements/delete/{stock_movement}', 'deleteMovement');
         Route::put('movements/update/{stock_movement}', 'update');
-       
     });
 
 
@@ -381,17 +372,17 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get("{inventory}", 'show');
     });
 
-    
 
-   
+
+
 
 
     Route::prefix('articles')->controller(ArticleStockController::class)->group(function () {
         Route::get('stock', 'stock');
         Route::get('list', 'list');
-        
+
         Route::delete('{article_stock:code}', 'destroy');
-      
+
         Route::get('emplacements/{piece}', 'emplacements');
         Route::get('', 'index');
         Route::post('store', 'store');
@@ -451,22 +442,25 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('transfer', 'transfer');
         Route::get('reset/{piece}', 'reset');
         Route::post('movement/{piece}', 'movement');
-       
+
         Route::get('validation/{piece}', 'validation');
     });
 
 
-     Route::prefix('devise')->controller(DeviseController::class)->group(function () {
+    Route::prefix('devise')->controller(DeviseController::class)->group(function () {
         Route::get('', 'index');
     });
 
-    
+
 
 
     Route::apiResource('purchase-documents', PurchaseDocumentController::class);
     Route::get('status-count/{status}',  [PurchaseDocumentController::class, 'statusCount']);
     Route::post('purchase-documents/transfer',  [PurchaseDocumentController::class, 'transfer']);
-   
+    Route::post('purchase-line/{line}/non-compliant',  [PurchaseDocumentController::class, 'storeLineNonCompliant']);
+    Route::get('purchase-line/{line}/non-compliant',  [PurchaseDocumentController::class, 'showLineNonCompliant']);
+    Route::patch('purchase-line/{nonCompliant}/non-compliant/update',  [PurchaseDocumentController::class, 'LineNonCompliantUpdateSupplier']);
+
 
     // Lignes
     Route::apiResource('purchase-lines', PurchaseLineController::class);
@@ -476,6 +470,7 @@ Route::middleware('auth:sanctum')->group(function () {
 
     // Historiques
     Route::apiResource('purchase-document-histories', PurchaseDocumentHistoryController::class);
+
     Route::apiResource('services', ServiceController::class);
 
     Route::get('status-notification', [DocumentController::class, 'statusNotification']);
@@ -509,10 +504,3 @@ Route::post('/user/update/{id}', [UserController::class, 'update']);
 
 Route::get('/webhook', [WhatsappController::class, 'verify']);
 Route::post('/webhook', [WhatsAppController::class, 'receive']);
-
-
-
-
-
-
-

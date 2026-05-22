@@ -5,11 +5,13 @@ namespace App\Http\Controllers;
 use App\Models\Article;
 use App\Models\ArticleSupplier;
 use App\Models\Collaborator;
+use App\Models\Compte;
 use App\Models\CurrentPiece;
 use App\Models\Devise;
 use App\Models\PurchaseDocument;
 use App\Models\PurchaseLine;
 use App\Models\PurchaseLineFile;
+use App\Models\PurchaseLineNonCompliant;
 use Carbon\Carbon;
 use DateTime;
 use Illuminate\Http\Request;
@@ -18,6 +20,7 @@ use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Validator;
 use Exception;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Validation\Rule;
 
 class PurchaseDocumentController extends Controller
 {
@@ -26,7 +29,12 @@ class PurchaseDocumentController extends Controller
         $user = auth()->user();
 
         $query = PurchaseDocument::with(['user', 'service'])
-            ->withCount('lines');
+            ->withCount('lines')
+            ->withCount([
+                'lines as non_compliant_lines_count' => function ($q) {
+                    $q->has('nonCompliant');
+                }
+            ]);
 
         /* ---------------- Role-based visibility ---------------- */
         if ($user->hasRole(['admin', 'super_admin', 'dg'])) {
@@ -162,7 +170,20 @@ class PurchaseDocumentController extends Controller
 
     public function show(PurchaseDocument $purchaseDocument)
     {
-        $purchaseDocument->load(['user', 'service', 'lines.files']);
+        $purchaseDocument->load([
+            'user',
+            'service',
+            'lines.files',
+        ]);
+
+        $purchaseDocument->loadCount([
+            'lines as non_compliant_lines_count' => function ($q) {
+                $q->has('nonCompliant');
+            }
+        ]);
+
+        $purchaseDocument->lines->loadCount('nonCompliant');
+
         return response()->json($purchaseDocument);
     }
 
@@ -839,13 +860,86 @@ class PurchaseDocumentController extends Controller
         if (!$file) {
             return response()->json(['message' => 'Fichier non trouvé'], 404);
         }
-
-        // Check if file exists in storage
         if (!Storage::disk('public')->exists($file->file_path)) {
             return response()->json(['message' => 'Fichier introuvable sur le serveur'], 404);
         }
-
-        // Force download with original filename
         return Storage::disk('public')->download($file->file_path, $file->file_name);
+    }
+
+
+
+    public function storeLineNonCompliant(Request $request, PurchaseLine $line)
+    {
+        $validator = Validator::make($request->all(), [
+            'quantity'      => 'required|integer|min:1',
+            'note'          => 'nullable|string|max:1000',
+            'supplier_code' => 'nullable|string|max:100',
+            'file'          => 'nullable|file|mimes:jpg,jpeg,png,pdf|max:5120', // 5MB
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'message' => $validator->errors()->first(),
+                'errors'  => $validator->errors()
+            ], 406);
+        }
+
+        $filePath = null;
+
+        if ($request->hasFile('file')) {
+            $filePath = $request->file('file')->store('non_compliant_files', 'public');
+        }
+
+        $nonCompliant = PurchaseLineNonCompliant::create([
+            'purchase_line_id' => $line->id,
+            'quantity'         => $request->quantity,
+            'user_id'          => auth()->id(),
+            'note'             => $request->note,
+            'supplier_code'    => $request->supplier_code,
+            'file'             => $filePath,
+        ]);
+
+        return response()->json([
+            'message' => 'Non-compliant line created successfully',
+            'data'    => $nonCompliant
+        ]);
+    }
+
+
+    public function showLineNonCompliant(PurchaseLine $line)
+    {
+        $nonCompliant = $line->nonCompliant()->with('user')->get();
+
+        return response()->json($nonCompliant);
+    }
+
+    public function LineNonCompliantUpdateSupplier(
+        Request $request,
+        PurchaseLineNonCompliant $nonCompliant
+    ) {
+
+        $validator = Validator::make($request->all(), [
+            'supplier_code' => [
+                'nullable',
+                'string',
+                'max:100',
+                Rule::exists('sqlsrv_inter.dbo.F_COMPTET', 'CT_Num'),
+            ],
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'message' => $validator->errors()->first(),
+                'errors'  => $validator->errors()
+            ], 406);
+        }
+
+        $nonCompliant->update([
+            'supplier_code' => $request->supplier_code,
+        ]);
+
+        return response()->json([
+            'message' => 'Supplier added successfully',
+        ]);
     }
 }

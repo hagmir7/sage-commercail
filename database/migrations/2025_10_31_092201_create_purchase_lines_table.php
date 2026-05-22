@@ -14,12 +14,12 @@ return new class extends Migration
         Schema::create('purchase_lines', function (Blueprint $table) {
             $table->id();
             $table->foreignId('purchase_document_id')->constrained()->onDelete('cascade');
-            $table->string('code')->nullable(); // item code or reference
-            $table->text('description'); // item description
-            $table->decimal('quantity', 10, 2)->default(1); // requested quantity
-            $table->string('unit')->nullable(); // unit of measure
-            $table->decimal('estimated_price', 10, 2)->nullable(); // estimated unit price
-            $table->decimal('total', 10, 2)->nullable(); // total (quantity * price)
+            $table->string('code')->nullable();
+            $table->text('description');
+            $table->decimal('quantity', 10, 2)->default(1); 
+            $table->string('unit')->nullable();
+            $table->decimal('estimated_price', 10, 2)->nullable(); 
+            $table->decimal('total', 10, 2)->nullable();
             $table->timestamps();
         });
     }

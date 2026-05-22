@@ -22,6 +22,8 @@ class PurchaseLineFile extends Model
         return $this->belongsTo(PurchaseLine::class, 'purchase_line_id');
     }
 
+  
+
     // uploader user
     public function uploader()
     {

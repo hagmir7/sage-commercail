@@ -26,13 +26,21 @@ class PurchaseLine extends Model
         return $this->belongsTo(PurchaseDocument::class, 'purchase_document_id');
     }
 
+    public function nonCompliant()
+    {
+        return $this->hasMany(
+            PurchaseLineNonCompliant::class,
+            'purchase_line_id'
+        );
+    }
+
 
     public function files()
     {
         return $this->hasMany(PurchaseLineFile::class);
     }
 
-     protected static function booted()
+    protected static function booted()
     {
         static::saving(function ($line) {
             if (!is_null($line->quantity) && !is_null($line->estimated_price)) {
