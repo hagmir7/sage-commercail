@@ -1,16 +1,14 @@
 <?php
 
-use App\Exports\StockMovementsExport;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\DocenteteController;
 use App\Http\Controllers\SqlEditorController;
-use App\Http\Controllers\UserController;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\LogViewerController;
 
 
 Route::get('/', function () {
-    return view('welcome');
+    return redirect('https://intercocina.com');
 });
 
 Route::get('/test/{id}', [DocenteteController::class, 'show']);

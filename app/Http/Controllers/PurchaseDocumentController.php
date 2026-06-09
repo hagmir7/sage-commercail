@@ -5,7 +5,6 @@ namespace App\Http\Controllers;
 use App\Models\Article;
 use App\Models\ArticleSupplier;
 use App\Models\Collaborator;
-use App\Models\Compte;
 use App\Models\CurrentPiece;
 use App\Models\Devise;
 use App\Models\PurchaseDocument;
@@ -941,5 +940,15 @@ class PurchaseDocumentController extends Controller
         return response()->json([
             'message' => 'Supplier added successfully',
         ]);
+    }
+
+    public function deleteLineNonCompliant(PurchaseLineNonCompliant $nonCompliant)
+    {
+        if (auth()->user()->hasRole('admin')) {
+            $nonCompliant->delete();
+            return response()->json([
+                'message' => "Supprimé avec succès"
+            ]);
+        }
     }
 }

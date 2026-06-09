@@ -144,8 +144,6 @@ Route::get('/users', function (Request $request) {
 Route::get('inventory/{inventory}/movements/export', [InventoryExportController::class, 'movements']);
 
 
-
-
 Route::get('inventory/{inventory}/export', [InventoryExportController::class, 'export']);
 
 
@@ -153,7 +151,7 @@ Route::get("progress/{piece}", [DocenteteController::class, 'progress']);
 
 
 Route::middleware('auth:sanctum')->group(function () {
-
+    
     Route::prefix('ncf')->group(function () {
 
         Route::get('/',    [SupplierNonConformityController::class, 'index']);
@@ -203,8 +201,6 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('evaluations', [QuoteEvaluationController::class, 'storeOrUpdate']);
         Route::get('pdf', [QuoteComparisonController::class, 'download']);
     });
-
-
 
 
     // Permissions
@@ -459,6 +455,8 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('purchase-documents/transfer',  [PurchaseDocumentController::class, 'transfer']);
     Route::post('purchase-line/{line}/non-compliant',  [PurchaseDocumentController::class, 'storeLineNonCompliant']);
     Route::get('purchase-line/{line}/non-compliant',  [PurchaseDocumentController::class, 'showLineNonCompliant']);
+    Route::delete('purchase-line/{line}/non-compliant',  [PurchaseDocumentController::class, 'deleteLineNonCompliant']);
+
     Route::patch('purchase-line/{nonCompliant}/non-compliant/update',  [PurchaseDocumentController::class, 'LineNonCompliantUpdateSupplier']);
 
 
