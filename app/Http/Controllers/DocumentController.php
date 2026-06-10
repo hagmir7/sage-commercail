@@ -774,8 +774,9 @@ class DocumentController extends Controller
 
     public function archive(Request $request)
     {
-        if (auth()->user()->hasRole('fabrication')) {
+        $userCompanyId = auth()->user()->company_id;
 
+        if (auth()->user()->hasRole('fabrication')) {
             $query = Document::with([
                 'docentete:DO_Domaine,DO_Type,DO_Piece,DO_Date,DO_Ref,DO_Tiers,DO_Statut,cbMarq,cbCreation,DO_DateLivr,DO_Expedit',
                 'status',
@@ -784,16 +785,19 @@ class DocumentController extends Controller
                 }
             ])->whereHas('lines', function ($q) {
                 $q->whereNotNull('fabricated_by');
+            })->whereHas('companies', function ($q) use ($userCompanyId) {
+                $q->where('companies.id', $userCompanyId);
             });
+
         } elseif (auth()->user()->hasRole('commercial')) {
 
             $query = Document::with([
                 'docentete:DO_Domaine,DO_Type,DO_Piece,DO_Date,DO_Ref,DO_Tiers,DO_Statut,cbMarq,cbCreation,DO_DateLivr,DO_Expedit',
                 'status'
             ]);
+
         } else {
 
-            $userCompanyId = auth()->user()->company_id;
             $query = Document::with([
                 'docentete:cbMarq,DO_Domaine,DO_Type,DO_Piece,DO_Date,DO_Ref,DO_Tiers,DO_Statut,cbCreation,DO_DateLivr,DO_Expedit',
                 'status'

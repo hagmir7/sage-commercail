@@ -906,13 +906,13 @@ class DocenteteController extends Controller
                 $document = $lines->first()->document;
 
                 // ✅ Generate code only if role is fabrication AND no code exists
-                if ($role->name === 'fabrication' && empty($document->code)) {
+                if ($role->name === 'fabrication' && empty($document->code) && intval(auth()->user()->company_id) == 1 ) {
                     $document->code = $this->generateFabricationCode();
                 }
 
                 $document->update([
                     'status_id' => $status == 7 ? 7 : 2,
-                    'code' => $document->code, // ensure it's saved
+                    'code' => $document->code, 
                 ]);
 
                 $document->companies()->updateExistingPivot(auth()->user()->company_id, [
