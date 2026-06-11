@@ -32,44 +32,62 @@ class SupplierInterviewController extends Controller
     /**
      * Store a newly created resource in storage.
      */
-    public function store(Request $request)
-    {
-        $connection = $request->company_db;
+ public function store(Request $request)
+{
+    $connection = $request->company_db;
 
-        $validator = Validator::make($request->all(), [
-            'CT_Num' => 'required',
-            'date'          => 'required|date',
-            'description'   => 'nullable|string',
+    $validator = Validator::make($request->all(), [
+        'CT_Num'      => 'required',
+        'date'        => 'required|date',
+        'description' => 'nullable|string',
+    ]);
+
+    if ($validator->fails()) {
+        return response()->json([
+            'message' => $validator->errors()->first(),
+        ], 422);
+    }
+
+    $year = date('Y', strtotime($request->date));
+
+    $exists = app()->environment('local')
+        ? SupplierInterview::on($connection)
+            ->where('CT_Num', $request->CT_Num)
+            ->whereYear('date', $year)
+            ->exists()
+        : DB::connection($connection)->selectOne(
+            "SELECT TOP 1 1 FROM supplier_interviews 
+             WHERE CT_Num = ? AND YEAR([date]) = ?",
+            [$request->CT_Num, $year]
+          );
+
+    if ($exists) {
+        return response()->json([
+           'message' => "Un enregistrement pour [{$request->CT_Num}] existe déjà pour l'année {$year}.",
+        ], 422);
+    }
+
+    if (app()->environment('local')) {
+        $supplierInterview = SupplierInterview::on($connection)->create([
+            'CT_Num'      => $request->CT_Num,
+            'date'        => $request->date,
+            'description' => $request->description,
+            'user_id'     => auth()->id(),
         ]);
+    } else {
+        $supplierInterview = DB::connection($connection)->insert(
+            "INSERT INTO supplier_interviews 
+             (CT_Num, [date], description, user_id, created_at, updated_at)
+             VALUES (?, ?, ?, ?, GETDATE(), GETDATE())",
+            [
+                $request->CT_Num,
+                $request->date,
+                $request->description,
+                auth()->id(),
+            ]
+        );
+    }
 
-        if ($validator->fails()) {
-            return response()->json([
-                'message' => $validator->errors()->first(),
-            ], 422);
-        }
-
-
-        if (app()->environment('local')) {
-
-            $supplierInterview = SupplierInterview::on($connection)->create([
-                'CT_Num'      => $request->CT_Num,
-                'date'        => $request->date,
-                'description' => $request->description,
-                'user_id'     => auth()->id(),
-            ]);
-        } else {
-            $supplierInterview = DB::connection($connection)->insert(
-                "INSERT INTO supplier_interviews 
-            (CT_Num, [date], description, user_id, created_at, updated_at)
-        VALUES (?, ?, ?, ?, GETDATE(), GETDATE())",
-                [
-                    $request->CT_Num,
-                    $request->date,
-                    $request->description,
-                    auth()->id(),
-                ]
-            );
-        }
 
 
         return response()->json($supplierInterview, 201);

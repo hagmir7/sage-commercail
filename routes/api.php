@@ -73,6 +73,12 @@ Route::get('/download/purchase-file/{id}', [PurchaseDocumentController::class, '
 
 Route::get('tracking', [DocumentController::class, 'traking']);
 
+Route::get('deadline-suppliers', [PurchaseController::class, 'deadlineSuppliers']);
+Route::get('deadline-suppliers/{ctNum}', [PurchaseController::class, 'deadlineSupplier']);
+Route::get('non-compliant-lines', [PurchaseController::class, 'nonCompliantLines']);
+Route::get('supplier-interviews-state', [PurchaseController::class, 'supplierInterviewsByYear']);
+
+
 
 Route::post('import-movements', function (Request $request) {
     $request->validate([

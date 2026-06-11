@@ -3,8 +3,13 @@
 namespace App\Http\Controllers;
 
 use App\Models\Client;
+use App\Models\Compte;
+use App\Models\Docentete;
+use App\Models\Docligne;
 use App\Models\PurchaseDocument;
+use App\Models\PurchaseLineNonCompliant;
 use App\Models\Service;
+use App\Models\SupplierInterview;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -176,6 +181,226 @@ class PurchaseController extends Controller
         }
 
         return $total;
+    }
+
+public function deadlineSuppliers(): array
+{
+    $start = Carbon::now()->subMonths(11)->startOfMonth()->format('Ymd');
+    $end   = Carbon::now()->endOfMonth()->format('Ymd');
+
+    $totalSubquery = Docentete::on('sqlsrv_inter')
+        ->where('F_DOCENTETE.DO_Domaine', 1)
+        ->leftJoin('F_DOCLIGNE', 'F_DOCLIGNE.DO_Piece', '=', 'F_DOCENTETE.DO_Piece')
+        ->selectRaw("
+            F_DOCENTETE.DO_Piece,
+            CASE
+                WHEN F_DOCENTETE.DO_Piece LIKE '%BL%'
+                    THEN FORMAT(F_DOCENTETE.DO_Date, 'yyyy-MM')
+                WHEN F_DOCENTETE.DO_Piece LIKE '%FA%'
+                    THEN FORMAT(MAX(F_DOCLIGNE.DL_DateBL), 'yyyy-MM')
+                ELSE FORMAT(F_DOCENTETE.DO_Date, 'yyyy-MM')
+            END AS month
+        ")
+        ->whereBetween('F_DOCENTETE.DO_DateLivr', [$start, $end])
+        ->groupByRaw("
+            F_DOCENTETE.DO_Piece,
+            F_DOCENTETE.DO_Date,
+            F_DOCENTETE.DO_DateLivr
+        ")
+        ->toBase(); // raw query builder, no Eloquent wrapping
+
+    // Main query: late deliveries (DL_DateBL > DO_DateLivr) + join total subquery
+    $rows = Docentete::on('sqlsrv_inter')
+        ->where('F_DOCENTETE.DO_Domaine', 1)
+        ->whereBetween('F_DOCENTETE.DO_DateLivr', [$start, $end])
+        ->join('F_DOCLIGNE', function ($join) {
+            $join->on('F_DOCLIGNE.DO_Piece', '=', 'F_DOCENTETE.DO_Piece')
+                ->whereRaw('F_DOCLIGNE.DL_DateBL > F_DOCENTETE.DO_DateLivr');
+        })
+        // Join the totals subquery on the same month
+        ->joinSub($totalSubquery, 'totals', function ($join) {
+            $join->on('totals.DO_Piece', '=', 'F_DOCENTETE.DO_Piece');
+        })
+        ->selectRaw("
+            FORMAT(F_DOCENTETE.DO_DateLivr, 'yyyy-MM') AS month,
+            COUNT(DISTINCT F_DOCENTETE.DO_Piece)        AS count,
+            COUNT(DISTINCT totals.DO_Piece)             AS total
+        ")
+        ->groupByRaw("FORMAT(F_DOCENTETE.DO_DateLivr, 'yyyy-MM')")
+        ->get()
+        ->keyBy('month');
+
+    // However, since total is independent, we fetch it separately and merge
+    $totals = \DB::connection('sqlsrv_inter')
+        ->table(\DB::raw("({$totalSubquery->toSql()}) as t"))
+        ->mergeBindings($totalSubquery)
+        ->selectRaw("month, COUNT(DISTINCT DO_Piece) AS total")
+        ->groupBy('month')
+        ->get()
+        ->keyBy('month');
+
+    return collect(range(11, 0))->map(function ($i) use ($rows, $totals) {
+        $month = Carbon::now()->subMonths($i)->format('Y-m');
+        $row   = $rows[$month]   ?? null;
+        $tot   = $totals[$month] ?? null;
+        return [
+            'month' => $month,
+            'count' => (int) ($row->count ?? 0),
+            'total' => (int) ($tot->total ?? 0),
+        ];
+    })->values()->all();
+}
+
+
+    public function deadlineSupplier(string $ctNum): array
+    {
+        $start = Carbon::now()->subMonths(11)->startOfMonth()->format('Ymd');
+        $end   = Carbon::now()->endOfMonth()->format('Ymd');
+
+        $totalSubquery = Docentete::on('sqlsrv_inter')
+            ->where('F_DOCENTETE.DO_Domaine', 1)
+            ->where('F_DOCENTETE.DO_Tiers', $ctNum)
+            ->whereBetween('F_DOCENTETE.DO_DateLivr', [$start, $end])
+            ->leftJoin('F_DOCLIGNE', 'F_DOCLIGNE.DO_Piece', '=', 'F_DOCENTETE.DO_Piece')
+            ->selectRaw("
+            F_DOCENTETE.DO_Piece,
+            CASE
+                WHEN F_DOCENTETE.DO_Piece LIKE '%BL%'
+                    THEN FORMAT(F_DOCENTETE.DO_Date, 'yyyy-MM')
+                WHEN F_DOCENTETE.DO_Piece LIKE '%FA%'
+                    THEN FORMAT(MAX(F_DOCLIGNE.DL_DateBL), 'yyyy-MM')
+                ELSE FORMAT(F_DOCENTETE.DO_Date, 'yyyy-MM')
+            END AS month
+        ")
+            ->groupByRaw("
+            F_DOCENTETE.DO_Piece,
+            F_DOCENTETE.DO_Date,
+            F_DOCENTETE.DO_DateLivr
+        ")
+            ->toBase();
+
+        // Late-delivery count query (DL_DateBL > DO_DateLivr)
+        $rows = Docentete::on('sqlsrv_inter')
+            ->where('F_DOCENTETE.DO_Domaine', 1)
+            ->where('F_DOCENTETE.DO_Tiers', $ctNum)
+            ->whereBetween('F_DOCENTETE.DO_DateLivr', [$start, $end])
+            ->join('F_DOCLIGNE', function ($join) {
+                $join->on('F_DOCLIGNE.DO_Piece', '=', 'F_DOCENTETE.DO_Piece')
+                    ->whereRaw('F_DOCLIGNE.DL_DateBL > F_DOCENTETE.DO_DateLivr');
+            })
+            ->selectRaw("
+            FORMAT(F_DOCENTETE.DO_DateLivr, 'yyyy-MM') AS month,
+            COUNT(DISTINCT F_DOCENTETE.DO_Piece)        AS count
+        ")
+            ->groupByRaw("FORMAT(F_DOCENTETE.DO_DateLivr, 'yyyy-MM')")
+            ->get()
+            ->keyBy('month');
+
+        // Total documents per month (independent query)
+        $totals = \DB::connection('sqlsrv_inter')
+            ->table(\DB::raw("({$totalSubquery->toSql()}) as t"))
+            ->mergeBindings($totalSubquery)
+            ->selectRaw("month, COUNT(DISTINCT DO_Piece) AS total")
+            ->groupBy('month')
+            ->get()
+            ->keyBy('month');
+
+        return collect(range(11, 0))->map(function ($i) use ($rows, $totals) {
+            $month = Carbon::now()->subMonths($i)->format('Y-m');
+            $row   = $rows[$month]   ?? null;
+            $tot   = $totals[$month] ?? null;
+            return [
+                'month' => $month,
+                'count' => (int) ($row->count ?? 0),
+                'total' => (int) ($tot->total ?? 0),
+            ];
+        })->values()->all();
+    }
+
+    public function nonCompliantLines(): array
+    {
+        $start = Carbon::now()->subMonths(11)->startOfMonth();
+        $end   = Carbon::now()->endOfMonth();
+
+        $nonCompliantRows = PurchaseLineNonCompliant::whereBetween('created_at', [$start, $end])
+            ->selectRaw("
+            FORMAT(created_at, 'yyyy-MM') AS month,
+            COUNT(id) AS count
+        ")
+            ->groupByRaw("FORMAT(created_at, 'yyyy-MM')")
+            ->get()
+            ->keyBy('month');
+
+        $docligneRows = Docligne::on('sqlsrv_inter')
+            ->where('DO_Domaine', 1)
+            ->whereBetween(
+                DB::raw("CONVERT(datetime, cbCreation, 120)"),
+                [$start->format('Ymd'), $end->format('Ymd')]
+            )
+            ->where(function ($q) {
+                $q->where('DO_Piece', 'LIKE', '%FA%')
+                    ->orWhere('DO_Piece', 'LIKE', '%BL%');
+            })
+            ->selectRaw("
+                FORMAT(CONVERT(datetime, cbCreation, 120), 'yyyy-MM') AS month,
+                COUNT(cbMarq) AS total
+            ")
+            ->groupByRaw("FORMAT(CONVERT(datetime, cbCreation, 120), 'yyyy-MM')")
+            ->get()
+            ->keyBy('month');
+
+        return collect(range(11, 0))->map(function ($i) use ($nonCompliantRows, $docligneRows) {
+            $month = Carbon::now()->subMonths($i)->format('Y-m');
+            return [
+                'month' => $month,
+                'count_none_compliant_lines' => (int) ($nonCompliantRows[$month]->count ?? 0),
+                'total_livraisons' => (int) ($docligneRows[$month]->total ?? 0),
+            ];
+        })->values()->all();
+    }
+
+
+    public function supplierInterviewsByYear(): array
+    {
+        $startYear = Carbon::now()->subYears(6)->year; // 7 years including current
+        $endYear   = Carbon::now()->year;
+
+        // ── SupplierInterview counts per year (local DB) ──────────────────────
+        $interviewRows = SupplierInterview::on('sqlsrv_inter')->selectRaw('YEAR(created_at) AS year, COUNT(id) AS count')
+            ->whereYear('created_at', '>=', $startYear)
+            ->groupByRaw('YEAR(created_at)')
+            ->get()
+            ->keyBy('year');
+
+        // ── Compte counts per year (SQL Server) ───────────────────────────────
+        $compteRows = Compte::on('sqlsrv_inter')
+            ->selectRaw('YEAR(CONVERT(datetime, cbCreation, 120)) AS year, COUNT(CT_Num) AS count')
+            ->whereRaw('YEAR(CONVERT(datetime, cbCreation, 120)) >= ?', [$startYear])
+            ->groupByRaw('YEAR(CONVERT(datetime, cbCreation, 120))')
+            ->get()
+            ->keyBy('year');
+
+        // ── Build years range & apply cumulative totals ───────────────────────
+        $cumulativeInterviews = 0;
+        $cumulativeCompte     = 0;
+
+        return collect(range($startYear, $endYear))->map(function ($year) use (
+            $interviewRows,
+            $compteRows,
+            &$cumulativeInterviews,
+            &$cumulativeCompte
+        ) {
+            $cumulativeInterviews += (int) ($interviewRows[$year]->count ?? 0);
+            $cumulativeCompte     += (int) ($compteRows[$year]->count    ?? 0);
+
+            return [
+                'year'                => $year,
+                'interviews_count'    => (int) ($interviewRows[$year]->count ?? 0), // that year only
+                'interviews_total'    => $cumulativeInterviews,                      // cumulative
+                'suppliers_count'     => (int) ($compteRows[$year]->count    ?? 0), // that year only
+                'suppliers_total'     => $cumulativeCompte,                          // cumulative
+            ];
+        })->values()->all();
     }
 
 
