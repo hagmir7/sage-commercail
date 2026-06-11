@@ -461,7 +461,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('purchase-documents/transfer',  [PurchaseDocumentController::class, 'transfer']);
     Route::post('purchase-line/{line}/non-compliant',  [PurchaseDocumentController::class, 'storeLineNonCompliant']);
     Route::get('purchase-line/{line}/non-compliant',  [PurchaseDocumentController::class, 'showLineNonCompliant']);
-    Route::delete('purchase-line/{line}/non-compliant',  [PurchaseDocumentController::class, 'deleteLineNonCompliant']);
+    Route::delete('purchase-line/{nonCompliant}/non-compliant',  [PurchaseDocumentController::class, 'deleteLineNonCompliant']);
 
     Route::patch('purchase-line/{nonCompliant}/non-compliant/update',  [PurchaseDocumentController::class, 'LineNonCompliantUpdateSupplier']);
 
