@@ -362,8 +362,8 @@ public function deadlineSuppliers(): array
 
     public function supplierInterviewsByYear(): array
     {
-        $startYear = Carbon::now()->subYears(6)->year; // 7 years including current
-        $endYear   = Carbon::now()->year;
+        $startYear = Carbon::now()->subYears(6)->year;
+        $endYear   = Carbon::now()->subYears(1)->year;
 
         // ── SupplierInterview counts per year (local DB) ──────────────────────
         $interviewRows = SupplierInterview::on('sqlsrv_inter')->selectRaw('YEAR(created_at) AS year, COUNT(id) AS count')
@@ -395,10 +395,10 @@ public function deadlineSuppliers(): array
 
             return [
                 'year'                => $year,
-                'interviews_count'    => (int) ($interviewRows[$year]->count ?? 0), // that year only
-                'interviews_total'    => $cumulativeInterviews,                      // cumulative
-                'suppliers_count'     => (int) ($compteRows[$year]->count    ?? 0), // that year only
-                'suppliers_total'     => $cumulativeCompte,                          // cumulative
+                'interviews_count'    => (int) ($interviewRows[$year]->count ?? 0),
+                'interviews_total'    => $cumulativeInterviews,
+                'suppliers_count'     => (int) ($compteRows[$year]->count    ?? 0),
+                'suppliers_total'     => $cumulativeCompte,
             ];
         })->values()->all();
     }

@@ -314,8 +314,8 @@ class PaletteController extends Controller
 
 public function confirmPalette($code, $piece)
 {
+  
     $logContext = ['code' => $code, 'piece' => $piece, 'user_id' => auth()->id()];
-    Log::info('[confirmPalette] START', $logContext);
 
     DB::beginTransaction();
 
@@ -681,161 +681,155 @@ public function confirmPalette($code, $piece)
 
 
 
-    public function confirm(Request $request)
-    {
-        $validator = Validator::make($request->all(), [
-            'quantity'    => 'required|integer|max:1000|min:1',
-            'line'        => 'required|exists:lines,id',
-            'palette'     => 'required|exists:palettes,code',
-            'emplacement' => 'nullable'
-        ]);
+public function confirm(Request $request)
+{
+    $validator = Validator::make($request->all(), [
+        'quantity'    => 'required|integer|max:1000|min:1',
+        'line'        => 'required|exists:lines,id',
+        'palette'     => 'required|exists:palettes,code',
+        'emplacement' => 'nullable'
+    ]);
 
-        if ($validator->fails()) {
-            return response()->json([
-                'message' => $validator->errors()->first(),
-                'errors'  => $validator->errors()
-            ], 422);
-        }
-
-        $line     = Line::find($request->line);
-        $document = $line->document;
-        $palette  = Palette::where("code", $request->palette)->first();
-
-        $line->load(['palettes', 'document']);
-
-        try {
-            DB::transaction(function () use ($document, $request, $line, $palette) {
-
-                $docligne = $line?->docligne;
-
-                $ctValue = $docligne?->article?->conditions->where('EC_Enumere', $docligne?->EU_Enumere)->first()?->EC_Quantite;
-
-                $maxQty = (float) $docligne?->EU_Qte * ($ctValue || 1);
-                $currentQty = (float) $docligne?->DL_QteBL + (float) $request->quantity;
-
-        
-                if ($maxQty < $currentQty & !$document->urgent) {
-                    throw new \Exception("La quantité n'est pas valide", 422);
-                }
-
-                if ($line->document_id !== $palette->document_id) {
-                    throw new \Exception("Le document ne correspond pas", 404);
-                }
-
-                $line->palettes()->attach($palette->id, ['quantity' => $request->quantity]);
-
-                if($document->urgent){
-                    $line->update(['status_id' => 11]);
-                }else{
-                    $line->update(['status_id' => 8]);
-                }
-                
-        
-                $emplac_code = auth()->user()->company_id == 1 ? "K-4P" : "K-4SP";
-                $new_emplacement = Emplacement::where('code', $emplac_code)->first();
-
-
-                $palette->load(['lines.article_stock']);
-                $palette->update([
-                    'emplacement_id' => $new_emplacement->id
-                ]);
-
-
-
-                // ✅ Decrement stock if emplacement is specified
-                if ($request->emplacement) {
-                    $article_stock = ArticleStock::where('code', $line->ref)->first();
-                    $emplacement = Emplacement::where("code", $request->emplacement)->first();
-
-
-
-                    // ✅ Create stock OUT movement
-                    StockMovement::create([
-                        'code_article'     => $line->ref,
-                        'designation'      => $article_stock->description ?? '',
-                        'emplacement_id'   => $emplacement?->id,
-                        'movement_type'    => $document->urgent ? "OUT" : "TRANSFER",
-                        'article_stock_id' => $article_stock->id,
-                        'quantity'         => floatval($currentQty * $ctValue),
-                        'moved_by'         => auth()->id(),
-                        'company_id'       => auth()->user()->company_id,
-                        'to_company_id'    => null,
-                        'movement_date'    => now(),
-                        'to_emplacement_id' => $document->urgent ? null : $new_emplacement->id
-                    ]);
-
-                    if($document->urgent){
-                        $this->stockService->stockOut($emplacement, $article_stock, ($currentQty * $ctValue));
-                    }else{
-                        $this->stockService->transfer($emplacement, $new_emplacement, $article_stock, ($currentQty * $ctValue));
-                    }
-                   
-                } else {
-                    try {
-                        // new ArticleStockController()->decrementQuantity($line->ref, $request->emplacement);
-                    } catch (\Throwable $th) {
-                        //throw $th;
-                    }
-                }
-
-                $multiplier = floatval($ctValue ?: 1);
-
-                $docligne = Docligne::where('cbMarq', $line->docligne_id);
-
-                if(!$document->urgent){
-                    $docligne->increment('DL_QteBL', floatval($request->quantity) * $multiplier);
-                }else{
-                    $line->update([
-                        'quantity_prepare' => $line->quantity_prepare + $request->quantity
-                    ]);
-                }
-                
-
-                $status_id = $document->urgent ? 11 : 8;
-
-
-
-                if (!$document->urgent) {
-                    if ($document->validation()) {
-                        $document->update(['status_id' => 8]);
-                    }
-
-                    $status = $this->validationCompany(auth()->user()->company_id, $document->id) ? $status_id : 7;
-
-                    $document->companies()->updateExistingPivot(auth()->user()->company_id, [
-                        'status_id' => $status,
-                        'updated_at' => now(),
-                    ]);
-                } else {
-                    if ($document->validationByStatus()) {
-                        $document->update(['status_id' => 11]);
-                    }
-
-                    $status = $document->validationCompanyByStatus(auth()->user()->company_id) ? $status_id : 7;
-
-                    $document->companies()->updateExistingPivot(auth()->user()->company_id, [
-                        'status_id' => $status,
-                        'updated_at' => now(),
-                    ]);
-                }
-               
-
-                auth()->user()->lines()->syncWithoutDetaching([
-                    $line->id => ['action_name' => 'Preparation']
-                ]);
-            });
-
-            return response()->json([
-                'palette'   => $palette->fresh(),
-                'line'      => $line->fresh(['palettes', 'docligne']),
-                'document'  => $document->fresh(),
-            ]);
-        } catch (\Exception $e) {
-            return response()->json([
-                'message' => $e->getMessage()
-            ], in_array($e->getCode(), [404, 422]) ? $e->getCode() : 500);
-        }
+    if ($validator->fails()) {
+        return response()->json([
+            'message' => $validator->errors()->first(),
+            'errors'  => $validator->errors()
+        ], 422);
     }
+
+    $line     = Line::find($request->line);
+    $document = $line->document;
+    $palette  = Palette::where("code", $request->palette)->first();
+
+    $line->load(['palettes', 'document']);
+
+    try {
+        DB::transaction(function () use ($document, $request, $line, $palette) {
+
+            $docligne = $line?->docligne;
+
+            $ctValue = $docligne?->article?->conditions->where('EC_Enumere', $docligne?->EU_Enumere)->first()?->EC_Quantite;
+
+            // Fixed: use ?: fallback to get a real numeric multiplier
+            $multiplier = floatval($ctValue ?: 1);
+
+            $maxQty = (float) $docligne?->EU_Qte * $multiplier;
+            $currentQty = (float) $docligne?->DL_QteBL + (float) $request->quantity;
+
+            // Fixed: & -> &&
+            if ($maxQty < $currentQty && !$document->urgent) {
+                throw new \Exception("La quantité n'est pas valide", 422);
+            }
+
+            if ($line->document_id !== $palette->document_id) {
+                throw new \Exception("Le document ne correspond pas", 404);
+            }
+
+            $line->palettes()->attach($palette->id, ['quantity' => $request->quantity]);
+
+            if ($document->urgent) {
+                $line->update(['status_id' => 11]);
+            } else {
+                $line->update(['status_id' => 8]);
+            }
+
+            $emplac_code = auth()->user()->company_id == 1 ? "K-4P" : "K-4SP";
+            $new_emplacement = Emplacement::where('code', $emplac_code)->first();
+
+            $palette->load(['lines.article_stock']);
+            $palette->update([
+                'emplacement_id' => $new_emplacement->id
+            ]);
+
+            // ✅ Decrement stock if emplacement is specified
+            if ($request->emplacement) {
+                $article_stock = ArticleStock::where('code', $line->ref)->first();
+                $emplacement = Emplacement::where("code", $request->emplacement)->first();
+
+                // ✅ Create stock OUT movement
+                StockMovement::create([
+                    'code_article'      => $line->ref,
+                    'designation'       => $article_stock->description ?? '',
+                    'emplacement_id'    => $emplacement?->id,
+                    'movement_type'     => $document->urgent ? "OUT" : "TRANSFER",
+                    'article_stock_id'  => $article_stock->id,
+                    // Fixed: use $multiplier instead of raw $ctValue (was producing 0 when $ctValue was null)
+                    'quantity'          => floatval($currentQty * $multiplier),
+                    'moved_by'          => auth()->id(),
+                    'company_id'        => auth()->user()->company_id,
+                    'to_company_id'     => null,
+                    'movement_date'     => now(),
+                    'to_emplacement_id' => $document->urgent ? null : $new_emplacement->id
+                ]);
+
+                if ($document->urgent) {
+                    // Fixed: use $multiplier instead of raw $ctValue
+                    $this->stockService->stockOut($emplacement, $article_stock, ($currentQty * $multiplier));
+                } else {
+                    // Fixed: use $multiplier instead of raw $ctValue
+                    $this->stockService->transfer($emplacement, $new_emplacement, $article_stock, ($currentQty * $multiplier));
+                }
+
+            } else {
+                try {
+                    // new ArticleStockController()->decrementQuantity($line->ref, $request->emplacement);
+                } catch (\Throwable $th) {
+                    //throw $th;
+                }
+            }
+
+            $docligne = Docligne::where('cbMarq', $line->docligne_id);
+
+            if (!$document->urgent) {
+                $docligne->increment('DL_QteBL', floatval($request->quantity) * $multiplier);
+            } else {
+                $line->update([
+                    'quantity_prepare' => $line->quantity_prepare + $request->quantity
+                ]);
+            }
+
+            $status_id = $document->urgent ? 11 : 8;
+
+            if (!$document->urgent) {
+                if ($document->validation()) {
+                    $document->update(['status_id' => 8]);
+                }
+
+                $status = $this->validationCompany(auth()->user()->company_id, $document->id) ? $status_id : 7;
+
+                $document->companies()->updateExistingPivot(auth()->user()->company_id, [
+                    'status_id'  => $status,
+                    'updated_at' => now(),
+                ]);
+            } else {
+                if ($document->validationByStatus()) {
+                    $document->update(['status_id' => 11]);
+                }
+
+                $status = $document->validationCompanyByStatus(auth()->user()->company_id) ? $status_id : 7;
+
+                $document->companies()->updateExistingPivot(auth()->user()->company_id, [
+                    'status_id'  => $status,
+                    'updated_at' => now(),
+                ]);
+            }
+
+            auth()->user()->lines()->syncWithoutDetaching([
+                $line->id => ['action_name' => 'Preparation']
+            ]);
+        });
+
+        return response()->json([
+            'palette'  => $palette->fresh(),
+            'line'     => $line->fresh(['palettes', 'docligne']),
+            'document' => $document->fresh(),
+        ]);
+    } catch (\Exception $e) {
+        return response()->json([
+            'message' => $e->getMessage()
+        ], in_array($e->getCode(), [404, 422]) ? $e->getCode() : 500);
+    }
+}
 
     public function documentPalettes($piece)
     {
