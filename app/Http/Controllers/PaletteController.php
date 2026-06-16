@@ -242,7 +242,7 @@ class PaletteController extends Controller
                     $query->whereColumn('EU_Qte', '>', 'DL_QteBL');
                 });
             }
-                
+
 
             if (!$request->has('all') || $request->all !== 'true') {
                 $line->whereHas('article_stock', function ($query) use ($lineIdentifier) {
@@ -312,191 +312,190 @@ class PaletteController extends Controller
 
 
 
-public function confirmPalette($code, $piece)
-{
-  
-    $logContext = ['code' => $code, 'piece' => $piece, 'user_id' => auth()->id()];
+    public function confirmPalette($code, $piece)
+    {
 
-    DB::beginTransaction();
+        $logContext = ['code' => $code, 'piece' => $piece, 'user_id' => auth()->id()];
 
-    try {
-        // --- 1. Find Document ---
-        $document = Document::with('palettes')->where('piece_fa', $piece)->first()
-            ?? Document::with('palettes')->where('piece_bl', $piece)->first()
-            ?? Document::with('palettes')->where('piece', $piece)->first();
+        DB::beginTransaction();
 
-        if (!$document) {
-            Log::warning('[confirmPalette] Document not found', $logContext);
-            return response()->json([
-                'error'   => 'Document not found',
-                'message' => 'Document non trouvée'
-            ], 404);
-        }
+        try {
+            // --- 1. Find Document ---
+            $document = Document::with('palettes')->where('piece_fa', $piece)->first()
+                ?? Document::with('palettes')->where('piece_bl', $piece)->first()
+                ?? Document::with('palettes')->where('piece', $piece)->first();
 
-        Log::info('[confirmPalette] Document found', array_merge($logContext, [
-            'document_id'  => $document->id,
-            'palettes_count' => $document->palettes->count(),
-        ]));
-
-        // --- 2. Find Palette ---
-        $palette = $document->palettes->where('code', $code)->first();
-
-        if (!$palette) {
-            Log::warning('[confirmPalette] Palette not found', array_merge($logContext, [
-                'document_id'    => $document->id,
-                'palette_codes'  => $document->palettes->pluck('code')->toArray(),
-            ]));
-            return response()->json([
-                'error'   => 'Palette not found',
-                'message' => 'Aucune palette dans le document'
-            ], 404);
-        }
-
-        Log::info('[confirmPalette] Palette found', array_merge($logContext, [
-            'palette_id'   => $palette->id,
-            'palette_code' => $palette->code,
-            'delivered_at' => $palette->delivered_at,
-        ]));
-
-        // --- 3. Eager load lines with relationships ---
-        $palette->load(['lines.docligne', 'lines.article_stock']);
-
-        Log::info('[confirmPalette] Lines loaded', array_merge($logContext, [
-            'lines_count' => $palette->lines->count(),
-        ]));
-
-        // --- 4. Update delivered_at ---
-        $palette->update(['delivered_at' => now()]);
-        Log::info('[confirmPalette] Palette delivered_at updated', $logContext);
-
-        // --- 5. Resolve emplacement ---
-        $emplac_code  = intval(auth()->user()->company_id) == 1 ? "K-3P" : "K-3SP";
-        $emplacement  = Emplacement::where('code', $emplac_code)->first();
-
-        Log::info('[confirmPalette] Emplacement resolved', array_merge($logContext, [
-            'emplac_code'    => $emplac_code,
-            'emplacement_id' => $emplacement?->id,
-        ]));
-
-        if (!$emplacement) {
-            throw new \Exception("Emplacement '{$emplac_code}' not found in database.");
-        }
-
-        // --- 6. Process lines ---
-        foreach ($palette->lines as $line) {
-            $lineLog = array_merge($logContext, ['line_id' => $line->id]);
-
-            // Check docligne
-            $docligne = $line->docligne;
-            Log::info('[confirmPalette] Processing line — docligne', array_merge($lineLog, [
-                'docligne_exists' => !is_null($docligne),
-                'docligne_data'   => $docligne?->toArray(),
-            ]));
-
-            if (!$docligne) {
-                Log::error('[confirmPalette] docligne is NULL for line', $lineLog);
-                throw new \Exception("docligne is null for palette line ID {$line->id}");
+            if (!$document) {
+                Log::warning('[confirmPalette] Document not found', $logContext);
+                return response()->json([
+                    'error'   => 'Document not found',
+                    'message' => 'Document non trouvée'
+                ], 404);
             }
 
-            // Check article_stock
-            $articleStock = $line->article_stock;
-            Log::info('[confirmPalette] Processing line — article_stock', array_merge($lineLog, [
-                'article_stock_exists' => !is_null($articleStock),
-                'article_stock_data'   => $articleStock?->toArray(),
+            Log::info('[confirmPalette] Document found', array_merge($logContext, [
+                'document_id'  => $document->id,
+                'palettes_count' => $document->palettes->count(),
             ]));
 
-            if (!$articleStock) {
-                Log::error('[confirmPalette] article_stock is NULL for line', $lineLog);
-                throw new \Exception("article_stock is null for palette line ID {$line->id}");
-            }
+            // --- 2. Find Palette ---
+            $palette = $document->palettes->where('code', $code)->first();
 
-            // Check quantity
-            $quantity = $docligne->DL_Qte;
-            Log::info('[confirmPalette] Quantity check', array_merge($lineLog, [
-                'DL_Qte'   => $quantity,
-                'raw_type' => gettype($quantity),
-            ]));
-
-            if (is_null($quantity) || $quantity <= 0) {
-                Log::error('[confirmPalette] QUANTITY IS ZERO OR NULL', array_merge($lineLog, [
-                    'DL_Qte'       => $quantity,
-                    'docligne_id'  => $docligne->getKey(),
-                    'docligne_all' => $docligne->toArray(),
+            if (!$palette) {
+                Log::warning('[confirmPalette] Palette not found', array_merge($logContext, [
+                    'document_id'    => $document->id,
+                    'palette_codes'  => $document->palettes->pluck('code')->toArray(),
                 ]));
-                throw new \Exception("Quantity is 0 or null for line ID {$line->id} (docligne ID: {$docligne->getKey()})");
+                return response()->json([
+                    'error'   => 'Palette not found',
+                    'message' => 'Aucune palette dans le document'
+                ], 404);
             }
 
-            // Create StockMovement
-            $movement = StockMovement::create([
-                'code_article'     => $articleStock->code,
-                'designation'      => $articleStock->description,
-                'emplacement_id'   => $emplacement->id,
-                'movement_type'    => "OUT",
-                'article_stock_id' => $articleStock->id,
-                'quantity'         => $quantity,
-                'moved_by'         => auth()->id(),
-                'company_id'       => auth()?->user()?->company_id ?? 1,
-                'movement_date'    => now(),
-            ]);
-
-            Log::info('[confirmPalette] StockMovement created', array_merge($lineLog, [
-                'movement_id' => $movement->id,
-                'quantity'    => $quantity,
-                'article'     => $articleStock->code,
+            Log::info('[confirmPalette] Palette found', array_merge($logContext, [
+                'palette_id'   => $palette->id,
+                'palette_code' => $palette->code,
+                'delivered_at' => $palette->delivered_at,
             ]));
 
-            // Stock Out
-            $this->stockService->stockOut(
-                $emplacement,
-                $articleStock,
-                $quantity,
-                'Livraison'
-            );
+            // --- 3. Eager load lines with relationships ---
+            $palette->load(['lines.docligne', 'lines.article_stock']);
 
-            Log::info('[confirmPalette] stockOut called successfully', array_merge($lineLog, [
-                'quantity' => $quantity,
+            Log::info('[confirmPalette] Lines loaded', array_merge($logContext, [
+                'lines_count' => $palette->lines->count(),
             ]));
+
+            // --- 4. Update delivered_at ---
+            $palette->update(['delivered_at' => now()]);
+            Log::info('[confirmPalette] Palette delivered_at updated', $logContext);
+
+            // --- 5. Resolve emplacement ---
+            $emplac_code  = intval(auth()->user()->company_id) == 1 ? "K-3P" : "K-3SP";
+            $emplacement  = Emplacement::where('code', $emplac_code)->first();
+
+            Log::info('[confirmPalette] Emplacement resolved', array_merge($logContext, [
+                'emplac_code'    => $emplac_code,
+                'emplacement_id' => $emplacement?->id,
+            ]));
+
+            if (!$emplacement) {
+                throw new \Exception("Emplacement '{$emplac_code}' not found in database.");
+            }
+
+            // --- 6. Process lines ---
+            foreach ($palette->lines as $line) {
+                $lineLog = array_merge($logContext, ['line_id' => $line->id]);
+
+                // Check docligne
+                $docligne = $line->docligne;
+                Log::info('[confirmPalette] Processing line — docligne', array_merge($lineLog, [
+                    'docligne_exists' => !is_null($docligne),
+                    'docligne_data'   => $docligne?->toArray(),
+                ]));
+
+                if (!$docligne) {
+                    Log::error('[confirmPalette] docligne is NULL for line', $lineLog);
+                    throw new \Exception("docligne is null for palette line ID {$line->id}");
+                }
+
+                // Check article_stock
+                $articleStock = $line->article_stock;
+                Log::info('[confirmPalette] Processing line — article_stock', array_merge($lineLog, [
+                    'article_stock_exists' => !is_null($articleStock),
+                    'article_stock_data'   => $articleStock?->toArray(),
+                ]));
+
+                if (!$articleStock) {
+                    Log::error('[confirmPalette] article_stock is NULL for line', $lineLog);
+                    throw new \Exception("article_stock is null for palette line ID {$line->id}");
+                }
+
+                // Check quantity
+                $quantity = $docligne->DL_Qte;
+                Log::info('[confirmPalette] Quantity check', array_merge($lineLog, [
+                    'DL_Qte'   => $quantity,
+                    'raw_type' => gettype($quantity),
+                ]));
+
+                if (is_null($quantity) || $quantity <= 0) {
+                    Log::error('[confirmPalette] QUANTITY IS ZERO OR NULL', array_merge($lineLog, [
+                        'DL_Qte'       => $quantity,
+                        'docligne_id'  => $docligne->getKey(),
+                        'docligne_all' => $docligne->toArray(),
+                    ]));
+                    throw new \Exception("Quantity is 0 or null for line ID {$line->id} (docligne ID: {$docligne->getKey()})");
+                }
+
+                // Create StockMovement
+                $movement = StockMovement::create([
+                    'code_article'     => $articleStock->code,
+                    'designation'      => $articleStock->description,
+                    'emplacement_id'   => $emplacement->id,
+                    'movement_type'    => "OUT",
+                    'article_stock_id' => $articleStock->id,
+                    'quantity'         => $quantity,
+                    'moved_by'         => auth()->id(),
+                    'company_id'       => auth()?->user()?->company_id ?? 1,
+                    'movement_date'    => now(),
+                ]);
+
+                Log::info('[confirmPalette] StockMovement created', array_merge($lineLog, [
+                    'movement_id' => $movement->id,
+                    'quantity'    => $quantity,
+                    'article'     => $articleStock->code,
+                ]));
+
+                // Stock Out
+                $this->stockService->stockOut(
+                    $emplacement,
+                    $articleStock,
+                    $quantity,
+                    'Livraison'
+                );
+
+                Log::info('[confirmPalette] stockOut called successfully', array_merge($lineLog, [
+                    'quantity' => $quantity,
+                ]));
+            }
+
+            // --- 7. Check if all palettes delivered ---
+            $allPalettesDelivered = $document->palettes
+                ->every(fn($p) => !is_null($p->delivered_at));
+
+            Log::info('[confirmPalette] All palettes delivered check', array_merge($logContext, [
+                'all_delivered' => $allPalettesDelivered,
+                'palette_statuses' => $document->palettes->map(fn($p) => [
+                    'id'           => $p->id,
+                    'code'         => $p->code,
+                    'delivered_at' => $p->delivered_at,
+                ])->toArray(),
+            ]));
+
+            if ($allPalettesDelivered) {
+                $document->update(['status_id' => 14]);
+                Log::info('[confirmPalette] Document status updated to 14', $logContext);
+            }
+
+            DB::commit();
+            Log::info('[confirmPalette] Transaction committed successfully', $logContext);
+
+            return response()->json($palette);
+        } catch (\Throwable $e) {
+            DB::rollBack();
+            Log::error('[confirmPalette] EXCEPTION — transaction rolled back', array_merge($logContext, [
+                'exception'  => get_class($e),
+                'message'    => $e->getMessage(),
+                'file'       => $e->getFile(),
+                'line'       => $e->getLine(),
+                'trace'      => $e->getTraceAsString(),
+            ]));
+
+            return response()->json([
+                'error'   => 'An error occurred while processing the scan.',
+                'message' => $e->getMessage()
+            ], 500);
         }
-
-        // --- 7. Check if all palettes delivered ---
-        $allPalettesDelivered = $document->palettes
-            ->every(fn($p) => !is_null($p->delivered_at));
-
-        Log::info('[confirmPalette] All palettes delivered check', array_merge($logContext, [
-            'all_delivered' => $allPalettesDelivered,
-            'palette_statuses' => $document->palettes->map(fn($p) => [
-                'id'           => $p->id,
-                'code'         => $p->code,
-                'delivered_at' => $p->delivered_at,
-            ])->toArray(),
-        ]));
-
-        if ($allPalettesDelivered) {
-            $document->update(['status_id' => 14]);
-            Log::info('[confirmPalette] Document status updated to 14', $logContext);
-        }
-
-        DB::commit();
-        Log::info('[confirmPalette] Transaction committed successfully', $logContext);
-
-        return response()->json($palette);
-
-    } catch (\Throwable $e) {
-        DB::rollBack();
-        Log::error('[confirmPalette] EXCEPTION — transaction rolled back', array_merge($logContext, [
-            'exception'  => get_class($e),
-            'message'    => $e->getMessage(),
-            'file'       => $e->getFile(),
-            'line'       => $e->getLine(),
-            'trace'      => $e->getTraceAsString(),
-        ]));
-
-        return response()->json([
-            'error'   => 'An error occurred while processing the scan.',
-            'message' => $e->getMessage()
-        ], 500);
     }
-}
 
 
     public function validationCompany($companyId, $document_id): bool
@@ -544,7 +543,7 @@ public function confirmPalette($code, $piece)
         $destinationCode = auth()->user()->company_id == 1 ? 'K-4P' : 'K-4SP';
 
         $destination = Emplacement::where('code', $destinationCode)->first();
-        
+
         if (!$destination) {
             return response()->json(['message' => 'Emplacement destination introuvable.'], 404);
         }
@@ -643,23 +642,23 @@ public function confirmPalette($code, $piece)
                         'quantity' => $lineQuantity
                     ]);
 
-                    if(!$document->urgent){
+                    if (!$document->urgent) {
                         $docligne->update([
                             'DL_QteBL' => $docligne->DL_Qte
                         ]);
-                    }else{
+                    } else {
                         $line->increment('quantity_prepare', $lineQuantity);
                     }
-                   
+
                     $status_id =  $document->urgent ? 11 : 8;
 
                     $line->update(['status_id' => $status_id]);
- 
+
                     $this->stockMovement($line->ref, $docligne->DL_Qte);
                 }
             }
 
- 
+
             $documentStatus = $document->validation() ? $status_id : 7;
             if ($document->status_id !== $documentStatus) {
                 $document->update(['status_id' => $documentStatus]);
@@ -681,155 +680,154 @@ public function confirmPalette($code, $piece)
 
 
 
-public function confirm(Request $request)
-{
-    $validator = Validator::make($request->all(), [
-        'quantity'    => 'required|integer|max:1000|min:1',
-        'line'        => 'required|exists:lines,id',
-        'palette'     => 'required|exists:palettes,code',
-        'emplacement' => 'nullable'
-    ]);
+    public function confirm(Request $request)
+    {
+        $validator = Validator::make($request->all(), [
+            'quantity'    => 'required|integer|max:1000|min:1',
+            'line'        => 'required|exists:lines,id',
+            'palette'     => 'required|exists:palettes,code',
+            'emplacement' => 'nullable'
+        ]);
 
-    if ($validator->fails()) {
-        return response()->json([
-            'message' => $validator->errors()->first(),
-            'errors'  => $validator->errors()
-        ], 422);
-    }
+        if ($validator->fails()) {
+            return response()->json([
+                'message' => $validator->errors()->first(),
+                'errors'  => $validator->errors()
+            ], 422);
+        }
 
-    $line     = Line::find($request->line);
-    $document = $line->document;
-    $palette  = Palette::where("code", $request->palette)->first();
+        $line     = Line::find($request->line);
+        $document = $line->document;
+        $palette  = Palette::where("code", $request->palette)->first();
 
-    $line->load(['palettes', 'document']);
+        $line->load(['palettes', 'document']);
 
-    try {
-        DB::transaction(function () use ($document, $request, $line, $palette) {
+        try {
+            DB::transaction(function () use ($document, $request, $line, $palette) {
 
-            $docligne = $line?->docligne;
+                $docligne = $line?->docligne;
 
-            $ctValue = $docligne?->article?->conditions->where('EC_Enumere', $docligne?->EU_Enumere)->first()?->EC_Quantite;
+                $ctValue = $docligne?->article?->conditions->where('EC_Enumere', $docligne?->EU_Enumere)->first()?->EC_Quantite;
 
-            // Fixed: use ?: fallback to get a real numeric multiplier
-            $multiplier = floatval($ctValue ?: 1);
+                // Fixed: use ?: fallback to get a real numeric multiplier
+                $multiplier = floatval($ctValue ?: 1);
 
-            $maxQty = (float) $docligne?->EU_Qte * $multiplier;
-            $currentQty = (float) $docligne?->DL_QteBL + (float) $request->quantity;
+                $maxQty = (float) $docligne?->EU_Qte * $multiplier;
+                $currentQty = (float) $docligne?->DL_QteBL + (float) $request->quantity;
 
-            // Fixed: & -> &&
-            if ($maxQty < $currentQty && !$document->urgent) {
-                throw new \Exception("La quantité n'est pas valide", 422);
-            }
+                // Fixed: & -> &&
+                if ($maxQty < $currentQty && !$document->urgent) {
+                    throw new \Exception("La quantité n'est pas valide", 422);
+                }
 
-            if ($line->document_id !== $palette->document_id) {
-                throw new \Exception("Le document ne correspond pas", 404);
-            }
+                if ($line->document_id !== $palette->document_id) {
+                    throw new \Exception("Le document ne correspond pas", 404);
+                }
 
-            $line->palettes()->attach($palette->id, ['quantity' => $request->quantity]);
-
-            if ($document->urgent) {
-                $line->update(['status_id' => 11]);
-            } else {
-                $line->update(['status_id' => 8]);
-            }
-
-            $emplac_code = auth()->user()->company_id == 1 ? "K-4P" : "K-4SP";
-            $new_emplacement = Emplacement::where('code', $emplac_code)->first();
-
-            $palette->load(['lines.article_stock']);
-            $palette->update([
-                'emplacement_id' => $new_emplacement->id
-            ]);
-
-            // ✅ Decrement stock if emplacement is specified
-            if ($request->emplacement) {
-                $article_stock = ArticleStock::where('code', $line->ref)->first();
-                $emplacement = Emplacement::where("code", $request->emplacement)->first();
-
-                // ✅ Create stock OUT movement
-                StockMovement::create([
-                    'code_article'      => $line->ref,
-                    'designation'       => $article_stock->description ?? '',
-                    'emplacement_id'    => $emplacement?->id,
-                    'movement_type'     => $document->urgent ? "OUT" : "TRANSFER",
-                    'article_stock_id'  => $article_stock->id,
-                    // Fixed: use $multiplier instead of raw $ctValue (was producing 0 when $ctValue was null)
-                    'quantity'          => floatval($currentQty * $multiplier),
-                    'moved_by'          => auth()->id(),
-                    'company_id'        => auth()->user()->company_id,
-                    'to_company_id'     => null,
-                    'movement_date'     => now(),
-                    'to_emplacement_id' => $document->urgent ? null : $new_emplacement->id
-                ]);
+                $line->palettes()->attach($palette->id, ['quantity' => $request->quantity]);
 
                 if ($document->urgent) {
-                    // Fixed: use $multiplier instead of raw $ctValue
-                    $this->stockService->stockOut($emplacement, $article_stock, ($currentQty * $multiplier));
+                    $line->update(['status_id' => 11]);
                 } else {
-                    // Fixed: use $multiplier instead of raw $ctValue
-                    $this->stockService->transfer($emplacement, $new_emplacement, $article_stock, ($currentQty * $multiplier));
+                    $line->update(['status_id' => 8]);
                 }
 
-            } else {
-                try {
-                    // new ArticleStockController()->decrementQuantity($line->ref, $request->emplacement);
-                } catch (\Throwable $th) {
-                    //throw $th;
-                }
-            }
+                $emplac_code = auth()->user()->company_id == 1 ? "K-4P" : "K-4SP";
+                $new_emplacement = Emplacement::where('code', $emplac_code)->first();
 
-            $docligne = Docligne::where('cbMarq', $line->docligne_id);
-
-            if (!$document->urgent) {
-                $docligne->increment('DL_QteBL', floatval($request->quantity) * $multiplier);
-            } else {
-                $line->update([
-                    'quantity_prepare' => $line->quantity_prepare + $request->quantity
+                $palette->load(['lines.article_stock']);
+                $palette->update([
+                    'emplacement_id' => $new_emplacement->id
                 ]);
-            }
 
-            $status_id = $document->urgent ? 11 : 8;
+                // ✅ Decrement stock if emplacement is specified
+                if ($request->emplacement) {
+                    $article_stock = ArticleStock::where('code', $line->ref)->first();
+                    $emplacement = Emplacement::where("code", $request->emplacement)->first();
 
-            if (!$document->urgent) {
-                if ($document->validation()) {
-                    $document->update(['status_id' => 8]);
+                    // ✅ Create stock OUT movement
+                    StockMovement::create([
+                        'code_article'      => $line->ref,
+                        'designation'       => $article_stock->description ?? '',
+                        'emplacement_id'    => $emplacement?->id,
+                        'movement_type'     => $document->urgent ? "OUT" : "TRANSFER",
+                        'article_stock_id'  => $article_stock->id,
+                        // Fixed: use $multiplier instead of raw $ctValue (was producing 0 when $ctValue was null)
+                        'quantity'          => floatval($currentQty * $multiplier),
+                        'moved_by'          => auth()->id(),
+                        'company_id'        => auth()->user()->company_id,
+                        'to_company_id'     => null,
+                        'movement_date'     => now(),
+                        'to_emplacement_id' => $document->urgent ? null : $new_emplacement->id
+                    ]);
+
+                    if ($document->urgent) {
+                        // Fixed: use $multiplier instead of raw $ctValue
+                        $this->stockService->stockOut($emplacement, $article_stock, ($currentQty * $multiplier));
+                    } else {
+                        // Fixed: use $multiplier instead of raw $ctValue
+                        $this->stockService->transfer($emplacement, $new_emplacement, $article_stock, ($currentQty * $multiplier));
+                    }
+                } else {
+                    try {
+                        // new ArticleStockController()->decrementQuantity($line->ref, $request->emplacement);
+                    } catch (\Throwable $th) {
+                        //throw $th;
+                    }
                 }
 
-                $status = $this->validationCompany(auth()->user()->company_id, $document->id) ? $status_id : 7;
+                $docligne = Docligne::where('cbMarq', $line->docligne_id);
 
-                $document->companies()->updateExistingPivot(auth()->user()->company_id, [
-                    'status_id'  => $status,
-                    'updated_at' => now(),
-                ]);
-            } else {
-                if ($document->validationByStatus()) {
-                    $document->update(['status_id' => 11]);
+                if (!$document->urgent) {
+                    $docligne->increment('DL_QteBL', floatval($request->quantity) * $multiplier);
+                } else {
+                    $line->update([
+                        'quantity_prepare' => $line->quantity_prepare + $request->quantity
+                    ]);
                 }
 
-                $status = $document->validationCompanyByStatus(auth()->user()->company_id) ? $status_id : 7;
+                $status_id = $document->urgent ? 11 : 8;
 
-                $document->companies()->updateExistingPivot(auth()->user()->company_id, [
-                    'status_id'  => $status,
-                    'updated_at' => now(),
+                if (!$document->urgent) {
+                    if ($document->validation()) {
+                        $document->update(['status_id' => 8]);
+                    }
+
+                    $status = $this->validationCompany(auth()->user()->company_id, $document->id) ? $status_id : 7;
+
+                    $document->companies()->updateExistingPivot(auth()->user()->company_id, [
+                        'status_id'  => $status,
+                        'updated_at' => now(),
+                    ]);
+                } else {
+                    if ($document->validationByStatus()) {
+                        $document->update(['status_id' => 11]);
+                    }
+
+                    $status = $document->validationCompanyByStatus(auth()->user()->company_id) ? $status_id : 7;
+
+                    $document->companies()->updateExistingPivot(auth()->user()->company_id, [
+                        'status_id'  => $status,
+                        'updated_at' => now(),
+                    ]);
+                }
+
+                auth()->user()->lines()->syncWithoutDetaching([
+                    $line->id => ['action_name' => 'Preparation']
                 ]);
-            }
+            });
 
-            auth()->user()->lines()->syncWithoutDetaching([
-                $line->id => ['action_name' => 'Preparation']
+            return response()->json([
+                'palette'  => $palette->fresh(),
+                'line'     => $line->fresh(['palettes', 'docligne']),
+                'document' => $document->fresh(),
             ]);
-        });
-
-        return response()->json([
-            'palette'  => $palette->fresh(),
-            'line'     => $line->fresh(['palettes', 'docligne']),
-            'document' => $document->fresh(),
-        ]);
-    } catch (\Exception $e) {
-        return response()->json([
-            'message' => $e->getMessage()
-        ], in_array($e->getCode(), [404, 422]) ? $e->getCode() : 500);
+        } catch (\Exception $e) {
+            return response()->json([
+                'message' => $e->getMessage()
+            ], in_array($e->getCode(), [404, 422]) ? $e->getCode() : 500);
+        }
     }
-}
 
     public function documentPalettes($piece)
     {

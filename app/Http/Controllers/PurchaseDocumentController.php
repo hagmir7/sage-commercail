@@ -916,7 +916,6 @@ class PurchaseDocumentController extends Controller
         Request $request,
         PurchaseLineNonCompliant $nonCompliant
     ) {
-
         $validator = Validator::make($request->all(), [
             'supplier_code' => [
                 'nullable',
@@ -924,6 +923,7 @@ class PurchaseDocumentController extends Controller
                 'max:100',
                 Rule::exists('sqlsrv_inter.dbo.F_COMPTET', 'CT_Num'),
             ],
+            'status' => ['sometimes', 'boolean'],
         ]);
 
         if ($validator->fails()) {
@@ -933,12 +933,11 @@ class PurchaseDocumentController extends Controller
             ], 406);
         }
 
-        $nonCompliant->update([
-            'supplier_code' => $request->supplier_code,
-        ]);
+        $nonCompliant->update($request->only(['supplier_code', 'status']));
 
         return response()->json([
-            'message' => 'Supplier added successfully',
+            'message' => 'Mis à jour avec succès',
+            'data' => $nonCompliant->fresh()->load('user'),
         ]);
     }
 

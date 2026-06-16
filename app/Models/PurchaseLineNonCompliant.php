@@ -15,7 +15,8 @@ class PurchaseLineNonCompliant extends Model
         'user_id',
         'note',
         'file',
-        'supplier_code'
+        'supplier_code',
+        'status'
     ];
 
 
