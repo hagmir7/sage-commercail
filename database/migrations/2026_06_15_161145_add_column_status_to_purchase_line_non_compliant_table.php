@@ -12,7 +12,7 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('purchase_line_non_compliant', function (Blueprint $table) {
-            $table->boolean('status')->default(false);
+            $table->boolean('status')->nullable()->default(null);
         });
     }
 
