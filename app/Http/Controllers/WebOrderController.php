@@ -36,7 +36,6 @@ class WebOrderController extends Controller
             ? $matches[1] . str_pad((int) $matches[2] + 1, 6, '0', STR_PAD_LEFT)
             : '26DE000001';
 
-        // Increment the counter so the next call gets a fresh piece
         DB::connection('sqlsrv')
             ->table('F_DOCCURRENTPIECE')
             ->where('cbMarq', 1)
@@ -59,6 +58,14 @@ class WebOrderController extends Controller
             ->NextDL_No;
     }
 
+    // Trick : passer par JSON pour strip les bytes invalides
+    private function fixEncoding(?string $value): string
+    {
+        if ($value === null) return '';
+
+        $clean = json_encode($value, JSON_INVALID_UTF8_IGNORE);
+        return json_decode($clean) ?? '';
+    }
     // ─── Main entry point ─────────────────────────────────────────────────────
 
     public function store(Request $request)
@@ -82,9 +89,15 @@ class WebOrderController extends Controller
             'products.*.color'            => 'nullable|string',
         ]);
 
+        // Fix encoding on all string fields of every product
+        $products = array_map(function (array $product) {
+            return array_map(function ($value) {
+                return is_string($value) ? $this->fixEncoding($value) : $value;
+            }, $product);
+        }, $request->products);
+
         $orderCode    = $request->order_code;
         $customerCode = $request->customer_code;
-        $products     = $request->products;
         $totalHT      = floatval($request->total_ht);
         $totalTTC     = floatval($request->total_ttc);
 
@@ -110,14 +123,19 @@ class WebOrderController extends Controller
 
         } catch (Exception $e) {
             DB::connection('sqlsrv')->rollBack();
+
+            $errorMsg = mb_check_encoding($e->getMessage(), 'UTF-8')
+                ? $e->getMessage()
+                : mb_convert_encoding($e->getMessage(), 'UTF-8', 'Windows-1252');
+
             Log::error('WebOrder DE transfer failed', [
                 'order_code' => $orderCode,
-                'error'      => $e->getMessage(),
+                'error'      => $errorMsg,
             ]);
 
             return response()->json([
                 'status'  => 'error',
-                'message' => 'Erreur lors du transfert: ' . $e->getMessage(),
+                'message' => 'Erreur lors du transfert: ' . $errorMsg,
             ], 500);
         }
     }
@@ -197,12 +215,13 @@ class WebOrderController extends Controller
         $qty         = intval($product['quantity']);
         $arRef       = substr($product['code'], 0, 19);
 
-        $article = Article::where("AR_Ref", $arRef)->first();
+        $article     = Article::where('AR_Ref', $arRef)->first();
+
+        // Use the already-fixed $product['designation'] (encoding fixed upstream)
         $designation = substr(preg_replace('/\s+/', ' ', trim($product['designation'])), 0, 69);
 
-        $priceNet   = round($article->AR_PrixVen * (1 - $discount / 100), 2);
-        $priceTTC   = round($priceNet * 1.20, 2);
-
+        $priceNet = round($article->AR_PrixVen * (1 - $discount / 100), 2);
+        $priceTTC = round($priceNet * 1.20, 2);
 
         DB::connection('sqlsrv')->table('F_DOCLIGNE')->insert([
             'DO_Domaine'            => self::DO_DOMAINE,
@@ -216,20 +235,18 @@ class WebOrderController extends Controller
             'DL_TRemPied'           => 0,
             'DL_TRemExep'           => 0,
             'AR_Ref'                => $arRef,
-            'DL_Design'             => $designation,
+            'DL_Design'             => $designation,           // cleaned + truncated
             'DL_Qte'                => $qty,
             'DL_QteBC'              => $qty,
             'DL_QteBL'              => $qty,
             'DL_PoidsNet'           => 0,
             'DL_PoidsBrut'          => 0,
             'DL_PrixRU'             => 0,
-            
             'DL_Remise01REM_Type'   => 1,
             'DL_Remise02REM_Valeur' => 0,
             'DL_Remise02REM_Type'   => 0,
             'DL_Remise03REM_Valeur' => 0,
             'DL_Remise03REM_Type'   => 0,
-
             'DL_Remise01REM_Valeur' => $discount,
             'DL_PrixUnitaire'       => $article->AR_PrixVen,
             'DL_Taxe1'              => 20,
@@ -238,8 +255,6 @@ class WebOrderController extends Controller
             'DL_PUTTC'              => $priceTTC,
             'DL_MontantHT'          => round($priceNet * $qty, 2),
             'DL_MontantTTC'         => round($priceTTC * $qty, 2),
-           
-
             'DL_TypeTaux1'          => 0,
             'DL_TypeTaxe1'          => 0,
             'DL_Taxe2'              => 0,
@@ -252,7 +267,6 @@ class WebOrderController extends Controller
             'AG_No1'                => 0,
             'AG_No2'                => 0,
             'DL_NoRef'              => 1,
-            
             'DL_CMUP'               => 0,
             'DL_MvtStock'           => 0,
             'DT_No'                 => 0,
@@ -293,7 +307,6 @@ class WebOrderController extends Controller
             'cbCreationUser'        => self::CB_CREATION_USER,
             'cbModification'        => DB::raw('GETDATE()'),
             'cbCreation'            => DB::raw('GETDATE()'),
-            'Nom'                   => substr($product['designation'] ?? '', 0, 69),
             'Hauteur'               => floatval($product['height'] ?? 0),
             'Largeur'               => floatval($product['width']  ?? 0),
             'Profondeur'            => floatval($product['depth']  ?? 0),
@@ -302,8 +315,6 @@ class WebOrderController extends Controller
             'Chant'                 => null,
             'Episseur'              => 0,
             'TRANSMIS'              => null,
-            'Poignée'               => null,
-            'Description'           => substr($designation, 0, 35),
             'Rotation'              => null,
             'DL_NoColis'            => 0,
         ]);
