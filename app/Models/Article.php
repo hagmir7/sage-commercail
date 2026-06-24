@@ -23,5 +23,9 @@ class Article extends Model
     public function conditions(){
         return $this->hasMany(Condition::class, 'AR_Ref');
     }
+
+    public function unit(){
+        return $this->belongsTo(Unit::class, 'AR_UniteVen', 'cbIndice');
+    }
     
 }

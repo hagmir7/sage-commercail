@@ -49,6 +49,7 @@ use App\Http\Controllers\QuoteOfferController;
 use App\Http\Controllers\QuoteEvaluationController;
 use App\Http\Controllers\ShippingController;
 use App\Http\Controllers\ShippingCriteriaController;
+use App\Http\Controllers\WebOrderController;
 use Illuminate\Support\Facades\Route;
 
 
@@ -59,6 +60,10 @@ Route::get('/user', function (Request $request) {
 Route::get('login', function () {
     return [];
 })->name('login');
+
+Route::get('/', function () {
+    return ['message' => "Success"];
+});
 
 
 Route::get('check-cin',       [TravelDriverController::class, 'checkCIN']);
@@ -240,6 +245,8 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::prefix('machines')->controller(MachineController::class)->group(function () {
         Route::get('', 'index');
     });
+
+    Route::post('orders/transfer-de', [WebOrderController::class, 'store']);
 
 
 
