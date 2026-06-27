@@ -74,7 +74,7 @@ class InventoryMovement extends Model
                 $q->where('code', 'like', "%$emplacement%");
             })
 
-                ->orWhereHas('articleStock', function ($q) use ($emplacement) {
+                ->orWhereHas('article', function ($q) use ($emplacement) {
                     $q->where('code', 'like', "%$emplacement%");
                 });
         });
