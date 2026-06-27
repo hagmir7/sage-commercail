@@ -478,11 +478,10 @@ public function insert(Request $request, Inventory $inventory)
             fn($item) => $item->quantity * ($item->article?->price ?? 0)
         );
 
-        // Collect used codes from already-loaded movements (avoid extra DB queries)
-        $usedCodes       = $inventory->movements->pluck('code_article')->unique()->all();
-        $emplacementCodes = $inventory->movements->pluck('emplacement_code')->unique()->all();
 
-        // Run count queries in parallel-friendly way (single round-trip each)
+        $usedCodes       = $inventory->movements->pluck('code_article')->unique()->all();
+
+
         [$totalArticles, $totalEmplacements] = [
             ArticleStock::count(),
             Emplacement::count(),
@@ -508,7 +507,7 @@ public function insert(Request $request, Inventory $inventory)
             'total_articles'              => $totalArticles,
             'emplacements'                => $totalEmplacements,
             'articles_non_used'           => ArticleStock::whereNotIn('code', $usedCodes)->count(),
-            'emplacement_non_used'        => ArticleStock::whereNotIn('code', $emplacementCodes)->count(),
+            'emplacement_non_used'        => Emplacement::count() - $inventory->movements->pluck('emplacement_code')->unique()->count(),
         ];
     }
 
@@ -725,11 +724,6 @@ public function insert(Request $request, Inventory $inventory)
             DB::transaction(function () use ($inventory) {
 
                 Palette::where('type', 'Stock')
-                    ->whereNotNull('inventory_id')
-                    ->update(['type' => 'Inventaire']);
-
-
-                Palette::where('type', 'Stock')
                     ->whereNull('inventory_id')
                     ->delete();
 
@@ -767,17 +761,21 @@ public function insert(Request $request, Inventory $inventory)
                 'message' => 'Non autorisé. Vous n\'avez pas les permissions nécessaires.'
             ], 403);
         }
+
         try {
             DB::transaction(function () use ($inventory) {
+                $movements = $inventory->movements()
+                    ->where('merged_to_stock', false)
+                    ->get(); 
 
-                foreach ($inventory->movements as $movemnt) {
-                    if (!$movemnt->merged_to_stock) {
-                        $this->stockService->stockInsert(
-                            $movemnt->emplacement,
-                            $movemnt->article,
-                            $movemnt->quantity,
-                        );
-                    }
+                foreach ($movements as $movement) { 
+                    $this->stockService->stockInsert(
+                        $movement->emplacement,
+                        $movement->article,
+                        $movement->quantity,
+                    );
+
+                    $movement->update(['merged_to_stock' => true]); 
                 }
             });
 
@@ -785,9 +783,7 @@ public function insert(Request $request, Inventory $inventory)
                 'success' => true,
                 'message' => 'Le stock a été intégré avec succès.',
             ]);
-
         } catch (\Throwable $e) {
-
             Log::error('Stock reset failed', ['error' => $e->getMessage()]);
 
             return response()->json([
