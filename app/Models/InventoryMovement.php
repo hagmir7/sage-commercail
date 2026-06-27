@@ -19,7 +19,8 @@ class InventoryMovement extends Model
         'type',
         'quantity',
         'user_id',
-        'company_id'
+        'company_id',
+        'merged_to_stock'
     ];
 
     public function user()

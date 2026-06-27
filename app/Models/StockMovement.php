@@ -28,6 +28,7 @@ class StockMovement extends Model
     {
         return $this->belongsTo(ArticleStock::class, 'article_stock_id');
     }
+    
     public function emplacement()
     {
         return $this->belongsTo(Emplacement::class, 'emplacement_id');

@@ -185,6 +185,7 @@ Route::middleware('auth:sanctum')->group(function () {
 
 
     Route::get('inventory/{inventory}/init', [InventoryController::class, 'resetToStock']);
+    Route::get('inventory/{inventory}/merge', [InventoryController::class, 'mergeToStock']);
     Route::post('/logout', [AuthController::class, 'logout']);
     Route::get('/user', [AuthController::class, 'user']);
 
