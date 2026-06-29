@@ -727,12 +727,14 @@ public function insert(Request $request, Inventory $inventory)
                     ->whereNull('inventory_id')
                     ->delete();
 
-                foreach ($inventory->movements as $movemnt) {
+                foreach ($inventory->movements as $movement) {
                     $this->stockService->stockInsert(
-                        $movemnt->emplacement,
-                        $movemnt->article,
-                        $movemnt->quantity,
+                        $movement->emplacement,
+                        $movement->article,
+                        $movement->quantity,
                     );
+
+                    $movement->update(['merged_to_stock' => true]); 
                 }
             });
 
