@@ -321,6 +321,7 @@ Route::middleware('auth:sanctum')->group(function () {
 
 
     Route::prefix('lines')->controller(LineController::class)->group(function () {
+        Route::get('{line}', 'show');
         Route::post('prepare', 'prepare');
     });
 

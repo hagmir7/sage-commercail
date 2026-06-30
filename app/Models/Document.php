@@ -51,10 +51,10 @@ class Document extends Model
     }
 
 
-    public function transferBy()
-    {
-        return $this->belongsToMany(User::class, 'transfer_by');
-    }
+public function transferUser()
+{
+    return $this->belongsTo(User::class, 'transfer_by');
+}
 
     public function palettes()
     {

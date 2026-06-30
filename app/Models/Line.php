@@ -79,6 +79,15 @@ class Line extends Model
         return $this->belongsTo(ArticleStock::class, 'ref', 'code');
     }
 
+    public function preparedUser(){
+        return $this->belongsTo(User::class, 'prepared_by');
+    }
+
+    public function fabricatedUser()
+    {
+        return $this->belongsTo(User::class, 'fabricated_by');
+    }
+
     public function user_role(){
         return $this->belongsTo(User::class, 'role_id', 'id');
     }

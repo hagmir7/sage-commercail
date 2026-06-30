@@ -73,7 +73,11 @@ class LineController extends Controller
 
 
         // attach palette to line
-        $line->update(['palette_id' => $palette->id]);
+        $line->update([
+            'palette_id' => $palette->id,
+            'prepared_by' => auth()->id(),
+            'prepared_at' => now()
+        ]);
 
         $quantity = floatval($line->docligne->EU_Qte);
 
@@ -89,7 +93,7 @@ class LineController extends Controller
 
 
         if ($document->validation()) {
-            $document->update(['status_id' => 8]);
+            $document->update(['status_id' => 8,]);
         } elseif ($document->status_id != 7) {
             $document->update(['status_id' => 7]);
         }
@@ -102,5 +106,11 @@ class LineController extends Controller
         }
 
         return response()->json($line);
+    }
+
+
+    public function show(Line $line){
+        $line->load(['preparedUser', 'fabricatedUser', 'company', 'document', 'document.transferUser']);
+        return $line;
     }
 }

@@ -185,7 +185,6 @@ class DocenteteController extends Controller
 
     public function start(Request $request)
     {
-        \Log::alert($request->complation_date);
 
         $validator = Validator::make(
             $request->all(),

@@ -652,7 +652,11 @@ class PaletteController extends Controller
 
                     $status_id =  $document->urgent ? 11 : 8;
 
-                    $line->update(['status_id' => $status_id]);
+                    $line->update([
+                        'status_id' => $status_id,
+                        'prepared_by' => auth()->id(),
+                        'prepared_at' => now()
+                    ]);
 
                     $this->stockMovement($line->ref, $docligne->DL_Qte);
                 }
@@ -727,9 +731,17 @@ class PaletteController extends Controller
                 $line->palettes()->attach($palette->id, ['quantity' => $request->quantity]);
 
                 if ($document->urgent) {
-                    $line->update(['status_id' => 11]);
+                    $line->update([
+                        'status_id' => 11,
+                        'prepared_by' => auth()->id(),
+                        'prepared_at' => now()
+                    ]);
                 } else {
-                    $line->update(['status_id' => 8]);
+                    $line->update([
+                        'status_id' => 8,
+                        'prepared_by' => auth()->id(),
+                        'prepared_at' => now()
+                    ]);
                 }
 
                 $emplac_code = auth()->user()->company_id == 1 ? "K-4P" : "K-4SP";
