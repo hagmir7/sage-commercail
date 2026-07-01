@@ -27,6 +27,47 @@ class ArticleStockImport
         return strtoupper($value) === 'NULL' || $value === '' ? $default : $value;
     }
 
+    /**
+     * Sanitize and cast a numeric field (height, width, depth, thickness).
+     *
+     * Handles:
+     *  - Non-breaking spaces (U+00A0), both raw byte and UTF-8 encoded,
+     *    which Excel/PDF-to-Excel copy-pastes commonly introduce
+     *    (e.g. "108\xa0" instead of "108") and which PHP's trim()
+     *    does NOT strip.
+     *  - Regular whitespace.
+     *  - French-style decimal commas (e.g. "108,5" -> "108.5").
+     *  - Empty / "NULL" / non-numeric values -> fallback to $default.
+     */
+    private function parseNumeric($value, $default = 0)
+    {
+        if ($value === null) {
+            return $default;
+        }
+
+        $value = (string) $value;
+
+        // Strip non-breaking spaces (UTF-8 encoded \xc2\xa0 and raw \xa0)
+        // and any regular whitespace.
+        $value = str_replace(["\xc2\xa0", "\xa0", ' ', "\t", "\n", "\r"], '', $value);
+        $value = trim($value);
+
+        // Normalize decimal comma to decimal point.
+        $value = str_replace(',', '.', $value);
+
+        if ($value === '' || strtoupper($value) === 'NULL' || !is_numeric($value)) {
+            if ($value !== '' && strtoupper($value) !== 'NULL') {
+                Log::warning('Import: non-numeric value for numeric field, using default', [
+                    'raw_value' => $value,
+                    'default'   => $default,
+                ]);
+            }
+            return $default;
+        }
+
+        return (float) $value;
+    }
+
     private function normalizeKey(string $key): string
     {
         return preg_replace('/\s+/', '_', mb_strtolower(trim($key)));
@@ -84,10 +125,10 @@ class ArticleStockImport
                 $article->update([
                     'description' => $this->parseValue($mapped['designation']),
                     'name'        => $this->parseValue($mapped['nom'] ?? null),
-                    'height'      => $this->parseValue($mapped['hauteur'] ?? null, 0),
-                    'width'       => $this->parseValue($mapped['largeur'] ?? null, 0),
-                    'depth'       => $this->parseValue($mapped['profondeur'] ?? null, 0),
-                    'thickness'   => $this->parseValue($mapped['epaisseur'] ?? null, 0),
+                    'height'      => $this->parseNumeric($mapped['hauteur'] ?? null),
+                    'width'       => $this->parseNumeric($mapped['largeur'] ?? null),
+                    'depth'       => $this->parseNumeric($mapped['profondeur'] ?? null),
+                    'thickness'   => $this->parseNumeric($mapped['epaisseur'] ?? null),
                     'color'       => $this->parseValue($mapped['couleur'] ?? null),
                 ]);
                 $article->touch();
@@ -99,10 +140,10 @@ class ArticleStockImport
                 'code'              => $refArticle,
                 'description'       => $this->parseValue($mapped['designation']),
                 'name'              => $this->parseValue($mapped['nom'] ?? null),
-                'height'            => $this->parseValue($mapped['hauteur'] ?? null, 0),
-                'width'             => $this->parseValue($mapped['largeur'] ?? null, 0),
-                'depth'             => $this->parseValue($mapped['profondeur'] ?? null, 0),
-                'thickness'         => $this->parseValue($mapped['epaisseur'] ?? null, 0),
+                'height'            => $this->parseNumeric($mapped['hauteur'] ?? null),
+                'width'             => $this->parseNumeric($mapped['largeur'] ?? null),
+                'depth'             => $this->parseNumeric($mapped['profondeur'] ?? null),
+                'thickness'         => $this->parseNumeric($mapped['epaisseur'] ?? null),
                 'color'             => $this->parseValue($mapped['couleur'] ?? null),
                 'code_supplier'     => $this->parseValue($mapped['ref_four'] ?? null),
                 'condition'         => $this->parseValue($mapped['condition'] ?? null),
