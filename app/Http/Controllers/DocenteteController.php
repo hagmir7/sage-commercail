@@ -1300,151 +1300,9 @@ class DocenteteController extends Controller
 
         return response()->json($documents);
 
-
-        $documents = Document::whereHas('docentete', function ($query) {
-            $query->where('DO_Statut', 2)
-                ->where('DO_Domaine', 0)
-                ->where('DO_Type', 3);
-        })
-            ->with([
-                'docentete' => function ($query) {
-                    $query->select('cbMarq', 'DO_Piece', 'DO_Type', 'DO_DateLivr', 'DO_Statut', 'DO_TotalHTNet', 'DO_TotalTTC');
-                },
-                'status'
-            ])
-            ->select('id', 'docentete_id', 'piece', 'type', 'ref', 'expedition', 'client_id', 'status_id')
-            ->withCount('lines');
-
-        // Apply search filter if provided
-        if ($request->filled('search')) {
-            $search = $request->search;
-            $documents->where(function ($q) use ($search) {
-                $q->where('piece', 'like', "%$search%")
-                    ->orWhere('ref', 'like', "%$search%")
-                    ->orWhere('client_id', 'like', "%$search%");
-            });
-        }
-
-        // Apply date filter if provided
-        if ($request->filled('date')) {
-            try {
-                $dates = explode(',', $request->date);
-                $start = Carbon::parse(urldecode($dates[0]))->startOfDay();
-                $end = Carbon::parse(urldecode($dates[1]))->endOfDay();
-
-                $documents->whereBetween('created_at', [$start, $end]);
-            } catch (\Exception $e) {
-                return response()->json([
-                    'message' => 'Invalid date format provided.'
-                ], 422);
-            }
-        }
-
-        // Paginate results
-        $results = $documents->paginate(20);
-
-        return response()->json($results);
     }
 
-    public function generatePieceForDuplication($piece, $souche, int $maxAttempts = 20): string
-    {
-        $cbMarq = null;
-        if (intval($souche) == 1) {
-            if (str_contains($piece, 'FA')) {
-                $cbMarq = null; // BFA
-            } elseif (str_contains($piece, 'BL')) {
-                $cbMarq = 13; // BBL
-            } elseif (str_contains($piece, 'PL')) {
-                $cbMarq = 12; // BBL
-            }
-        } elseif (intval($souche) == 0) {
-            if (str_contains($piece, 'BFA')) {
-                $cbMarq = null; // FA
-            } elseif (str_contains($piece, 'BBL')) {
-                $cbMarq = 4; // BL
-            } elseif (str_contains($piece, 'BPL')) {
-                $cbMarq = 3; // PL
-            }
-        }
 
-        if (!$cbMarq) {
-            throw new \Exception("Impossible de modifier ce document '$piece' and et '$souche'");
-        }
-
-        $attempts = 0;
-        $lastPiece = null;
-
-        while ($attempts < $maxAttempts) {
-            $attempts++;
-
-            try {
-                return DB::transaction(function () use ($cbMarq, &$lastPiece) {
-                    $result = DB::selectOne("SELECT TOP 1 * FROM F_DOCCURRENTPIECE WHERE cbMarq = ?", [$cbMarq]);
-                    $currentPiece = $result?->DC_Piece ?? '26FA000000';
-
-                    $newPiece = $this->computeNextAvailablePiece($currentPiece);
-                    $lastPiece = $newPiece;
-
-                    // If you also need to EXEC the stored procedure, do it here,
-                    // inside this same fresh transaction attempt:
-                    // DB::statement("EXEC Update_DO_Piece ?, ?, ?", [$currentPiece, $newPiece, $cbMarq]);
-
-                    DB::update("UPDATE F_DOCCURRENTPIECE SET DC_Piece = ? WHERE cbMarq = ?", [$newPiece, $cbMarq]);
-
-                    return $currentPiece;
-                });
-            } catch (\Illuminate\Database\QueryException $e) {
-                // Swallow it — don't let "piece already exists" or the
-                // transaction-count mismatch reach the caller.
-                // Just retry with a brand new transaction + a fresh piece.
-                usleep(50000); // tiny backoff, optional
-                continue;
-            }
-        }
-
-        // Only reached if genuinely exhausted — still avoid leaking the raw SQL error
-        throw new \Exception("Impossible de générer un numéro de pièce disponible, veuillez réessayer.");
-    }
-
-    private function computeNextAvailablePiece(string $currentPiece): string
-    {
-        if (preg_match('/^([A-Z0-9]+?)(\d+)$/', $currentPiece, $matches)) {
-            $prefix = $matches[1];
-            $numberStr = $matches[2];
-            $number = (int) $numberStr;
-            $length = strlen($numberStr);
-        } else {
-            $prefix = '26FA';
-            $number = 1;
-            $length = 6;
-        }
-
-        do {
-            $number++;
-            $candidate = $prefix . str_pad($number, $length, '0', STR_PAD_LEFT);
-        } while ($this->pieceExists($candidate));
-
-        return $candidate;
-    }
-
-    private function pieceExists(string $piece): bool
-    {
-        $existsInEntete = DB::selectOne(
-            "SELECT TOP 1 1 AS found FROM F_DOCENTETE WHERE DO_Piece = ?",
-            [$piece]
-        );
-
-        if ($existsInEntete) {
-            return true;
-        }
-
-        $existsInLigne = DB::selectOne(
-            "SELECT TOP 1 1 AS found FROM F_DOCLGINE WHERE DL_Piece = ?",
-            [$piece]
-        );
-
-        return (bool) $existsInLigne;
-    }
 
 
     public function generatePiece(string $type, string $souche): string
@@ -1481,6 +1339,47 @@ class DocenteteController extends Controller
     }
 
 
+        public function generatePieceDuplication($piece, $souche): string
+    {
+        return DB::transaction(function () use ($souche, $piece) {
+            $cbMarq = null;
+            if (intval($souche) == 1) {
+                if (str_contains($piece, 'FA')) {
+                    $cbMarq = null; // BFA
+                } elseif (str_contains($piece, 'BL')) {
+                    $cbMarq = 13; // BBL
+                } elseif (str_contains($piece, 'PL')) {
+                    $cbMarq = 12; // BBL
+                }
+            } elseif (intval($souche) == 0) {
+                if (str_contains($piece, 'BFA')) {
+                    $cbMarq = null; // FA
+                } elseif (str_contains($piece, 'BBL')) {
+                    $cbMarq = 4; // BL
+                } elseif (str_contains($piece, 'BPL')) {
+                    $cbMarq = 3; // PL
+                }
+            }
+            if (!$cbMarq) {
+                throw new \Exception("Impossible de modifier ce document '$piece' and et '$souche'");
+            }
+            $result = DB::selectOne("SELECT TOP 1 * FROM F_DOCCURRENTPIECE WHERE cbMarq = ?", [$cbMarq]);
+            $currentPiece = $result?->DC_Piece ?? '26FA000000';
+            if (preg_match('/^([A-Z0-9]+?)(\d+)$/', $currentPiece, $matches)) {
+                $prefix = $matches[1];
+                $number = (int)$matches[2];
+                $nextNumber = $number + 1;
+                $newPiece = $prefix . str_pad($nextNumber, strlen($matches[2]), '0', STR_PAD_LEFT);
+            } else {
+                $newPiece = '26FA000001';
+            }
+            DB::update("UPDATE F_DOCCURRENTPIECE SET DC_Piece = ? WHERE cbMarq = ?", [$newPiece, $cbMarq]);
+            return $currentPiece;
+        });
+    }
+
+
+
 
     public function duplicate($piece, Request $request)
     {
@@ -1508,7 +1407,7 @@ class DocenteteController extends Controller
 
 
 
-            $new_piece = $this->generatePieceForDuplication($piece, $souche);
+            $new_piece = $this->generatePieceDuplication($piece, $souche);
 
             $docentete->update([
                 'DO_Piece'  => $new_piece,
