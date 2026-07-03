@@ -905,13 +905,13 @@ class DocenteteController extends Controller
                 $document = $lines->first()->document;
 
                 // ✅ Generate code only if role is fabrication AND no code exists
-                if ($role->name === 'fabrication' && empty($document->code) && intval(auth()->user()->company_id) == 1 ) {
+                if ($role->name === 'fabrication' && empty($document->code) && intval(auth()->user()->company_id) == 1) {
                     $document->code = $this->generateFabricationCode();
                 }
 
                 $document->update([
                     'status_id' => $status == 7 ? 7 : 2,
-                    'code' => $document->code, 
+                    'code' => $document->code,
                 ]);
 
                 $document->companies()->updateExistingPivot(auth()->user()->company_id, [
@@ -1080,7 +1080,7 @@ class DocenteteController extends Controller
             }
 
 
-         
+
 
 
 
@@ -1089,7 +1089,7 @@ class DocenteteController extends Controller
                 DB::statement('EXEC Update_DO_Piece ?, ?, ?', [$docentete->DO_Piece, $document->piece, 2]);
 
                 // Use new piece to find the renamed record directly
-               
+
             }
 
             $triggers = DB::select("
@@ -1119,7 +1119,7 @@ class DocenteteController extends Controller
             }
 
             // DB::statement('ENABLE TRIGGER TRG_LOCK_F_DOCLIGNE ON F_DOCLIGNE');
-            
+
             DB::commit();
 
             return response()->json([
@@ -1346,43 +1346,104 @@ class DocenteteController extends Controller
         return response()->json($results);
     }
 
-    public function generatePieceForDuplication($piece, $souche): string
+    public function generatePieceForDuplication($piece, $souche, int $maxAttempts = 20): string
     {
-        return DB::transaction(function () use ($souche, $piece) {
-            $cbMarq = null;
-            if (intval($souche) == 1) {
-                if (str_contains($piece, 'FA')) {
-                    $cbMarq = null; // BFA
-                } elseif (str_contains($piece, 'BL')) {
-                    $cbMarq = 13; // BBL
-                } elseif (str_contains($piece, 'PL')) {
-                    $cbMarq = 12; // BBL
-                }
-            } elseif (intval($souche) == 0) {
-                if (str_contains($piece, 'BFA')) {
-                    $cbMarq = null; // FA
-                } elseif (str_contains($piece, 'BBL')) {
-                    $cbMarq = 4; // BL
-                } elseif (str_contains($piece, 'BPL')) {
-                    $cbMarq = 3; // PL
-                }
+        $cbMarq = null;
+        if (intval($souche) == 1) {
+            if (str_contains($piece, 'FA')) {
+                $cbMarq = null; // BFA
+            } elseif (str_contains($piece, 'BL')) {
+                $cbMarq = 13; // BBL
+            } elseif (str_contains($piece, 'PL')) {
+                $cbMarq = 12; // BBL
             }
-            if (!$cbMarq) {
-                throw new \Exception("Impossible de modifier ce document '$piece' and et '$souche'");
+        } elseif (intval($souche) == 0) {
+            if (str_contains($piece, 'BFA')) {
+                $cbMarq = null; // FA
+            } elseif (str_contains($piece, 'BBL')) {
+                $cbMarq = 4; // BL
+            } elseif (str_contains($piece, 'BPL')) {
+                $cbMarq = 3; // PL
             }
-            $result = DB::selectOne("SELECT TOP 1 * FROM F_DOCCURRENTPIECE WHERE cbMarq = ?", [$cbMarq]);
-            $currentPiece = $result?->DC_Piece ?? '26FA000000';
-            if (preg_match('/^([A-Z0-9]+?)(\d+)$/', $currentPiece, $matches)) {
-                $prefix = $matches[1];
-                $number = (int)$matches[2];
-                $nextNumber = $number + 1;
-                $newPiece = $prefix . str_pad($nextNumber, strlen($matches[2]), '0', STR_PAD_LEFT);
-            } else {
-                $newPiece = '26FA000001';
+        }
+
+        if (!$cbMarq) {
+            throw new \Exception("Impossible de modifier ce document '$piece' and et '$souche'");
+        }
+
+        $attempts = 0;
+        $lastPiece = null;
+
+        while ($attempts < $maxAttempts) {
+            $attempts++;
+
+            try {
+                return DB::transaction(function () use ($cbMarq, &$lastPiece) {
+                    $result = DB::selectOne("SELECT TOP 1 * FROM F_DOCCURRENTPIECE WHERE cbMarq = ?", [$cbMarq]);
+                    $currentPiece = $result?->DC_Piece ?? '26FA000000';
+
+                    $newPiece = $this->computeNextAvailablePiece($currentPiece);
+                    $lastPiece = $newPiece;
+
+                    // If you also need to EXEC the stored procedure, do it here,
+                    // inside this same fresh transaction attempt:
+                    // DB::statement("EXEC Update_DO_Piece ?, ?, ?", [$currentPiece, $newPiece, $cbMarq]);
+
+                    DB::update("UPDATE F_DOCCURRENTPIECE SET DC_Piece = ? WHERE cbMarq = ?", [$newPiece, $cbMarq]);
+
+                    return $currentPiece;
+                });
+            } catch (\Illuminate\Database\QueryException $e) {
+                // Swallow it — don't let "piece already exists" or the
+                // transaction-count mismatch reach the caller.
+                // Just retry with a brand new transaction + a fresh piece.
+                usleep(50000); // tiny backoff, optional
+                continue;
             }
-            DB::update("UPDATE F_DOCCURRENTPIECE SET DC_Piece = ? WHERE cbMarq = ?", [$newPiece, $cbMarq]);
-            return $currentPiece;
-        });
+        }
+
+        // Only reached if genuinely exhausted — still avoid leaking the raw SQL error
+        throw new \Exception("Impossible de générer un numéro de pièce disponible, veuillez réessayer.");
+    }
+
+    private function computeNextAvailablePiece(string $currentPiece): string
+    {
+        if (preg_match('/^([A-Z0-9]+?)(\d+)$/', $currentPiece, $matches)) {
+            $prefix = $matches[1];
+            $numberStr = $matches[2];
+            $number = (int) $numberStr;
+            $length = strlen($numberStr);
+        } else {
+            $prefix = '26FA';
+            $number = 1;
+            $length = 6;
+        }
+
+        do {
+            $number++;
+            $candidate = $prefix . str_pad($number, $length, '0', STR_PAD_LEFT);
+        } while ($this->pieceExists($candidate));
+
+        return $candidate;
+    }
+
+    private function pieceExists(string $piece): bool
+    {
+        $existsInEntete = DB::selectOne(
+            "SELECT TOP 1 1 AS found FROM F_DOCENTETE WHERE DO_Piece = ?",
+            [$piece]
+        );
+
+        if ($existsInEntete) {
+            return true;
+        }
+
+        $existsInLigne = DB::selectOne(
+            "SELECT TOP 1 1 AS found FROM F_DOCLGINE WHERE DL_Piece = ?",
+            [$piece]
+        );
+
+        return (bool) $existsInLigne;
     }
 
 
