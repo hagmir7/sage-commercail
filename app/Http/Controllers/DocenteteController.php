@@ -1329,7 +1329,7 @@ class DocenteteController extends Controller
             DB::update(
                 "UPDATE F_DOCCURRENTPIECE 
                 SET DC_Piece = ? 
-                WHERE DC_IdCol = ? AND DC_Souche = ?",
+                WHERE DC_IdCol = ? AND DC_Souche = ? AND DC_Domaine = 0",
                 [$newPiece, $type, $souche]
             );
 
