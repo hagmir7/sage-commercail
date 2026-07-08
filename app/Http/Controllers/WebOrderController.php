@@ -315,7 +315,6 @@ class WebOrderController extends Controller
             'Chant'                 => null,
             'Episseur'              => 0,
             'TRANSMIS'              => null,
-            'Rotation'              => null,
             'DL_NoColis'            => 0,
         ]);
     }

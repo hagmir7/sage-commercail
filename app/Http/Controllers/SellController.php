@@ -247,7 +247,7 @@ class SellController extends Controller
                 DL_PieceOFProd, DL_PieceDE, DL_DateDE, DL_QteDE, DL_Operation,
                 CA_No, DO_DocType, cbProt,
                 Nom, Hauteur, Largeur, Profondeur, Langeur,
-                Couleur, Chant, Episseur, TRANSMIS, Poignée, Description, Rotation, DL_NoColis
+                Couleur, Chant, Episseur, TRANSMIS, Description, DL_NoColis
             )
             SELECT
                 1,  -- DO_Domaine
@@ -349,9 +349,7 @@ class SellController extends Controller
                 LEFT(s.Chant, 69),
                 s.Episseur,
                 LEFT(s.TRANSMIS, 50),
-                LEFT(s.Poignée, 35),
                 LEFT(s.Description, 35),
-                LEFT(s.Rotation, 69),
                 s.DL_NoColis
             FROM F_DOCLIGNE s
             WHERE s.DL_No = ?

@@ -713,7 +713,7 @@ class DocenteteController extends Controller
                 $query->select('code', 'qte_inter', 'qte_serie', 'code_supplier');
             }
         ])
-            ->select("DO_Piece", "AR_Ref", 'DL_Design', 'DL_Qte', "Nom", "Hauteur", "Largeur", "Profondeur", "Langeur", "Couleur", "Chant", "Episseur", "cbMarq", "DL_Ligne", 'Description', "Poignée as Poignee", "Rotation", 'DL_QteBL', 'EU_Qte', 'Line_ID', 'DL_QtePL')
+            ->select("DO_Piece", "AR_Ref", 'DL_Design', 'DL_Qte', "Nom", "Hauteur", "Largeur", "Profondeur", "Langeur", "Couleur", "Chant", "Episseur", "cbMarq", "DL_Ligne", 'Description', 'DL_QteBL', 'EU_Qte', 'Line_ID', 'DL_QtePL')
             ->orderBy("DL_Ligne")
             ->where(function ($q) use ($piece) {
                 $q->where('DO_Piece', $piece)
@@ -1311,7 +1311,7 @@ class DocenteteController extends Controller
             $result = DB::selectOne(
                 "SELECT TOP 1 * 
                 FROM F_DOCCURRENTPIECE WITH (UPDLOCK, HOLDLOCK) 
-                WHERE DC_IdCol = ? AND DC_Souche = ?",
+                WHERE DC_IdCol = ? AND DC_Souche = ? AND DC_Domaine = 0",
                 [$type, $souche]
             );
 
