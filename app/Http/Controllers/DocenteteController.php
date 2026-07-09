@@ -992,9 +992,9 @@ class DocenteteController extends Controller
             // DB::statement('DISABLE TRIGGER TRG_LOCK_F_DOCLIGNE ON F_DOCLIGNE');
 
             if (!$document && !$document_piece) {
-                $piece = str_contains($docentete->DO_Piece, 'BC')
-                    ? $this->generatePiece(2, $docentete->DO_Souche)
-                    : $docentete->DO_Piece;
+                $piece = str_contains($docentete->DO_Piece, 'BC') ? $this->generatePiece(2, $docentete->DO_Souche) : $docentete->DO_Piece;
+
+                \Log::alert("Souch => " . $docentete->DO_Souche);
 
                 $document = Document::create([
                     'docentete_id' => $docentete->cbMarq,
