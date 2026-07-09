@@ -989,12 +989,14 @@ class DocenteteController extends Controller
             $document = Document::where('docentete_id', $docentete->cbMarq)->first();
             $document_piece = Document::where('piece', $docentete->DO_Piece)->first();
 
-            // DB::statement('DISABLE TRIGGER TRG_LOCK_F_DOCLIGNE ON F_DOCLIGNE');
-
             if (!$document && !$document_piece) {
                 $piece = str_contains($docentete->DO_Piece, 'BC') ? $this->generatePiece(2, $docentete->DO_Souche) : $docentete->DO_Piece;
 
-                \Log::alert("Souch => " . $docentete->DO_Souche);
+                \Log::alert([
+                    "Souch" => $docentete->DO_Souche,
+                    "New Piec" => $this->generatePiece(2, $docentete->DO_Souche),
+                    "BC Piec" => $docentete?->DO_Piece
+                ]);
 
                 $document = Document::create([
                     'docentete_id' => $docentete->cbMarq,
@@ -1310,8 +1312,8 @@ class DocenteteController extends Controller
         return DB::transaction(function () use ($type, $souche) {
             $result = DB::selectOne(
                 "SELECT TOP 1 * 
-                FROM F_DOCCURRENTPIECE WITH (UPDLOCK, HOLDLOCK) 
-                WHERE DC_IdCol = ? AND DC_Souche = ? AND DC_Domaine = 0",
+            FROM F_DOCCURRENTPIECE WITH (UPDLOCK, HOLDLOCK) 
+            WHERE DC_IdCol = ? AND DC_Souche = ? AND DC_Domaine = 0",
                 [$type, $souche]
             );
 
@@ -1326,13 +1328,21 @@ class DocenteteController extends Controller
                 $newPiece = '26PL000001';
             }
 
-            DB::update(
-                "UPDATE F_DOCCURRENTPIECE 
-                SET DC_Piece = ? 
-                WHERE DC_IdCol = ? AND DC_Souche = ? AND DC_Domaine = 0",
-                [$newPiece, $type, $souche]
+            // Atomic upsert: avoids the race where two concurrent calls
+            // both see no existing row and both try to "create" it.
+            DB::statement(
+                "MERGE F_DOCCURRENTPIECE WITH (HOLDLOCK) AS target
+            USING (SELECT ? AS DC_IdCol, ? AS DC_Souche, 0 AS DC_Domaine) AS src
+            ON target.DC_IdCol = src.DC_IdCol 
+               AND target.DC_Souche = src.DC_Souche 
+               AND target.DC_Domaine = src.DC_Domaine
+            WHEN MATCHED THEN
+                UPDATE SET DC_Piece = ?
+            WHEN NOT MATCHED THEN
+                INSERT (DC_IdCol, DC_Souche, DC_Domaine, DC_Piece)
+                VALUES (src.DC_IdCol, src.DC_Souche, src.DC_Domaine, ?);",
+                [$type, $souche, $newPiece, $newPiece]
             );
-
 
             return $newPiece;
         });
