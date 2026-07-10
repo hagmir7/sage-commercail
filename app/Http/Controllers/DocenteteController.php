@@ -1317,19 +1317,17 @@ class DocenteteController extends Controller
                 [$type, $souche]
             );
 
-            $currentPiece = $result?->DC_Piece ?? '26PL000001';
-
-            if (preg_match('/^([A-Z0-9]+?)(\d+)$/', $currentPiece, $matches)) {
+            if ($result && preg_match('/^([A-Z0-9]+?)(\d+)$/', $result->DC_Piece, $matches)) {
                 $prefix = $matches[1];
                 $number = (int)$matches[2];
                 $nextNumber = $number + 1;
                 $newPiece = $prefix . str_pad($nextNumber, strlen($matches[2]), '0', STR_PAD_LEFT);
             } else {
-                $newPiece = '26PL000001';
+                // No existing row (or unparsable piece) -> build the correct
+                // starting reference for THIS type/souche, not a hardcoded one
+                $newPiece = $this->buildDefaultPiece($type, $souche);
             }
 
-            // Atomic upsert: avoids the race where two concurrent calls
-            // both see no existing row and both try to "create" it.
             DB::statement(
                 "MERGE F_DOCCURRENTPIECE WITH (HOLDLOCK) AS target
             USING (SELECT ? AS DC_IdCol, ? AS DC_Souche, 0 AS DC_Domaine) AS src
@@ -1346,6 +1344,39 @@ class DocenteteController extends Controller
 
             return $newPiece;
         });
+    }
+
+    /**
+     * Builds the correct starting piece reference for a given type/souche
+     * when no row exists yet in F_DOCCURRENTPIECE.
+     *
+     * DC_Souche = 0 -> no "B" prefix (e.g. PL, BC, BL, FA...)
+     * DC_Souche = 1 -> "B" prefix   (e.g. BPL, BBC, BBL, BFA...)
+     */
+    private function buildDefaultPiece(string $type, string $souche): string
+    {
+        // DC_IdCol => document code, based on your existing data
+        $codeMap = [
+            '0' => 'DE',
+            '1' => 'BC',
+            '2' => 'PL',
+            '3' => 'BL',
+            '4' => 'BR',
+            '5' => 'BV',
+            '6' => 'FA',
+            '7' => 'FR',
+            '8' => 'FV',
+        ];
+
+        if (!isset($codeMap[$type])) {
+            throw new \InvalidArgumentException("Unknown document type: {$type}");
+        }
+
+        $code    = $codeMap[$type];
+        $bPrefix = ((string)$souche === '1') ? 'B' : '';
+        $year    = date('y'); // "26" for 2026, adjust if your system doesn't rotate by year
+
+        return $year . $bPrefix . $code . '000001';
     }
 
 
