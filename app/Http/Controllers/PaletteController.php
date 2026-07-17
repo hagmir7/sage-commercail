@@ -999,6 +999,12 @@ class PaletteController extends Controller
                     'controlled_at' => now(),
                 ]);
             }
+            $palette->document->companies()->syncWithoutDetaching([
+                auth()->user()->company_id => [
+                    'controlled_by' => auth()->id(),
+                    'controlled_at' => now()
+                ],
+            ]);
         });
 
         return response()->json([

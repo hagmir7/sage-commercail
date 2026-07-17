@@ -51,10 +51,10 @@ class Document extends Model
     }
 
 
-public function transferUser()
-{
-    return $this->belongsTo(User::class, 'transfer_by');
-}
+    public function transferUser()
+    {
+        return $this->belongsTo(User::class, 'transfer_by');
+    }
 
     public function palettes()
     {
@@ -68,7 +68,21 @@ public function transferUser()
 
     public function companies()
     {
-        return $this->belongsToMany(Company::class, 'document_companies')->withPivot(['status_id', 'printed', 'updated']);
+        return $this->belongsToMany(Company::class, 'document_companies')->withPivot([
+            'id',
+            'status_id',
+            'printed',
+            'updated',
+            'complation_date',
+            'fabricated_by',
+            'delivery_date',
+            'note',
+            'fabricated_at',
+            'validated_by',
+            'controlled_by',
+            'validated_at',
+            'controlled_at'
+        ]);
     }
 
 

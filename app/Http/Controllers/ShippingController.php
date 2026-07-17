@@ -73,12 +73,21 @@ public function store(Request $request)
             ->where('company_id', auth()->user()->company_id)
             ->update(['status_id' => 14]);
 
+            $document = Document::find($shipping->document_id);
+            $document->companies()->syncWithoutDetaching([
+                auth()->user()->company_id => [
+                    'delivery_date' => now()
+                ],
+            ]);
+
         DB::commit();
 
         return response()->json([
             'message'  => 'Shipping created successfully.',
             'shipping' => $shipping->load('criteria', 'document', 'user'),
         ], 201);
+
+
 
     } catch (\Exception $e) {
         DB::rollBack();

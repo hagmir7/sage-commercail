@@ -136,6 +136,15 @@ class DocenteteController extends Controller
                 'next_role_id' => null,
             ]);
 
+            $document = Document::where("piece", $request->piece)->first();
+            $document->companies()->syncWithoutDetaching([
+                auth()->user()->company_id => [
+                    'fabricated_at' => now(),
+                    'fabricated_by' => auth()->id(),
+
+                ],
+            ]);
+
             $this->stockMovmentInser($line->ref, $line?->docligne?->DL_Qte);
         }
         return response()->json($request->all(), 200);
@@ -189,13 +198,15 @@ class DocenteteController extends Controller
         $validator = Validator::make(
             $request->all(),
             [
-                'complation_date' => "required",
+                'complation_date' => 'required|date|after_or_equal:today',
                 'lines' => 'required|array'
             ],
-            [],
+            [
+                'complation_date.after_or_equal' => 'La date de complétion doit être égale ou postérieure à aujourd\'hui.',
+            ],
             [
                 'complation_date' => 'date de complétion',
-                'lines' => 'lignes',
+                'piece' => "Le numéro de document n'est pas valide"
             ]
         );
 
@@ -228,7 +239,14 @@ class DocenteteController extends Controller
             $document->update([
                 'complation_date' => $request->complation_date
             ]);
+
+            $document->companies()->syncWithoutDetaching([
+                auth()->user()->company_id => [
+                    'complation_date' => $request->complation_date
+                ],
+            ]);
         }
+
 
         // 🔥 Update each line + actions
         foreach ($lines as $line) {
@@ -593,6 +611,14 @@ class DocenteteController extends Controller
                         'validated_at' => now()
                     ]
                 );
+
+
+                $document->companies()->syncWithoutDetaching([
+                    auth()->user()->company_id => [
+                        'validated_by' => auth()->id(),
+                        'validated_at' => now()
+                    ],
+                ]);
 
                 // Achat d'article
                 $sellController = new SellController();
@@ -1019,7 +1045,8 @@ class DocenteteController extends Controller
                 $request->company => [
                     'status_id' => 1,
                     'updated_at' => now(),
-                    'printed' => false
+                    'printed' => false,
+                    'created_at' => now()
                 ]
             ]);
 

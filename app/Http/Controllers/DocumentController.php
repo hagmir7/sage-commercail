@@ -11,6 +11,8 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
 use App\Exports\PreparationDocumentsExport;
+use App\Models\DocumentCompany;
+use Illuminate\Http\JsonResponse;
 use Maatwebsite\Excel\Facades\Excel;
 
 class DocumentController extends Controller
@@ -774,37 +776,25 @@ class DocumentController extends Controller
 
     public function archive(Request $request)
     {
-        $userCompanyId = auth()->user()->company_id;
+        $user          = auth()->user();
+        $isPrivileged  = $user->hasRole(['commercial', 'admin']); // Spatie: true if user has any of these roles
+        $userCompanyId = $user->company_id;
 
-        if (auth()->user()->hasRole('fabrication')) {
-            $query = Document::with([
-                'docentete:DO_Domaine,DO_Type,DO_Piece,DO_Date,DO_Ref,DO_Tiers,DO_Statut,cbMarq,cbCreation,DO_DateLivr,DO_Expedit',
-                'status',
-                'lines' => function ($q) {
-                    $q->whereNotNull('fabricated_at')->limit(1);
-                }
-            ])->whereHas('lines', function ($q) {
-                $q->whereNotNull('fabricated_by');
-            })->whereHas('companies', function ($q) use ($userCompanyId) {
-                $q->where('companies.id', $userCompanyId);
-            });
+        $query = $this->buildArchiveQuery($user, $userCompanyId, $isPrivileged);
 
-        } elseif (auth()->user()->hasRole('commercial')) {
+        $pivot         = (new Document())->companies();
+        $pivotTable    = $pivot->getTable();
+        $pivotForeign  = $pivot->getForeignPivotKeyName();   // e.g. document_id
+        $pivotRelated  = $pivot->getRelatedPivotKeyName();   // e.g. company_id
+        $completionCol = "{$pivotTable}.complation_date";
 
-            $query = Document::with([
-                'docentete:DO_Domaine,DO_Type,DO_Piece,DO_Date,DO_Ref,DO_Tiers,DO_Statut,cbMarq,cbCreation,DO_DateLivr,DO_Expedit',
-                'status'
-            ]);
+        $query->join($pivotTable, function ($join) use ($pivotTable, $pivotForeign, $pivotRelated, $userCompanyId, $isPrivileged) {
+            $join->on("{$pivotTable}.{$pivotForeign}", '=', 'documents.id');
 
-        } else {
-
-            $query = Document::with([
-                'docentete:cbMarq,DO_Domaine,DO_Type,DO_Piece,DO_Date,DO_Ref,DO_Tiers,DO_Statut,cbCreation,DO_DateLivr,DO_Expedit',
-                'status'
-            ])->whereHas('companies', function ($q) use ($userCompanyId) {
-                $q->where('companies.id', $userCompanyId);
-            });
-        }
+            if (!$isPrivileged) {
+                $join->where("{$pivotTable}.{$pivotRelated}", '=', $userCompanyId);
+            }
+        });
 
         if ($request->filled('date')) {
             $dates = explode(',', $request->date, 2);
@@ -812,17 +802,15 @@ class DocumentController extends Controller
             $start = Carbon::parse(urldecode($dates[0]))->startOfDay();
             $end   = Carbon::parse(urldecode($dates[1] ?? $dates[0]))->endOfDay();
 
-            $query->whereBetween('created_at', [$start, $end]);
+            $query->whereBetween('documents.created_at', [$start, $end]);
         }
 
-        $query->when($request->filled('type'), function ($q) use ($request) {
-            if ($request->type == 2) {
-                $q->where(function ($q2) {
-                    $q2->where('piece_bl', 'like', '%BL%')
-                        ->orWhere('piece', 'like', '%BL%');
-                });
-            }
-        });
+        if ($request->filled('type') && $request->type == 2) {
+            $query->where(function ($q) {
+                $q->where('piece_bl', 'like', '%BL%')
+                    ->orWhere('piece', 'like', '%BL%');
+            });
+        }
 
         if ($request->filled('search')) {
             $search = $request->search;
@@ -837,41 +825,66 @@ class DocumentController extends Controller
         }
 
         // --- Counts (all filters applied, before pagination) ---
-
-        $totalCount = (clone $query)->count();
-
-        $onTimeCount = (clone $query)
-            ->whereHas('lines', function ($q) {
-                $q->whereNotNull('fabricated_at')
-                    ->whereRaw(
-                        'CAST(fabricated_at AS DATE) <= CAST(documents.complation_date AS DATE)'
-                    );
-            })
-            ->count();
-
-        $lateCount = (clone $query)
-            ->whereHas('lines', function ($q) {
-                $q->whereNotNull('fabricated_at')
-                    ->whereRaw(
-                        'CAST(fabricated_at AS DATE) > CAST(documents.complation_date AS DATE)'
-                    );
-            })
-            ->count();
-
-        // --------------------------------------------------------
+        $totalCount  = (clone $query)->count();
+        $onTimeCount = $this->countLinesByCompletion(clone $query, $completionCol, '<=');
+        $lateCount   = $this->countLinesByCompletion(clone $query, $completionCol, '>');
 
         $documents = $query
-            ->select('documents.*')
-            ->orderByDesc('id')
+            ->select('documents.*', "{$completionCol} as complation_date")
+            ->orderByDesc('documents.id')
             ->paginate(70);
 
-        // Merge counts into the paginator response without breaking frontend
         $result                = $documents->toArray();
         $result['total_count'] = $totalCount;
         $result['on_time']     = $onTimeCount;
         $result['late']        = $lateCount;
 
         return response()->json($result, 200, [], JSON_UNESCAPED_UNICODE);
+    }
+
+    private function buildArchiveQuery($user, ?int $userCompanyId, bool $isPrivileged = false)
+    {
+        if ($user->hasRole('fabrication')) {
+            return Document::with([
+                'docentete:DO_Domaine,DO_Type,DO_Piece,DO_Date,DO_Ref,DO_Tiers,DO_Statut,cbMarq,cbCreation,DO_DateLivr,DO_Expedit',
+                'status',
+                'companies',
+                'lines' => fn($q) => $q->whereNotNull('fabricated_at')->limit(1),
+            ])
+                ->whereHas('lines', fn($q) => $q->whereNotNull('fabricated_by'))
+                ->whereHas('companies', fn($q) => $q->where('companies.id', $userCompanyId));
+        }
+
+        if ($user->hasRole('commercial')) {
+            return Document::with([
+                'docentete:DO_Domaine,DO_Type,DO_Piece,DO_Date,DO_Ref,DO_Tiers,DO_Statut,cbMarq,cbCreation,DO_DateLivr,DO_Expedit',
+                'status',
+            ]);
+        }
+
+        if ($user->hasRole('admin')) {
+            return Document::with([
+                'docentete:cbMarq,DO_Domaine,DO_Type,DO_Piece,DO_Date,DO_Ref,DO_Tiers,DO_Statut,cbCreation,DO_DateLivr,DO_Expedit',
+                'status',
+            ]);
+        }
+
+        return Document::with([
+            'docentete:cbMarq,DO_Domaine,DO_Type,DO_Piece,DO_Date,DO_Ref,DO_Tiers,DO_Statut,cbCreation,DO_DateLivr,DO_Expedit',
+            'status',
+        ])->whereHas('companies', fn($q) => $q->where('companies.id', $userCompanyId));
+    }
+
+    /**
+     * Counts documents whose latest fabricated line is on-time/late relative
+     * to the per-company pivot completion date.
+     */
+    private function countLinesByCompletion($query, string $completionCol, string $operator): int
+    {
+        return $query->whereHas('lines', function ($q) use ($completionCol, $operator) {
+            $q->whereNotNull('fabricated_at')
+                ->whereRaw("CAST(fabricated_at AS DATE) {$operator} CAST({$completionCol} AS DATE)");
+        })->count();
     }
 
 
@@ -1095,5 +1108,21 @@ class DocumentController extends Controller
             }
             return $document;
         }
+    }
+
+    public function storeNote(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'note' => ['required', 'string', 'max:600'],
+            'document_company_id' => ['required', 'integer', 'exists:document_companies,id'],
+        ]);
+
+        DocumentCompany::whereKey($validated['document_company_id'])->update([
+            'note' => $validated['note'],
+        ]);
+
+        return response()->json([
+            'message' => 'Note enregistrée avec succès.',
+        ]);
     }
 }

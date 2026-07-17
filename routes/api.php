@@ -443,6 +443,7 @@ Route::middleware('auth:sanctum')->group(function () {
 
         Route::get('{document:piece}', 'show');
         Route::get('{piece}', 'checkControlled');
+        Route::patch('note', 'storeNote');
     });
 
 
