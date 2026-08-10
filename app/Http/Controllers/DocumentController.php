@@ -406,7 +406,7 @@ class DocumentController extends Controller
         $user = auth()->user();
 
         $query = Document::query()
-            ->with(['companies', 'lines', 'docentete:DO_Piece,cbMarq,DO_DateLivr,DO_Date']);
+            ->with(['companies', 'lines', 'docentete:DO_Piece,cbMarq,DO_DateLivr,DO_Date', 'shipping']);
 
         if (!empty($user->company_id)) {
 
@@ -849,6 +849,7 @@ class DocumentController extends Controller
                 'docentete:DO_Domaine,DO_Type,DO_Piece,DO_Date,DO_Ref,DO_Tiers,DO_Statut,cbMarq,cbCreation,DO_DateLivr,DO_Expedit',
                 'status',
                 'companies',
+                'shipping',
                 'lines' => fn($q) => $q->whereNotNull('fabricated_at')->limit(1),
             ])
                 ->whereHas('lines', fn($q) => $q->whereNotNull('fabricated_by'))
@@ -859,6 +860,7 @@ class DocumentController extends Controller
             return Document::with([
                 'docentete:DO_Domaine,DO_Type,DO_Piece,DO_Date,DO_Ref,DO_Tiers,DO_Statut,cbMarq,cbCreation,DO_DateLivr,DO_Expedit',
                 'status',
+                'shipping'
             ]);
         }
 
@@ -866,12 +868,14 @@ class DocumentController extends Controller
             return Document::with([
                 'docentete:cbMarq,DO_Domaine,DO_Type,DO_Piece,DO_Date,DO_Ref,DO_Tiers,DO_Statut,cbCreation,DO_DateLivr,DO_Expedit',
                 'status',
+                'shipping'
             ]);
         }
 
         return Document::with([
             'docentete:cbMarq,DO_Domaine,DO_Type,DO_Piece,DO_Date,DO_Ref,DO_Tiers,DO_Statut,cbCreation,DO_DateLivr,DO_Expedit',
             'status',
+            'shipping'
         ])->whereHas('companies', fn($q) => $q->where('companies.id', $userCompanyId));
     }
 
