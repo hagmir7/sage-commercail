@@ -72,7 +72,7 @@ class WebOrderController extends Controller
     {
         $request->validate([
             'order_code'                  => 'required|string',
-            'customer_code'               => 'required|string',
+            'customer_code'               => 'string|nullable',
             'total_ht'                    => 'required|numeric',
             'total_ttc'                   => 'required|numeric',
             'products'                    => 'required|array|min:1',
@@ -97,7 +97,7 @@ class WebOrderController extends Controller
         }, $request->products);
 
         $orderCode    = $request->order_code;
-        $customerCode = $request->customer_code;
+        $customerCode = !empty($request->customer_code) ? $request->customer_code : 'CL150';
         $totalHT      = floatval($request->total_ht);
         $totalTTC     = floatval($request->total_ttc);
 
