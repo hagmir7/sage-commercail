@@ -1000,6 +1000,47 @@ class DocenteteController extends Controller
 
 
 
+    public function generatePiece(string $type, string $souche): string
+    {
+        return DB::transaction(function () use ($type, $souche) {
+            $result = DB::selectOne(
+                "SELECT TOP 1 * 
+            FROM F_DOCCURRENTPIECE WITH (UPDLOCK, HOLDLOCK) 
+            WHERE DC_IdCol = ? AND DC_Souche = ? AND DC_Domaine = 0",
+                [$type, $souche]
+            );
+
+            if ($result && preg_match('/^([A-Z0-9]+?)(\d+)$/', $result->DC_Piece, $matches)) {
+                $prefix = $matches[1];
+                $number = (int)$matches[2];
+                $newPiece = $prefix . str_pad($number + 1, strlen($matches[2]), '0', STR_PAD_LEFT);
+                $CurrentPiece = $prefix . str_pad($number, strlen($matches[2]), '0', STR_PAD_LEFT);
+            } else {
+                // No existing row (or unparsable piece) -> build the correct
+                // starting reference for THIS type/souche, not a hardcoded one
+                $newPiece = $this->buildDefaultPiece($type, $souche);
+                $CurrentPiece = $this->buildDefaultPiece($type, $souche);
+        
+            }
+
+            DB::statement(
+                "MERGE F_DOCCURRENTPIECE WITH (HOLDLOCK) AS target
+            USING (SELECT ? AS DC_IdCol, ? AS DC_Souche, 0 AS DC_Domaine) AS src
+            ON target.DC_IdCol = src.DC_IdCol 
+               AND target.DC_Souche = src.DC_Souche 
+               AND target.DC_Domaine = src.DC_Domaine
+            WHEN MATCHED THEN
+                UPDATE SET DC_Piece = ?
+            WHEN NOT MATCHED THEN
+                INSERT (DC_IdCol, DC_Souche, DC_Domaine, DC_Piece)
+                VALUES (src.DC_IdCol, src.DC_Souche, src.DC_Domaine, ?);",
+                [$type, $souche, $newPiece, $newPiece]
+            );
+
+            return $CurrentPiece;
+        });
+    }
+
 
     // Transfer to Company controller (Adill)
     public function transferCompany($request)
@@ -1017,13 +1058,6 @@ class DocenteteController extends Controller
 
             if (!$document && !$document_piece) {
                 $piece = str_contains($docentete->DO_Piece, 'BC') ? $this->generatePiece(2, $docentete->DO_Souche) : $docentete->DO_Piece;
-
-                \Log::alert([
-                    "Souch" => $docentete->DO_Souche,
-                    "New Piec" => $this->generatePiece(2, $docentete->DO_Souche),
-                    "BC Piec" => $docentete?->DO_Piece
-                ]);
-
                 $document = Document::create([
                     'docentete_id' => $docentete->cbMarq,
                     'piece' => $piece,
@@ -1077,9 +1111,6 @@ class DocenteteController extends Controller
                     }
                 }
 
-                $urgant_articles = ['AC002001', 'AC002002', 'AC002003', 'AC002004'];
-
-
                 $new_line = Line::firstOrCreate(
                     ['docligne_id' => $line->cbMarq],
                     [
@@ -1108,27 +1139,10 @@ class DocenteteController extends Controller
                 ]);
             }
 
-
-
-
-
-
             // Update piece only if document was just created AND DO_Piece contains 'BC'
             if ($document->wasRecentlyCreated && str_contains($docentete->DO_Piece, 'BC')) {
                 DB::statement('EXEC Update_DO_Piece ?, ?, ?', [$docentete->DO_Piece, $document->piece, 2]);
-
-                // Use new piece to find the renamed record directly
-
             }
-
-            $triggers = DB::select("
-                SELECT t.name AS trigger_name, o.name AS table_name
-                FROM sys.triggers t
-                JOIN sys.objects o ON t.parent_id = o.object_id
-                WHERE o.name = 'F_DOCENTETE'
-            ");
-
-
 
             if ($request->urgent) {
                 $new_docentete = Docentete::where('DO_Piece', $document->piece)->first();
@@ -1147,14 +1161,12 @@ class DocenteteController extends Controller
                 ]);
             }
 
-            // DB::statement('ENABLE TRIGGER TRG_LOCK_F_DOCLIGNE ON F_DOCLIGNE');
-
             DB::commit();
 
             return response()->json([
                 'status' => 'success',
                 'piece' => $document->piece,
-                'message' => 'Document transferred successfully',
+                'message' => 'Document transféré avec succès',
             ]);
         } catch (\Exception $e) {
             \Log::error($e);
@@ -1332,46 +1344,6 @@ class DocenteteController extends Controller
     }
 
 
-
-
-    public function generatePiece(string $type, string $souche): string
-    {
-        return DB::transaction(function () use ($type, $souche) {
-            $result = DB::selectOne(
-                "SELECT TOP 1 * 
-            FROM F_DOCCURRENTPIECE WITH (UPDLOCK, HOLDLOCK) 
-            WHERE DC_IdCol = ? AND DC_Souche = ? AND DC_Domaine = 0",
-                [$type, $souche]
-            );
-
-            if ($result && preg_match('/^([A-Z0-9]+?)(\d+)$/', $result->DC_Piece, $matches)) {
-                $prefix = $matches[1];
-                $number = (int)$matches[2];
-                $nextNumber = $number + 1;
-                $newPiece = $prefix . str_pad($nextNumber, strlen($matches[2]), '0', STR_PAD_LEFT);
-            } else {
-                // No existing row (or unparsable piece) -> build the correct
-                // starting reference for THIS type/souche, not a hardcoded one
-                $newPiece = $this->buildDefaultPiece($type, $souche);
-            }
-
-            DB::statement(
-                "MERGE F_DOCCURRENTPIECE WITH (HOLDLOCK) AS target
-            USING (SELECT ? AS DC_IdCol, ? AS DC_Souche, 0 AS DC_Domaine) AS src
-            ON target.DC_IdCol = src.DC_IdCol 
-               AND target.DC_Souche = src.DC_Souche 
-               AND target.DC_Domaine = src.DC_Domaine
-            WHEN MATCHED THEN
-                UPDATE SET DC_Piece = ?
-            WHEN NOT MATCHED THEN
-                INSERT (DC_IdCol, DC_Souche, DC_Domaine, DC_Piece)
-                VALUES (src.DC_IdCol, src.DC_Souche, src.DC_Domaine, ?);",
-                [$type, $souche, $newPiece, $newPiece]
-            );
-
-            return $newPiece;
-        });
-    }
 
     /**
      * Builds the correct starting piece reference for a given type/souche
