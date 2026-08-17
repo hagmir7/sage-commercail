@@ -251,6 +251,9 @@ class ReceptionController extends Controller
                     ->whereHas('doclignes.line', function ($q) {
                         $q->where('role_id', auth()->id());
                     })
+                    ->whereHas('document', function ($q) {
+                        $q->whereIn('status_id', [1,2]);
+                    })
                     ->with([
                         'doclignes' => function ($q) {
                             $q->select(['DO_Piece', 'cbMarq']);
@@ -300,14 +303,11 @@ class ReceptionController extends Controller
         $perPage = 30;
         $page = $request->get('page', 1);
         $paginated = new \Illuminate\Pagination\LengthAwarePaginator(
-            $allDocentetes->forPage($page, $perPage),
+            array_values($allDocentetes->forPage($page, $perPage)->values()->all()),
             $allDocentetes->count(),
             $perPage,
             $page,
-            [
-                'path' => $request->url(),
-                'query' => $request->query(),
-            ]
+            ['path' => $request->url(), 'query' => $request->query()]
         );
 
         return response()->json($paginated);
