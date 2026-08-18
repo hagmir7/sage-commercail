@@ -1020,7 +1020,6 @@ class DocenteteController extends Controller
                 // starting reference for THIS type/souche, not a hardcoded one
                 $newPiece = $this->buildDefaultPiece($type, $souche);
                 $CurrentPiece = $this->buildDefaultPiece($type, $souche);
-        
             }
 
             DB::statement(
@@ -1340,7 +1339,6 @@ class DocenteteController extends Controller
             ->get();
 
         return response()->json($documents);
-
     }
 
 
@@ -1379,7 +1377,7 @@ class DocenteteController extends Controller
     }
 
 
-        public function generatePieceDuplication($piece, $souche): string
+    public function generatePieceDuplication($piece, $souche): string
     {
         return DB::transaction(function () use ($souche, $piece) {
             $cbMarq = null;
@@ -1611,7 +1609,7 @@ class DocenteteController extends Controller
         ]);
 
         return response()->json([
-            'message' => 'Validation completed successfully'
+            'message' => 'Validation réussie'
         ]);
     }
 }
