@@ -32,4 +32,7 @@ class Emplacement extends Model
     {
         return $this->hasMany(Palette::class);
     }
+    public function limit(){
+        return $this->belongsToMany(EmplacementLimit::class);
+    }
 }
