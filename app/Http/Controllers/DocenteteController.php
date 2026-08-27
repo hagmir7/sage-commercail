@@ -114,39 +114,76 @@ class DocenteteController extends Controller
 
         $user = auth()->user();
 
-        foreach ($request->lines as $line) {
-            $line = Line::find($line);
+        // Map each line-role to its Line-table columns, its pivot columns,
+        // and the action_name recorded on the user_lines pivot.
+        $roleConfig = [
+            'fabrication' => [
+                'line_at' => 'fabricated_at',
+                'line_by' => 'fabricated_by',
+                'pivot_at' => 'fabricated_at',
+                'pivot_by' => 'fabricated_by',
+                'action_name' => 'Fabrication',
+                'status_id' => 7,
+            ],
+            'montage' => [
+                'line_at' => 'montage_at',
+                'line_by' => 'montage_by',
+                'pivot_at' => 'montage_at',
+                'pivot_by' => 'montage_by',
+                'action_name' => 'Montage',
+                'status_id' => 7,
+            ],
+            'peinture' => [
+                'line_at' => 'peinture_at',
+                'line_by' => 'peinture_by',
+                'pivot_at' => 'peinture_at',
+                'pivot_by' => 'peinture_by',
+                'action_name' => 'Peinture',
+                'status_id' => 7
+            ],
+        ];
+
+        $userRole = collect($roleConfig)->keys()->first(fn($role) => $user->hasRole($role));
+
+        if ($userRole === null) {
+            return response()->json(['message' => 'User has no permitted line role.'], 403);
+        }
+
+        $config = $roleConfig[$userRole];
+
+        foreach ($request->lines as $lineId) {
+            $line = Line::find($lineId);
+
+            if (!$line) {
+                continue; // or collect an error — see note below
+            }
 
             $line->update([
-                'role_id' => $line->next_role_id ? $line->next_role_id : null,
-                'next_role_id' => null,
-                'fabricated_by' => $user->hasRole("fabrication") ? auth()->id() : $line->fabricated_by,
-                'fabricated_at' => $user->hasRole("fabrication") ? now() : $line->fabricated_at,
-                'mounted_by' => $user->hasRole("montage") ? auth()->id() : $line->mounted_by,
-                'mounted_at' => $user->hasRole("montage") ? now() : $line->mounted_at,
-                'status_id' => $line->next_role_id ? 7 : ($user->hasRole("fabrication") ? 4 : 6)
+                'role_id'          => $line->next_role_id ? $line->next_role_id : null,
+                'next_role_id'     => null,
+                $config['line_by'] => auth()->id(),
+                $config['line_at'] => now(),
+                'status_id'        => $line->next_role_id ? 7 : $config['status_id'],
             ]);
 
             auth()->user()->lines()->syncWithoutDetaching([
-                $line->id => ['action_name' => $user->hasRole("fabrication") ? "Fabrication" : 'Montage']
+                $line->id => ['action_name' => $config['action_name']],
             ]);
 
+            $document = Document::where('piece', $request->piece)->first();
 
-            $line->update([
-                'next_role_id' => null,
-            ]);
-
-            $document = Document::where("piece", $request->piece)->first();
-            $document->companies()->syncWithoutDetaching([
-                auth()->user()->company_id => [
-                    'fabricated_at' => now(),
-                    'fabricated_by' => auth()->id(),
-
-                ],
-            ]);
+            if ($document) {
+                $document->companies()->syncWithoutDetaching([
+                    auth()->user()->company_id => [
+                        $config['pivot_at'] => now(),
+                        $config['pivot_by'] => auth()->id(),
+                    ],
+                ]);
+            }
 
             $this->stockMovmentInser($line->ref, $line?->docligne?->DL_Qte);
         }
+
         return response()->json($request->all(), 200);
     }
 
@@ -219,7 +256,7 @@ class DocenteteController extends Controller
 
         $user = auth()->user();
 
-        if (!($user->hasRole("fabrication") || $user->hasRole("montage"))) {
+        if (!($user->hasRole("fabrication") || $user->hasRole("montage") || $user->hasRole("peinture"))) {
             return response()->json(['error' => "You have no access"], 500);
         }
 
@@ -248,20 +285,18 @@ class DocenteteController extends Controller
         }
 
 
-        // 🔥 Update each line + actions
-        foreach ($lines as $line) {
+        if ($user->hasRole("fabrication")) {
+            $statusId = 3;
+        } elseif ($user->hasRole("montage")) {
+            $statusId = 5;
+        } elseif ($user->hasRole("peinture")) {
+            $statusId = 6;
+        }
 
+        foreach ($lines as $line) {
             $line->update([
                 'complation_date' => $request->complation_date,
                 'status_id' => $user->hasRole("fabrication") ? 3 : 5
-            ]);
-
-            Action::create([
-                'user_id' => auth()->id(),
-                'action_type_id' => $user->hasRole("fabrication") ? 4 : 5,
-                'line_id' => $line->id,
-                'description' => "Fabrication",
-                'start' => now(),
             ]);
         }
 
@@ -775,7 +810,7 @@ class DocenteteController extends Controller
             $docligneQuery->whereHas('line', function ($query) use ($userCompanyId) {
                 $query->where('company_id', $userCompanyId);
             });
-        } elseif (array_intersect(['fabrication', 'montage', 'preparation_cuisine', 'preparation_trailer', 'magasinier'], $userRoles)) {
+        } elseif (array_intersect(['fabrication', 'montage', 'preparation_cuisine', 'preparation_trailer', 'magasinier', 'peinture'], $userRoles)) {
 
             $docligneQuery->whereHas('line', function ($query) use ($userCompanyId, $userRoleIds, $id) {
 
@@ -786,7 +821,11 @@ class DocenteteController extends Controller
                             ->orWhereIn('next_role_id', $userRoleIds);
 
                         if (auth()->user()->hasRole("fabrication")) {
-                            $subQuery->orWhereNotNull('fabricated_by')->where('piece_pl', $id);
+                            $subQuery->orWhereNotNull('fabricated_by')->orWhereNotNull('cutted_at')->where('piece_pl', $id);
+                        }
+
+                        if(auth()->user()->hasRole("peinture")){
+                            $subQuery->orWhereNotNull('peinture_by')->where('piece_pl', $id);
                         }
                     });
             });
@@ -882,68 +921,143 @@ class DocenteteController extends Controller
             $status = match ($role->name) {
                 'fabrication' => 3,
                 'montage' => 5,
-                'magasinier', 'preparation_cuisine', 'preparation_trailer' => 7,
-                default => throw new \Exception("Unknown role: {$role->name}"),
+                'peinture' => 6,
+                'magasinier',
+                'preparation_cuisine',
+                'preparation_trailer' => 7,
+
+                // Role 19 = découpe
+                // Change 3 if cutting uses another status
+                'decoupe' => 3,
+
+                default => throw new \Exception(
+                    "Unknown role: {$role->name}"
+                ),
             };
 
             $lineData = $request->lines;
+
             $lineIds = [];
             $quantities = [];
 
             if (is_array($lineData) && !empty($lineData)) {
-                if (is_array($lineData[0]) && isset($lineData[0]['line_id'])) {
+
+                // Format:
+                // [
+                //     ['line_id' => 1, 'quantity' => 5],
+                //     ['line_id' => 2, 'quantity' => 3],
+                // ]
+                if (
+                    is_array($lineData[0]) &&
+                    isset($lineData[0]['line_id'])
+                ) {
                     foreach ($lineData as $item) {
                         $lineIds[] = $item['line_id'];
-                        $quantities[$item['line_id']] = $item['quantity'];
+
+                        $quantities[$item['line_id']] =
+                            $item['quantity'] ?? null;
                     }
                 } else {
+                    // Format:
+                    // [1, 2, 3]
                     $lineIds = $lineData;
                 }
             }
 
-            $lines = Line::whereIn("id", $lineIds)->get();
-
-            // Update document
-            if ($lines->isNotEmpty()) {
-                $document = $lines->first()->document;
-
-                $document->update([
-                    'status_id' => $status == 7 ? 7 : 2
-                ]);
-
-                $document->companies()->updateExistingPivot(auth()->user()->company_id, [
-                    'status_id' => $status,
-                    'updated_at' => now(),
-                ]);
+            if (empty($lineIds)) {
+                throw new \Exception("No lines selected");
             }
 
-            // Update each line
+            $lines = Line::whereIn('id', $lineIds)->get();
+
+            if ($lines->isEmpty()) {
+                throw new \Exception("No lines found");
+            }
+
+            /*
+        |--------------------------------------------------------------------------
+        | Get document
+        |--------------------------------------------------------------------------
+        */
+
+            $document = $lines->first()->document;
+
+            if (!$document) {
+                throw new \Exception("Document not found");
+            }
+
+            /*
+        |--------------------------------------------------------------------------
+        | Generate fabrication code
+        |--------------------------------------------------------------------------
+        */
+
+            if (
+                $role->name === 'fabrication' &&
+                empty($document->code) &&
+                intval(auth()->user()->company_id) === 1
+            ) {
+                $document->code = $this->generateFabricationCode();
+            }
+
+            /*
+        |--------------------------------------------------------------------------
+        | Update document
+        |--------------------------------------------------------------------------
+        */
+
+            $document->update([
+                'status_id' => $status == 7 ? 7 : 2,
+                'code' => $document->code,
+            ]);
+
+            /*
+        |--------------------------------------------------------------------------
+        | Update document_companies pivot
+        |--------------------------------------------------------------------------
+        */
+
+            $pivotData = [
+                'status_id' => $status,
+                'updated_at' => now(),
+            ];
+
+            /*
+        |--------------------------------------------------------------------------
+        | If selected role is 19 = cutting
+        |--------------------------------------------------------------------------
+        */
+
+            if ((int) $role->id === 19) {
+                $pivotData['cutted_at'] = now();
+                $pivotData['cutted_by'] = auth()->id();
+            }
+
+            $document->companies()->updateExistingPivot(
+                auth()->user()->company_id,
+                $pivotData
+            );
+
+            /*
+        |--------------------------------------------------------------------------
+        | Update each line
+        |--------------------------------------------------------------------------
+        */
+
             foreach ($lines as $line) {
+
                 $updateData = [
                     'role_id' => $role->id,
                     'status_id' => $status,
                     'next_role_id' => $next_role,
                 ];
-                $line->update($updateData);
-            }
 
-            if ($lines->isNotEmpty()) {
-                $document = $lines->first()->document;
-
-                // ✅ Generate code only if role is fabrication AND no code exists
-                if ($role->name === 'fabrication' && empty($document->code) && intval(auth()->user()->company_id) == 1) {
-                    $document->code = $this->generateFabricationCode();
+                if ((int) $role->id === 19) {
+                    $updateData['cutted_at'] = now();
+                    $updateData['cutted_by'] = auth()->id();
                 }
 
-                $document->update([
-                    'status_id' => $status == 7 ? 7 : 2,
-                    'code' => $document->code,
-                ]);
-
-                $document->companies()->updateExistingPivot(auth()->user()->company_id, [
-                    'status_id' => $status,
-                    'updated_at' => now(),
-                ]);
+                $line->update($updateData);
             }
 
             DB::commit();
@@ -955,6 +1069,7 @@ class DocenteteController extends Controller
                 'quantities' => $quantities ?: null,
             ], 200);
         } catch (\Exception $e) {
+
             DB::rollBack();
 
             return response()->json([
@@ -1226,8 +1341,7 @@ class DocenteteController extends Controller
 
                 return response()->json([
                     'status' => 'error',
-                    'message' => "Ce document est actuellement ouvert dans Sage. 
-                               Fermez-le et réessayez."
+                    'message' => "Ce document est actuellement ouvert dans Sage. Fermez-le et réessayez."
                 ], 409);
             }
 
@@ -1611,5 +1725,18 @@ class DocenteteController extends Controller
         return response()->json([
             'message' => 'Validation réussie'
         ]);
+    }
+
+
+
+    public function notTransferred()
+    {
+
+        $docentetes = Docentete::whereHas('doclignes', function ($query) {
+            $query->whereNull('Line_ID');
+        })->limit(10)->get();
+        // return $docentetes;
+
+        return response()->json($docentetes, 200, [], JSON_INVALID_UTF8_IGNORE);
     }
 }

@@ -36,6 +36,12 @@ class Line extends Model
         'mounted_at',
         'prepared_by',
         'prepared_at',
+        'cutted_by',
+        'cutted_at',
+        'montage_at',
+        'montage_by',
+        'peinture_at',
+        'peinture_by'
     ];
 
 
@@ -75,11 +81,13 @@ class Line extends Model
         return $this->belongsTo(Role::class);
     }
 
-    public function article_stock(){
+    public function article_stock()
+    {
         return $this->belongsTo(ArticleStock::class, 'ref', 'code');
     }
 
-    public function preparedUser(){
+    public function preparedUser()
+    {
         return $this->belongsTo(User::class, 'prepared_by');
     }
 
@@ -88,16 +96,19 @@ class Line extends Model
         return $this->belongsTo(User::class, 'fabricated_by');
     }
 
-    public function user_role(){
+    public function user_role()
+    {
         return $this->belongsTo(User::class, 'role_id', 'id');
     }
 
 
-    public function palettes(){
+    public function palettes()
+    {
         return $this->belongsToMany(Palette::class, 'line_palettes')->withPivot(['quantity', 'controlled_at']);
     }
 
-    public function status(){
+    public function status()
+    {
         return $this->belongsTo(Status::class);
     }
 

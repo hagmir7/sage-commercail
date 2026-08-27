@@ -235,7 +235,7 @@ class DocumentController extends Controller
         $user_roles = $user->roles()->pluck('name', 'id');
         $roleIds = $user_roles->keys()->toArray();
 
-        $preparationRoles = ['fabrication', 'montage', 'preparation_cuisine', 'preparation_trailer', 'magasinier'];
+        $preparationRoles = ['fabrication', 'montage', 'preparation_cuisine', 'preparation_trailer', 'magasinier', 'peinture'];
         $hasPreparationRole = !empty(array_intersect($user_roles->toArray(), $preparationRoles));
 
         $query = Document::query()
@@ -774,18 +774,29 @@ class DocumentController extends Controller
     }
 
 
+    /**
+     * Maps a "line" role to the pair of columns on the `lines` table
+     * that mark when/by-whom that production stage was completed.
+     */
+    private const LINE_ROLE_COLUMNS = [
+        'fabrication' => ['at' => ['fabricated_at', 'cutted_at'], 'by' => 'fabricated_by'],
+        'montage'     => ['at' => ['montage_at'],                 'by' => 'montage_by'],
+        'peinture'    => ['at' => ['peinture_at'],                'by' => 'peinture_by'],
+    ];
+
     public function archive(Request $request)
     {
         $user          = auth()->user();
-        $isPrivileged  = $user->hasRole(['commercial', 'admin']); // Spatie: true if user has any of these roles
+        $isPrivileged  = $user->hasRole(['commercial', 'admin']);
         $userCompanyId = $user->company_id;
+        $lineRole      = $this->resolveLineRole($user);
 
-        $query = $this->buildArchiveQuery($user, $userCompanyId, $isPrivileged);
+        $query = $this->buildArchiveQuery($user, $userCompanyId, $isPrivileged, $lineRole);
 
         $pivot         = (new Document())->companies();
         $pivotTable    = $pivot->getTable();
-        $pivotForeign  = $pivot->getForeignPivotKeyName();   // e.g. document_id
-        $pivotRelated  = $pivot->getRelatedPivotKeyName();   // e.g. company_id
+        $pivotForeign  = $pivot->getForeignPivotKeyName();
+        $pivotRelated  = $pivot->getRelatedPivotKeyName();
         $completionCol = "{$pivotTable}.complation_date";
 
         $query->join($pivotTable, function ($join) use ($pivotTable, $pivotForeign, $pivotRelated, $userCompanyId, $isPrivileged) {
@@ -798,10 +809,8 @@ class DocumentController extends Controller
 
         if ($request->filled('date')) {
             $dates = explode(',', $request->date, 2);
-
             $start = Carbon::parse(urldecode($dates[0]))->startOfDay();
             $end   = Carbon::parse(urldecode($dates[1] ?? $dates[0]))->endOfDay();
-
             $query->whereBetween('documents.created_at', [$start, $end]);
         }
 
@@ -814,7 +823,6 @@ class DocumentController extends Controller
 
         if ($request->filled('search')) {
             $search = $request->search;
-
             $query->where(function ($q) use ($search) {
                 $q->where('piece_fa', 'like', "%$search%")
                     ->orWhere('piece', 'like', "%$search%")
@@ -824,15 +832,33 @@ class DocumentController extends Controller
             });
         }
 
-        // --- Counts (all filters applied, before pagination) ---
-        $totalCount  = (clone $query)->count();
-        $onTimeCount = $this->countLinesByCompletion(clone $query, $completionCol, '<=');
-        $lateCount   = $this->countLinesByCompletion(clone $query, $completionCol, '>');
+        $timestampCols       = self::LINE_ROLE_COLUMNS[$lineRole]['at'] ?? ['fabricated_at'];
+        $primaryTimestampCol = $timestampCols[0];
 
-        $documents = $query
-            ->select('documents.*', "{$completionCol} as complation_date")
-            ->orderByDesc('documents.id')
-            ->paginate(70);
+        $totalCount  = (clone $query)->count();
+        $onTimeCount = $this->countLinesByCompletion(clone $query, $completionCol, '<=', $primaryTimestampCol);
+        $lateCount   = $this->countLinesByCompletion(clone $query, $completionCol, '>', $primaryTimestampCol);
+
+        $documents = $query->select('documents.*', "{$completionCol} as complation_date");
+
+        foreach ($timestampCols as $col) {
+            $documents->selectSub(function ($sub) use ($col) {
+                $sub->from('lines')
+                    ->selectRaw("MAX([{$col}])")
+                    ->whereColumn('lines.document_id', 'documents.id');
+            }, $col);
+        }
+
+        // Order by the role-relevant timestamp(s) instead of documents.id.
+        if (count($timestampCols) > 1) {
+            // fabrication: order by whichever of fabricated_at / cutted_at is set
+            $coalesced = implode(', ', array_map(fn($c) => "[{$c}]", $timestampCols));
+            $documents->orderByRaw("COALESCE({$coalesced}) DESC");
+        } else {
+            $documents->orderByDesc($timestampCols[0]);
+        }
+
+        $documents = $documents->paginate(70);
 
         $result                = $documents->toArray();
         $result['total_count'] = $totalCount;
@@ -841,18 +867,56 @@ class DocumentController extends Controller
 
         return response()->json($result, 200, [], JSON_UNESCAPED_UNICODE);
     }
-
-    private function buildArchiveQuery($user, ?int $userCompanyId, bool $isPrivileged = false)
+    /**
+     * Determines which "line role" (fabrication/montage/peinture) the user has,
+     * if any. Returns null for users without one of these roles.
+     */
+    private function resolveLineRole($user): ?string
     {
-        if ($user->hasRole('fabrication')) {
+        foreach (array_keys(self::LINE_ROLE_COLUMNS) as $role) {
+            if ($user->hasRole($role)) {
+                return $role;
+            }
+        }
+
+        return null;
+    }
+
+    private function buildArchiveQuery($user, ?int $userCompanyId, bool $isPrivileged = false, ?string $lineRole = null)
+    {
+        if ($lineRole === 'fabrication') {
             return Document::with([
                 'docentete:DO_Domaine,DO_Type,DO_Piece,DO_Date,DO_Ref,DO_Tiers,DO_Statut,cbMarq,cbCreation,DO_DateLivr,DO_Expedit',
                 'status',
                 'companies',
                 'shipping',
-                'lines' => fn($q) => $q->whereNotNull('fabricated_at')->limit(1),
+                'lines' => fn($q) => $q->where(function ($q2) {
+                    $q2->whereNotNull('fabricated_at')
+                        ->orWhereNotNull('cutted_at');
+                })->limit(1),
             ])
-                ->whereHas('lines', fn($q) => $q->whereNotNull('fabricated_by'))
+                ->whereHas('lines', function ($q) {
+                    $q->where(function ($q2) {
+                        $q2->whereNotNull('fabricated_at')
+                            ->orWhereNotNull('cutted_at');
+                    });
+                })
+                ->whereHas('companies', fn($q) => $q->where('companies.id', $userCompanyId));
+        }
+
+        if ($lineRole !== null) {
+            // montage / peinture — single-column roles, unchanged
+            $atCol = self::LINE_ROLE_COLUMNS[$lineRole]['at'][0];
+            $byCol = self::LINE_ROLE_COLUMNS[$lineRole]['by'];
+
+            return Document::with([
+                'docentete:DO_Domaine,DO_Type,DO_Piece,DO_Date,DO_Ref,DO_Tiers,DO_Statut,cbMarq,cbCreation,DO_DateLivr,DO_Expedit',
+                'status',
+                'companies',
+                'shipping',
+                'lines' => fn($q) => $q->whereNotNull($atCol)->limit(1),
+            ])
+                ->whereHas('lines', fn($q) => $q->whereNotNull($byCol))
                 ->whereHas('companies', fn($q) => $q->where('companies.id', $userCompanyId));
         }
 
@@ -878,19 +942,17 @@ class DocumentController extends Controller
             'shipping'
         ])->whereHas('companies', fn($q) => $q->where('companies.id', $userCompanyId));
     }
-
     /**
-     * Counts documents whose latest fabricated line is on-time/late relative
-     * to the per-company pivot completion date.
+     * Counts documents whose latest completed line (per $timestampCol) is
+     * on-time/late relative to the per-company pivot completion date.
      */
-    private function countLinesByCompletion($query, string $completionCol, string $operator): int
+    private function countLinesByCompletion($query, string $completionCol, string $operator, string $timestampCol = 'fabricated_at'): int
     {
-        return $query->whereHas('lines', function ($q) use ($completionCol, $operator) {
-            $q->whereNotNull('fabricated_at')
-                ->whereRaw("CAST(fabricated_at AS DATE) {$operator} CAST({$completionCol} AS DATE)");
+        return $query->whereHas('lines', function ($q) use ($completionCol, $operator, $timestampCol) {
+            $q->whereNotNull($timestampCol)
+                ->whereRaw("CAST([{$timestampCol}] AS DATE) {$operator} CAST({$completionCol} AS DATE)");
         })->count();
     }
-
 
     public function exportPreparationList(Request $request)
     {

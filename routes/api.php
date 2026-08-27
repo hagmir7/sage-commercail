@@ -327,6 +327,7 @@ Route::middleware('auth:sanctum')->group(function () {
 
 
     Route::prefix('docentetes')->controller(DocenteteController::class)->group(function () {
+        Route::get("not-transferred", 'notTransferred');
         Route::get("commercial", 'commercial');
         Route::get("preparation", 'preparation');
         Route::get("fabrication", 'fabrication');
@@ -340,6 +341,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get("duplicate/{piece}", 'duplicate');
         Route::post("validate-full", 'fullValidation');
         Route::get("{id}", 'show');
+        
     });
 
 
