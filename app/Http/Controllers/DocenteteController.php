@@ -21,7 +21,6 @@ use App\Models\StockMovement;
 use App\Services\StockMovementService;
 use App\Services\StockService;
 use Illuminate\Support\Facades\Auth;
-
 use function Symfony\Component\Clock\now;
 
 class DocenteteController extends Controller
