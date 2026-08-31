@@ -1244,6 +1244,18 @@ class DocenteteController extends Controller
                         'piece_bc' => $docentete->DO_Piece,
                         'piece_pl' => $document->piece,
                         'status_id' => 1,
+                        'fabricated_by' => null,
+                        'fabricated_at' => null,
+                        'mounted_by' => null,
+                        'mounted_at' => null,
+                        'prepared_by' => null,
+                        'prepared_at' => null,
+                        'cutted_by' => null,
+                        'cutted_at' => null,
+                        'montage_at' => null,
+                        'montage_by' => null,
+                        'peinture_at' => null,
+                        'peinture_by' => null
                     ]
                 );
 
