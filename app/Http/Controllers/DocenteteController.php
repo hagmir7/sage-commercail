@@ -823,7 +823,7 @@ class DocenteteController extends Controller
                             $subQuery->orWhereNotNull('fabricated_by')->orWhereNotNull('cutted_at')->where('piece_pl', $id);
                         }
 
-                        if(auth()->user()->hasRole("peinture")){
+                        if (auth()->user()->hasRole("peinture")) {
                             $subQuery->orWhereNotNull('peinture_by')->where('piece_pl', $id);
                         }
                     });
@@ -940,25 +940,12 @@ class DocenteteController extends Controller
             $quantities = [];
 
             if (is_array($lineData) && !empty($lineData)) {
-
-                // Format:
-                // [
-                //     ['line_id' => 1, 'quantity' => 5],
-                //     ['line_id' => 2, 'quantity' => 3],
-                // ]
-                if (
-                    is_array($lineData[0]) &&
-                    isset($lineData[0]['line_id'])
-                ) {
+                if (is_array($lineData[0]) && isset($lineData[0]['line_id'])) {
                     foreach ($lineData as $item) {
                         $lineIds[] = $item['line_id'];
-
-                        $quantities[$item['line_id']] =
-                            $item['quantity'] ?? null;
+                        $quantities[$item['line_id']] = $item['quantity'] ?? null;
                     }
                 } else {
-                    // Format:
-                    // [1, 2, 3]
                     $lineIds = $lineData;
                 }
             }
@@ -1032,6 +1019,19 @@ class DocenteteController extends Controller
                 $pivotData['cutted_by'] = auth()->id();
             }
 
+            if (auth()->user()->hasRole('preparation')) {
+                $pivotData = array_merge($pivotData, [
+                    'fabricated_at' => null,
+                    'fabricated_by' => null,
+                    'cutted_at' => null,
+                    'cutted_by' => null,
+                    'montage_at' => null,
+                    'montage_by' => null,
+                    'peinture_at' => null,
+                    'peinture_by' => null,
+                ]);
+            }
+
             $document->companies()->updateExistingPivot(
                 auth()->user()->company_id,
                 $pivotData
@@ -1051,9 +1051,28 @@ class DocenteteController extends Controller
                     'next_role_id' => $next_role,
                 ];
 
+
+
                 if ((int) $role->id === 19) {
                     $updateData['cutted_at'] = now();
                     $updateData['cutted_by'] = auth()->id();
+                }
+
+                if (auth()->user()->hasRole('preparation')) {
+                    $updateData = array_merge($updateData, [
+                        'fabricated_by' => null,
+                        'fabricated_at' => null,
+                        'mounted_by' => null,
+                        'mounted_at' => null,
+                        'prepared_by' => null,
+                        'prepared_at' => null,
+                        'cutted_by' => null,
+                        'cutted_at' => null,
+                        'montage_at' => null,
+                        'montage_by' => null,
+                        'peinture_at' => null,
+                        'peinture_by' => null
+                    ]);
                 }
 
                 $line->update($updateData);
@@ -1195,17 +1214,7 @@ class DocenteteController extends Controller
                     'printed' => false,
                     'created_at' => now(),
 
-                    'fabricated_at' => null,
-                    'fabricated_by' => null,
 
-                    'cutted_at' => null,
-                    'cutted_by' => null,
-
-                    'montage_at' => null,
-                    'montage_by' => null,
-
-                    'peinture_at' => null,
-                    'peinture_by' => null,
                 ]
             ]);
 
@@ -1256,18 +1265,6 @@ class DocenteteController extends Controller
                         'piece_bc' => $docentete->DO_Piece,
                         'piece_pl' => $document->piece,
                         'status_id' => 1,
-                        'fabricated_by' => null,
-                        'fabricated_at' => null,
-                        'mounted_by' => null,
-                        'mounted_at' => null,
-                        'prepared_by' => null,
-                        'prepared_at' => null,
-                        'cutted_by' => null,
-                        'cutted_at' => null,
-                        'montage_at' => null,
-                        'montage_by' => null,
-                        'peinture_at' => null,
-                        'peinture_by' => null
                     ]
                 );
 
