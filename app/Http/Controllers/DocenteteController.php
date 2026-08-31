@@ -1193,7 +1193,19 @@ class DocenteteController extends Controller
                     'status_id' => 1,
                     'updated_at' => now(),
                     'printed' => false,
-                    'created_at' => now()
+                    'created_at' => now(),
+
+                    'fabricated_at' => null,
+                    'fabricated_by' => null,
+
+                    'cutted_at' => null,
+                    'cutted_by' => null,
+
+                    'montage_at' => null,
+                    'montage_by' => null,
+
+                    'peinture_at' => null,
+                    'peinture_by' => null,
                 ]
             ]);
 
