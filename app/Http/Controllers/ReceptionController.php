@@ -16,6 +16,7 @@ use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Http\JsonResponse;
 use Symfony\Component\HttpKernel\Exception\HttpException;
 use function Symfony\Component\Clock\now;
 
@@ -112,10 +113,9 @@ class ReceptionController extends Controller
     }
 
 
-
-    public function show(Request $request, $piece)
+    public function show(Request $request, $piece): JsonResponse
     {
-        return Docentete::on($request->company)
+        $query = Docentete::on($request->company)
             ->select(
                 'DO_Reliquat',
                 'DO_Piece',
@@ -127,9 +127,60 @@ class ReceptionController extends Controller
                 'DO_Expedit',
                 'DO_TotalHT'
             )
-            ->with(['doclignes:DO_Piece,AR_Ref,DL_Design,DL_Qte,DL_QteBL,DL_Ligne,cbMarq,DL_Qte,Line_ID', 'doclignes.line', 'doclignes.line.user_role', 'document'])
-            ->find($piece);
+            ->with([
+                'doclignes' => function ($q) {
+                    $q->select(
+                        'DO_Piece',
+                        'AR_Ref',
+                        'DL_Design',
+                        'DL_Qte',
+                        'DL_QteBL',
+                        'DL_Ligne',
+                        'cbMarq',
+                        'Line_ID'
+                    );
+
+                    if (auth()->user()->hasRole('magasinier')) {
+                        $q->whereHas('line', function ($line) {
+                            $line->where(
+                                'company_id',
+                                auth()->user()->company_id
+                            );
+                        });
+                    }
+                },
+
+                'doclignes.line.user_role',
+
+                'document',
+            ]);
+
+        // Make sure the document belongs to the user's company
+        // for magasinier users.
+        if (auth()->user()->hasRole('magasinier')) {
+            $query->whereHas('doclignes.line', function ($q) {
+                $q->where(
+                    'company_id',
+                    auth()->user()->company_id
+                );
+            });
+        }
+
+        $docentete = $query->find($piece);
+
+        if (!$docentete) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Document not found',
+            ], 404);
+        }
+
+        return response()->json($docentete);
     }
+
+
+
+
     public function transfer(Request $request)
     {
         $validator = Validator::make($request->all(), [
@@ -507,6 +558,10 @@ class ReceptionController extends Controller
                 return response()->json(['message' => "Ligne document introuvable ou Quantité insuffisante"], 422);
             }
 
+            if(!empty($request->palettes) && ((int) $request->palettes * (int) $request->condition) > ($docligne->DL_Qte - $docligne->DL_QteBL)) {
+                return response()->json(['message' => "Quantité insuffisante."], 422);
+            }
+
 
             $emplacement = Emplacement::lockForUpdate()
                 ->where('code', $request->emplacement_code)
@@ -546,8 +601,11 @@ class ReceptionController extends Controller
                     'description'      => $docligne?->DL_Design,
                     'container_code'   => $request->container_code,
                     'depot_code' => $emplacement?->depot?->code,
+                    'total_palettes' => $request->palettes,
                     'created_at' => now()
                 ]);
+
+                
 
                 $docligne->update([
                     'DL_QteBL' => $docligne->DL_QteBL + (float) (floatval($request->quantity) * floatval($condition))

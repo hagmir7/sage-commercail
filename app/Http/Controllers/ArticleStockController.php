@@ -57,49 +57,67 @@ class ArticleStockController extends Controller
 
         $company = $request->filled('company') ? $request->company : null;
 
-
         $all   = $query->get();
         $ids   = $all->pluck('id')->all();
         $codes = $all->pluck('code')->all();
 
-        $stockQuery = DB::table('article_palette as ap')
-            ->join('palettes as p', 'p.id', '=', 'ap.palette_id')
-            ->join('emplacements as e', 'e.id', '=', 'p.emplacement_id')
-            ->join('depots as d', 'd.id', '=', 'e.depot_id')
-            ->where('p.type', 'Stock')
-            ->whereNotIn('e.code', ['K-3P', 'K-4P', 'K-4SP', 'K-3SP', 'ZONE-Q'])
-            ->whereIn('ap.article_stock_id', $ids);
+        // ── Stock Map (chunked) ───────────────────────────────────────────────
+        $stockMap = collect();
+        collect($ids)->chunk(500)->each(function ($chunk) use (&$stockMap, $company) {
+            $q = DB::table('article_palette as ap')
+                ->join('palettes as p',     'p.id', '=', 'ap.palette_id')
+                ->join('emplacements as e', 'e.id', '=', 'p.emplacement_id')
+                ->join('depots as d',       'd.id', '=', 'e.depot_id')
+                ->where('p.type', 'Stock')
+                ->whereNotIn('e.code', ['K-3P', 'K-4P', 'K-4SP', 'K-3SP', 'ZONE-Q'])
+                ->whereIn('ap.article_stock_id', $chunk->all());
 
-        if ($company) {
-            $stockQuery->where('d.company_id', $company);
-        }
+            if ($company) {
+                $q->where('d.company_id', $company);
+            }
 
-        $stockMap = $stockQuery
-            ->groupBy('ap.article_stock_id')
-            ->select('ap.article_stock_id', DB::raw('SUM(ap.quantity) as total'))
-            ->pluck('total', 'ap.article_stock_id');
+            $stockMap = $stockMap->merge(
+                $q->groupBy('ap.article_stock_id')
+                    ->select('ap.article_stock_id', DB::raw('SUM(ap.quantity) as total'))
+                    ->pluck('total', 'ap.article_stock_id')
+            );
+        });
 
+        // ── Limit Map (chunked) ───────────────────────────────────────────────
+        $limitMap = collect();
+        collect($ids)->chunk(500)->each(function ($chunk) use (&$limitMap) {
+            $limitMap = $limitMap->merge(
+                EmplacementLimit::whereIn('article_stock_id', $chunk->all())
+                    ->groupBy('article_stock_id')
+                    ->selectRaw('article_stock_id, SUM(quantity) as total')
+                    ->pluck('total', 'article_stock_id')
+            );
+        });
 
-        // ── Limit Map ─────────────────────────────────────────────────────────────
-        $limitMap = EmplacementLimit::whereIn('article_stock_id', $ids)
-            ->groupBy('article_stock_id')
-            ->selectRaw('article_stock_id, SUM(quantity) as total')
-            ->pluck('total', 'article_stock_id');
+        // ── Prep Map (chunked) ────────────────────────────────────────────────
+        $prepMap = collect();
+        collect($codes)->chunk(500)->each(function ($chunk) use (&$prepMap) {
+            $prepMap = $prepMap->merge(
+                Docligne::whereIn('AR_Ref', $chunk->all())
+                    ->whereIn('DO_Type', [1, 2, 3])
+                    ->whereColumn('DL_Qte', '>', 'DL_QteBL')
+                    ->groupBy('AR_Ref')
+                    ->selectRaw('AR_Ref, SUM(DL_Qte) as total')
+                    ->pluck('total', 'AR_Ref')
+            );
+        });
 
-        // ── Prep Map ──────────────────────────────────────────────────────────────
-        $prepMap = Docligne::whereIn('AR_Ref', $codes)
-            ->whereIn('DO_Type', [1, 2, 3])
-            ->whereColumn('DL_Qte', '>', 'DL_QteBL')
-            ->groupBy('AR_Ref')
-            ->selectRaw('AR_Ref, SUM(DL_Qte) as total')
-            ->pluck('total', 'AR_Ref');
-
-        // ── Zone Map ──────────────────────────────────────────────────────────────
-        $zoneMap = Docligne::whereIn('AR_Ref', $codes)
-            ->whereIn('DO_Type', [1, 2, 3])
-            ->groupBy('AR_Ref')
-            ->selectRaw('AR_Ref, SUM(DL_QteBL) as total')
-            ->pluck('total', 'AR_Ref');
+        // ── Zone Map (chunked) ────────────────────────────────────────────────
+        $zoneMap = collect();
+        collect($codes)->chunk(500)->each(function ($chunk) use (&$zoneMap) {
+            $zoneMap = $zoneMap->merge(
+                Docligne::whereIn('AR_Ref', $chunk->all())
+                    ->whereIn('DO_Type', [1, 2, 3])
+                    ->groupBy('AR_Ref')
+                    ->selectRaw('AR_Ref, SUM(DL_QteBL) as total')
+                    ->pluck('total', 'AR_Ref')
+            );
+        });
 
         // ── Enrich each article ───────────────────────────────────────────────────
         $all->transform(function ($article) use ($stockMap, $limitMap, $prepMap, $zoneMap) {
@@ -675,65 +693,133 @@ class ArticleStockController extends Controller
     }
 
 
-  public function stock(Request $request)
-{
-    $search               = $request->input('search');
-    $depotCodes           = $request->input('depot_code', []);
-    $category             = $request->input('category');
-    $emplacement          = $request->input('emplacement');
-    $sortBy               = $request->input('sort_by');
-    $sortDir              = in_array(strtolower($request->input('sort_dir', 'asc')), ['asc', 'desc'])
-        ? $request->input('sort_dir', 'asc')
-        : 'asc';
-    // $excludedEmplacements = ['K-4P', 'K-3P', 'K-4SP', 'K-2SP'];
+    public function stock(Request $request)
+    {
+        $search               = $request->input('search');
+        $depotCodes           = $request->input('depot_code', []);
+        $category             = $request->input('category');
+        $emplacement          = $request->input('emplacement');
+        $sortBy               = $request->input('sort_by');
+        $sortDir              = in_array(strtolower($request->input('sort_dir', 'asc')), ['asc', 'desc'])
+            ? $request->input('sort_dir', 'asc')
+            : 'asc';
+        // $excludedEmplacements = ['K-4P', 'K-3P', 'K-4SP', 'K-2SP'];
 
-    /* =======================================================
+        /* =======================================================
        PART 1: actual stock, but ONLY where an
        emplacement_limit is defined for that pair
        (INNER JOIN instead of LEFT JOIN)
     ======================================================= */
-    $stockQuery = DB::table('emplacements as e')
-        ->join('palettes as p', 'p.emplacement_id', '=', 'e.id')
-        ->join('article_palette as ap', 'ap.palette_id', '=', 'p.id')
-        ->join('article_stocks as a', 'a.id', '=', 'ap.article_stock_id')
-        ->join('depots as d', 'd.id', '=', 'e.depot_id')
-        ->join('emplacement_limit as el', function ($join) {
-            $join->on('el.emplacement_id', '=', 'e.id')
-                ->on('el.article_stock_id', '=', 'a.id');
-        })
-        ->select([
-            'e.id as emplacement_id',
-            'e.code as emplacement_code',
-            'a.id as article_stock_id',
-            'a.code as article_code',
-            'a.code_supplier',
-            'a.category',
-            'a.name',
-            'a.description',
-            'a.width',
-            'a.height',
-            'a.depth',
-            'a.thickness',
-            DB::raw('SUM(ap.quantity) as total_quantity'),
-            'el.quantity as quantity_limit',
-        ])
-        ->where('p.type', '=', 'STOCK')
-        ->where('a.category', '=', 'semi-fini');
+        $stockQuery = DB::table('emplacements as e')
+            ->join('palettes as p', 'p.emplacement_id', '=', 'e.id')
+            ->join('article_palette as ap', 'ap.palette_id', '=', 'p.id')
+            ->join('article_stocks as a', 'a.id', '=', 'ap.article_stock_id')
+            ->join('depots as d', 'd.id', '=', 'e.depot_id')
+            ->join('emplacement_limit as el', function ($join) {
+                $join->on('el.emplacement_id', '=', 'e.id')
+                    ->on('el.article_stock_id', '=', 'a.id');
+            })
+            ->select([
+                'e.id as emplacement_id',
+                'e.code as emplacement_code',
+                'a.id as article_stock_id',
+                'a.code as article_code',
+                'a.code_supplier',
+                'a.category',
+                'a.name',
+                'a.description',
+                'a.width',
+                'a.height',
+                'a.depth',
+                'a.thickness',
+                DB::raw('SUM(ap.quantity) as total_quantity'),
+                'el.quantity as quantity_limit',
+            ])
+            ->where('p.type', '=', 'STOCK')
+            ->where('a.category', '=', 'semi-fini');
         // ->whereNotIn('e.code', $excludedEmplacements);
 
-    /* =======================================================
+        /* =======================================================
        PART 2: emplacement_limit defined but currently
        no stock in that specific emplacement (quantity = 0)
     ======================================================= */
-    $emptyQuery = DB::table('emplacement_limit as el')
-        ->join('emplacements as e', 'e.id', '=', 'el.emplacement_id')
-        ->join('depots as d', 'd.id', '=', 'e.depot_id')
-        ->join('article_stocks as a', 'a.id', '=', 'el.article_stock_id')
-        ->select([
-            'e.id as emplacement_id',
-            'e.code as emplacement_code',
-            'a.id as article_stock_id',
-            'a.code as article_code',
+        $emptyQuery = DB::table('emplacement_limit as el')
+            ->join('emplacements as e', 'e.id', '=', 'el.emplacement_id')
+            ->join('depots as d', 'd.id', '=', 'e.depot_id')
+            ->join('article_stocks as a', 'a.id', '=', 'el.article_stock_id')
+            ->select([
+                'e.id as emplacement_id',
+                'e.code as emplacement_code',
+                'a.id as article_stock_id',
+                'a.code as article_code',
+                'a.code_supplier',
+                'a.category',
+                'a.name',
+                'a.description',
+                'a.width',
+                'a.height',
+                'a.depth',
+                'a.thickness',
+                DB::raw('0 as total_quantity'),
+                'el.quantity as quantity_limit',
+            ])
+            ->where('a.category', '=', 'semi-fini')
+            // ->whereNotIn('e.code', $excludedEmplacements)
+            ->whereNotExists(function ($q) {
+                $q->select(DB::raw(1))
+                    ->from('article_palette as ap')
+                    ->join('palettes as p', 'p.id', '=', 'ap.palette_id')
+                    ->whereColumn('p.emplacement_id', 'el.emplacement_id')
+                    ->whereColumn('ap.article_stock_id', 'el.article_stock_id')
+                    ->where('p.type', '=', 'STOCK');
+            });
+
+        /* =======================================================
+       APPLY THE SAME FILTERS TO BOTH PARTS
+    ======================================================= */
+        $applyFilters = function ($query) use ($search, $depotCodes, $emplacement, $category) {
+            if (!empty($search)) {
+                $query->where(function ($q) use ($search) {
+                    $q->where('a.code', 'like', "%{$search}%")
+                        ->orWhere('a.code_supplier', 'like', "%{$search}%")
+                        ->orWhere('a.name', 'like', "%{$search}%")
+                        ->orWhere('a.description', 'like', "%{$search}%")
+                        ->orWhere('e.code', 'like', "%{$search}%");
+                });
+            }
+
+            if (!empty($depotCodes)) {
+                if (is_string($depotCodes)) {
+                    $depotCodes = explode(',', $depotCodes);
+                }
+                $depotCodes = array_filter(array_map('trim', (array) $depotCodes));
+                if (count($depotCodes)) {
+                    $query->whereIn('d.code', $depotCodes);
+                }
+            }
+
+            if (!empty($emplacement)) {
+                $query->where('e.code', 'like', "%{$emplacement}%");
+            }
+
+            if (!empty($category)) {
+                $query->where('a.category', $category);
+            }
+
+            return $query;
+        };
+
+        $applyFilters($stockQuery);
+        $applyFilters($emptyQuery);
+
+        /* =======================================================
+       GROUP BY (only Part 1 needs it)
+    ======================================================= */
+        $stockQuery->groupBy(
+            'e.id',
+            'e.code',
+            'a.id',
+            'a.code',
             'a.code_supplier',
             'a.category',
             'a.name',
@@ -742,109 +828,50 @@ class ArticleStockController extends Controller
             'a.height',
             'a.depth',
             'a.thickness',
-            DB::raw('0 as total_quantity'),
-            'el.quantity as quantity_limit',
-        ])
-        ->where('a.category', '=', 'semi-fini')
-        // ->whereNotIn('e.code', $excludedEmplacements)
-        ->whereNotExists(function ($q) {
-            $q->select(DB::raw(1))
-                ->from('article_palette as ap')
-                ->join('palettes as p', 'p.id', '=', 'ap.palette_id')
-                ->whereColumn('p.emplacement_id', 'el.emplacement_id')
-                ->whereColumn('ap.article_stock_id', 'el.article_stock_id')
-                ->where('p.type', '=', 'STOCK');
-        });
+            'el.quantity'
+        );
 
-    /* =======================================================
-       APPLY THE SAME FILTERS TO BOTH PARTS
-    ======================================================= */
-    $applyFilters = function ($query) use ($search, $depotCodes, $emplacement, $category) {
-        if (!empty($search)) {
-            $query->where(function ($q) use ($search) {
-                $q->where('a.code', 'like', "%{$search}%")
-                    ->orWhere('a.code_supplier', 'like', "%{$search}%")
-                    ->orWhere('a.name', 'like', "%{$search}%")
-                    ->orWhere('a.description', 'like', "%{$search}%")
-                    ->orWhere('e.code', 'like', "%{$search}%");
-            });
-        }
-
-        if (!empty($depotCodes)) {
-            if (is_string($depotCodes)) {
-                $depotCodes = explode(',', $depotCodes);
-            }
-            $depotCodes = array_filter(array_map('trim', (array) $depotCodes));
-            if (count($depotCodes)) {
-                $query->whereIn('d.code', $depotCodes);
-            }
-        }
-
-        if (!empty($emplacement)) {
-            $query->where('e.code', 'like', "%{$emplacement}%");
-        }
-
-        if (!empty($category)) {
-            $query->where('a.category', $category);
-        }
-
-        return $query;
-    };
-
-    $applyFilters($stockQuery);
-    $applyFilters($emptyQuery);
-
-    /* =======================================================
-       GROUP BY (only Part 1 needs it)
-    ======================================================= */
-    $stockQuery->groupBy(
-        'e.id', 'e.code',
-        'a.id', 'a.code', 'a.code_supplier', 'a.category', 'a.name', 'a.description',
-        'a.width', 'a.height', 'a.depth', 'a.thickness',
-        'el.quantity'
-    );
-
-    /* =======================================================
+        /* =======================================================
        UNION — no ORDER BY inside; SQL Server forbids it
        in a derived table/subquery
     ======================================================= */
-    $unionQuery = $stockQuery->unionAll($emptyQuery);
+        $unionQuery = $stockQuery->unionAll($emptyQuery);
 
-    /* =======================================================
+        /* =======================================================
        COUNT
     ======================================================= */
-    $total = DB::query()
-        ->fromSub($unionQuery, 'u')
-        ->count();
+        $total = DB::query()
+            ->fromSub($unionQuery, 'u')
+            ->count();
 
-    /* =======================================================
+        /* =======================================================
        PAGE OF DATA (order on the outer query)
        Default order: description
     ======================================================= */
-    $page    = (int) $request->input('page', 1);
-    $perPage = 200;
+        $page    = (int) $request->input('page', 1);
+        $perPage = 200;
 
-    $results = DB::query()
-        ->fromSub($unionQuery, 'u')
-        ->when($sortBy === 'ecart', function ($q) use ($sortDir) {
-            $q->orderByRaw("(COALESCE(quantity_limit, 0) - total_quantity) {$sortDir}");
-        }, function ($q) use ($sortDir) {
-            $q->orderBy('description', $sortDir)
-              ->orderBy('emplacement_code')
-              ->orderBy('article_code');
-        })
-        ->forPage($page, $perPage)
-        ->get();
+        $results = DB::query()
+            ->fromSub($unionQuery, 'u')
+            ->when($sortBy === 'ecart', function ($q) use ($sortDir) {
+                $q->orderByRaw("(COALESCE(quantity_limit, 0) - total_quantity) {$sortDir}");
+            }, function ($q) use ($sortDir) {
+                $q->orderBy('description', $sortDir)
+                    ->orderBy('emplacement_code')
+                    ->orderBy('article_code');
+            })
+            ->forPage($page, $perPage)
+            ->get();
 
-    return new \Illuminate\Pagination\LengthAwarePaginator(
-        $results,
-        $total,
-        $perPage,
-        $page,
-        [
-            'path'  => $request->url(),
-            'query' => $request->query(),
-        ]
-    );
-}
+        return new \Illuminate\Pagination\LengthAwarePaginator(
+            $results,
+            $total,
+            $perPage,
+            $page,
+            [
+                'path'  => $request->url(),
+                'query' => $request->query(),
+            ]
+        );
+    }
 }

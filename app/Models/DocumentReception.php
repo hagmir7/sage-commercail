@@ -17,11 +17,15 @@ class DocumentReception extends Model
         'colis_quantity',
         'description',
         'container_code',
-        'depot_code'
+        'depot_code',
+        'total_palettes'
     ];
 
 
-    public $timestamps = false;
+    // public $timestamps = false;
+
+     protected $dateFormat = 'Y-m-d\TH:i:s.v';
+
 
     public function document()
     {
