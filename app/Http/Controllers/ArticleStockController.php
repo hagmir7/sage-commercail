@@ -67,7 +67,7 @@ class ArticleStockController extends Controller
             ->join('emplacements as e', 'e.id', '=', 'p.emplacement_id')
             ->join('depots as d', 'd.id', '=', 'e.depot_id')
             ->where('p.type', 'Stock')
-            ->whereNotIn('e.code', ['K-3P', 'K-4P', 'K-4SP', 'K-3SP', 'ZONE-Q'])
+            ->whereNotIn('e.code', ['K-4P', 'K-3P', 'K-4SP', 'K-2SP', 'K-3SP', 'ZONE-Q', 'SM-ZONE-Q'])
             ->whereIn('ap.article_stock_id', $ids);
 
         if ($company) {
@@ -182,7 +182,7 @@ class ArticleStockController extends Controller
                 ->join('emplacements as e', 'e.id', '=', 'p.emplacement_id')
                 ->join('depots as d',       'd.id', '=', 'e.depot_id')
                 ->where('p.type', 'Stock')
-                ->whereNotIn('e.code', ['K-3P', 'K-4P', 'K-4SP', 'K-3SP', 'ZONE-Q'])
+                ->whereNotIn('e.code', ['K-4P', 'K-3P', 'K-4SP', 'K-2SP', 'K-3SP', 'ZONE-Q', 'SM-ZONE-Q'])
                 ->whereIn('ap.article_stock_id', $chunk->all());
 
             if ($company) {
@@ -300,7 +300,7 @@ class ArticleStockController extends Controller
         $query = $article->palettes()
             ->where('type', 'Stock')
             ->whereDoesntHave('emplacement', function ($q) {
-                $q->whereIn('code', ['K-3P', 'K-4P', 'K-4SP', 'K-3SP', 'ZONE-Q']);
+                $q->whereIn('code', ['K-4P', 'K-3P', 'K-4SP', 'K-2SP', 'K-3SP', 'ZONE-Q', 'SM-ZONE-Q']);
             });
 
         if ($company_id) {
@@ -685,7 +685,7 @@ class ArticleStockController extends Controller
         $sortDir              = in_array(strtolower($request->input('sort_dir', 'asc')), ['asc', 'desc'])
             ? $request->input('sort_dir', 'asc')
             : 'asc';
-        // $excludedEmplacements = ['K-4P', 'K-3P', 'K-4SP', 'K-2SP'];
+        $excludedEmplacements = ['K-4P', 'K-3P', 'K-4SP', 'K-2SP', 'K-3SP', 'ZONE-Q', 'SM-ZONE-Q'];
 
         /* =======================================================
        PART 1: actual stock, but ONLY where an
@@ -697,7 +697,7 @@ class ArticleStockController extends Controller
             ->join('article_palette as ap', 'ap.palette_id', '=', 'p.id')
             ->join('article_stocks as a', 'a.id', '=', 'ap.article_stock_id')
             ->join('depots as d', 'd.id', '=', 'e.depot_id')
-            ->join('emplacement_limit as el', function ($join) {
+            ->leftJoin('emplacement_limit as el', function ($join) {
                 $join->on('el.emplacement_id', '=', 'e.id')
                     ->on('el.article_stock_id', '=', 'a.id');
             })
@@ -715,11 +715,11 @@ class ArticleStockController extends Controller
                 'a.depth',
                 'a.thickness',
                 DB::raw('SUM(ap.quantity) as total_quantity'),
-                'el.quantity as quantity_limit',
+                DB::raw('COALESCE(el.quantity, 0) as quantity_limit'),
             ])
-            ->where('p.type', '=', 'STOCK')
-            ->where('a.category', '=', 'semi-fini');
-        // ->whereNotIn('e.code', $excludedEmplacements);
+            ->where('p.type', '=', 'Stock')
+            ->where('a.category', '=', 'semi-fini')
+        ->whereNotIn('e.code', $excludedEmplacements);
 
         /* =======================================================
        PART 2: emplacement_limit defined but currently
@@ -753,7 +753,7 @@ class ArticleStockController extends Controller
                     ->join('palettes as p', 'p.id', '=', 'ap.palette_id')
                     ->whereColumn('p.emplacement_id', 'el.emplacement_id')
                     ->whereColumn('ap.article_stock_id', 'el.article_stock_id')
-                    ->where('p.type', '=', 'STOCK');
+                    ->where('p.type', '=', 'Stock');
             });
 
         /* =======================================================
