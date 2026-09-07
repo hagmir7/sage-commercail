@@ -108,7 +108,7 @@ class MovementImport implements ToCollection, WithHeadingRow, WithCalculatedForm
             
             DB::commit();
             
-            Log::info("Import completed successfully: {$importedCount} rows imported, {$skippedCount} empty rows skipped");
+            // Log::info("Import completed successfully: {$importedCount} rows imported, {$skippedCount} empty rows skipped");
             
         } catch (\Exception $e) {
             DB::rollBack();

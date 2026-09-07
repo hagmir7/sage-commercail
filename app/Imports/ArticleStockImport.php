@@ -168,12 +168,5 @@ class ArticleStockImport
 
             $imported++;
         }
-
-        Log::info('Import complete', [
-            'created' => $imported,
-            'updated' => $updated,
-            'skipped' => $skipped,
-            'total'   => count($rows) - 1,
-        ]);
     }
 }

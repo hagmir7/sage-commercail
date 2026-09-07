@@ -132,7 +132,7 @@ class PalettesImport implements ToCollection, WithHeadingRow
 
             DB::commit();
             
-            Log::info("Palette import completed successfully. Processed {$rows->count()} rows.");
+            // Log::info("Palette import completed successfully. Processed {$rows->count()} rows.");
             
         } catch (\Throwable $e) {
             DB::rollBack();

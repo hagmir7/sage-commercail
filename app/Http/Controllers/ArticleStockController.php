@@ -57,67 +57,49 @@ class ArticleStockController extends Controller
 
         $company = $request->filled('company') ? $request->company : null;
 
+
         $all   = $query->get();
         $ids   = $all->pluck('id')->all();
         $codes = $all->pluck('code')->all();
 
-        // ── Stock Map (chunked) ───────────────────────────────────────────────
-        $stockMap = collect();
-        collect($ids)->chunk(500)->each(function ($chunk) use (&$stockMap, $company) {
-            $q = DB::table('article_palette as ap')
-                ->join('palettes as p',     'p.id', '=', 'ap.palette_id')
-                ->join('emplacements as e', 'e.id', '=', 'p.emplacement_id')
-                ->join('depots as d',       'd.id', '=', 'e.depot_id')
-                ->where('p.type', 'Stock')
-                ->whereNotIn('e.code', ['K-3P', 'K-4P', 'K-4SP', 'K-3SP', 'ZONE-Q'])
-                ->whereIn('ap.article_stock_id', $chunk->all());
+        $stockQuery = DB::table('article_palette as ap')
+            ->join('palettes as p', 'p.id', '=', 'ap.palette_id')
+            ->join('emplacements as e', 'e.id', '=', 'p.emplacement_id')
+            ->join('depots as d', 'd.id', '=', 'e.depot_id')
+            ->where('p.type', 'Stock')
+            ->whereNotIn('e.code', ['K-3P', 'K-4P', 'K-4SP', 'K-3SP', 'ZONE-Q'])
+            ->whereIn('ap.article_stock_id', $ids);
 
-            if ($company) {
-                $q->where('d.company_id', $company);
-            }
+        if ($company) {
+            $stockQuery->where('d.company_id', $company);
+        }
 
-            $stockMap = $stockMap->merge(
-                $q->groupBy('ap.article_stock_id')
-                    ->select('ap.article_stock_id', DB::raw('SUM(ap.quantity) as total'))
-                    ->pluck('total', 'ap.article_stock_id')
-            );
-        });
+        $stockMap = $stockQuery
+            ->groupBy('ap.article_stock_id')
+            ->select('ap.article_stock_id', DB::raw('SUM(ap.quantity) as total'))
+            ->pluck('total', 'ap.article_stock_id');
 
-        // ── Limit Map (chunked) ───────────────────────────────────────────────
-        $limitMap = collect();
-        collect($ids)->chunk(500)->each(function ($chunk) use (&$limitMap) {
-            $limitMap = $limitMap->merge(
-                EmplacementLimit::whereIn('article_stock_id', $chunk->all())
-                    ->groupBy('article_stock_id')
-                    ->selectRaw('article_stock_id, SUM(quantity) as total')
-                    ->pluck('total', 'article_stock_id')
-            );
-        });
 
-        // ── Prep Map (chunked) ────────────────────────────────────────────────
-        $prepMap = collect();
-        collect($codes)->chunk(500)->each(function ($chunk) use (&$prepMap) {
-            $prepMap = $prepMap->merge(
-                Docligne::whereIn('AR_Ref', $chunk->all())
-                    ->whereIn('DO_Type', [1, 2, 3])
-                    ->whereColumn('DL_Qte', '>', 'DL_QteBL')
-                    ->groupBy('AR_Ref')
-                    ->selectRaw('AR_Ref, SUM(DL_Qte) as total')
-                    ->pluck('total', 'AR_Ref')
-            );
-        });
+        // ── Limit Map ─────────────────────────────────────────────────────────────
+        $limitMap = EmplacementLimit::whereIn('article_stock_id', $ids)
+            ->groupBy('article_stock_id')
+            ->selectRaw('article_stock_id, SUM(quantity) as total')
+            ->pluck('total', 'article_stock_id');
 
-        // ── Zone Map (chunked) ────────────────────────────────────────────────
-        $zoneMap = collect();
-        collect($codes)->chunk(500)->each(function ($chunk) use (&$zoneMap) {
-            $zoneMap = $zoneMap->merge(
-                Docligne::whereIn('AR_Ref', $chunk->all())
-                    ->whereIn('DO_Type', [1, 2, 3])
-                    ->groupBy('AR_Ref')
-                    ->selectRaw('AR_Ref, SUM(DL_QteBL) as total')
-                    ->pluck('total', 'AR_Ref')
-            );
-        });
+        // ── Prep Map ──────────────────────────────────────────────────────────────
+        $prepMap = Docligne::whereIn('AR_Ref', $codes)
+            ->whereIn('DO_Type', [1, 2, 3])
+            ->whereColumn('DL_Qte', '>', 'DL_QteBL')
+            ->groupBy('AR_Ref')
+            ->selectRaw('AR_Ref, SUM(DL_Qte) as total')
+            ->pluck('total', 'AR_Ref');
+
+        // ── Zone Map ──────────────────────────────────────────────────────────────
+        $zoneMap = Docligne::whereIn('AR_Ref', $codes)
+            ->whereIn('DO_Type', [1, 2, 3])
+            ->groupBy('AR_Ref')
+            ->selectRaw('AR_Ref, SUM(DL_QteBL) as total')
+            ->pluck('total', 'AR_Ref');
 
         // ── Enrich each article ───────────────────────────────────────────────────
         $all->transform(function ($article) use ($stockMap, $limitMap, $prepMap, $zoneMap) {
