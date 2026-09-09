@@ -465,9 +465,9 @@ class ReceptionController extends Controller
                     $emplacement,                       // Emplacement object
                     $article,                           // ArticleStock object
                     $reception->quantity,
-                    $reception->colis_quantity ?? 0,
-                    $reception->colis_type ?? 'Piece',
-                    $reception->quantity
+                    // $reception->colis_quantity ?? 0,
+                    // $reception->colis_type ?? 'Piece',
+                    // $reception->quantity
                 );
             }
 
@@ -601,7 +601,7 @@ class ReceptionController extends Controller
                     'description'      => $docligne?->DL_Design,
                     'container_code'   => $request->container_code,
                     'depot_code' => $emplacement?->depot?->code,
-                    'total_palettes' => $request->palettes,
+                    'total_palettes' => !empty($request->condition) ? $request->palettes : null,
                     'created_at' => now()
                 ]);
 
