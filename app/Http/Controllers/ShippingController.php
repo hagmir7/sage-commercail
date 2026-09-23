@@ -27,6 +27,7 @@ public function store(Request $request)
     $validator = Validator::make($request->all(), [
         'shipping_date'                   => 'required|date',
         'document_id'                     => 'required',
+        'total_articles'                  => 'required|numeric',
         'user_id'                         => 'required|exists:users,id',
         'criteria'                        => 'nullable|array',
         'criteria.*.shipping_criteria_id' => 'required_with:criteria|exists:shipping_criterias,id',
@@ -48,6 +49,13 @@ public function store(Request $request)
     $documentId = str_contains($validated['document_id'], 'PL')
         ? Document::where('piece', $validated['document_id'])->value('id')
         : $validated['document_id'];
+
+    $count_lines = Document::find($documentId)->lines()->where("company_id", auth()->user()->company_id)->count();
+    if ($count_lines != (int) $request->total_articles) {
+        return response()->json([
+          'message' => 'Nombre d’articles avec contrôle non conforme',
+        ], 406);
+    }
 
         
     try {

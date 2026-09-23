@@ -45,7 +45,7 @@
         <span class="text-[11pt] font-bold text-[#002060]">Comparatif des devis</span>
       </td>
       <td class="border border-black px-3 py-1.5 text-center">
-        <span class="text-[9pt] text-gray-600 font-medium">Version : 1.0</span>
+        <span class="text-[9pt] text-gray-600 font-medium">Version : 1.1</span>
       </td>
     </tr>
     <tr>
