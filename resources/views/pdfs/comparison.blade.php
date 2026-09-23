@@ -247,12 +247,12 @@
         <td class="p-1.5 border border-black text-center">{{ $comparison->purchasing_manager_date?->format('d/m/Y') ?? '' }}</td>
         <td class="p-1.5 border border-black h-[50px]"></td>
     </tr>
-    <tr>
+    {{-- <tr>
         <td class="bg-gold font-bold text-[9pt] p-1.5 border border-black">Directeur Général</td>
         <td class="p-1.5 border border-black">{{ $comparison->general_director ?? '' }}</td>
         <td class="p-1.5 border border-black text-center">{{ $comparison->general_director_date?->format('d/m/Y') ?? '' }}</td>
         <td class="p-1.5 border border-black h-[50px]"></td>
-    </tr>
+    </tr> --}}
 </table>
 
 </body>

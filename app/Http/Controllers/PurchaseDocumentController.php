@@ -240,15 +240,30 @@ class PurchaseDocumentController extends Controller
                 'planned_at' => $request->planned_at ?? null
             ]);
 
-            if (intval($document->status) == 2) {
-                $document->update([
-                    'sended_at' =>  now() 
-                ]);
-            }elseif(intval($document->status) == 1){
-                $document->update([
-                    'sended_at' =>  null
-                ]);
+            $statusTimestamps = [
+                2 => 'sended_at',
+                3 => 'submitted_at',
+                4 => 'approved_at',
+                5 => 'rejected_at',
+                6 => 'ordered_at',
+                7 => 'received_at',
+            ];
+
+            $statusInt = intval($document->status);
+            $timestampUpdates = [];
+
+            foreach ($statusTimestamps as $statusValue => $field) {
+                if ($statusInt === $statusValue) {
+                    $timestampUpdates[$field] = now();
+                } elseif ($statusInt < $statusValue) {
+                    $timestampUpdates[$field] = null;
+                }
             }
+
+            if (!empty($timestampUpdates)) {
+                $document->update($timestampUpdates);
+            }
+
 
             $updatedLineIds = [];
 
@@ -949,5 +964,62 @@ class PurchaseDocumentController extends Controller
                 'message' => "Supprimé avec succès"
             ]);
         }
+    }
+
+
+    public function averageProcessingTime(Request $request)
+    {
+        $year = $request->input('year', now()->year);
+
+        $documents = PurchaseDocument::where(function ($q) {
+            $q->whereNotNull('submitted_at')
+                ->orWhereNotNull('approved_at');
+        })
+            ->where(function ($q) {
+                $q->whereNotNull('ordered_at')
+                    ->orWhereNotNull('rejected_at');
+            })
+            ->where(function ($q) use ($year) {
+                $q->whereYear('ordered_at', $year)
+                    ->orWhereYear('rejected_at', $year);
+            })
+            ->get(['id', 'submitted_at', 'approved_at', 'ordered_at', 'rejected_at']);
+
+        $monthly = [];
+
+        foreach ($documents as $doc) {
+            $start = $doc->submitted_at ?? $doc->approved_at;
+            $end = $doc->ordered_at ?? $doc->rejected_at;
+
+            if (!$start || !$end || $end->lt($start)) {
+                // skip incomplete or inconsistent records (end before start)
+                continue;
+            }
+
+            $delayInDays = $start->diffInDays($end);
+            $month = $end->format('Y-m');
+
+            if (!isset($monthly[$month])) {
+                $monthly[$month] = ['total_delay' => 0, 'count' => 0];
+            }
+
+            $monthly[$month]['total_delay'] += $delayInDays;
+            $monthly[$month]['count']++;
+        }
+
+        $result = [];
+        foreach ($monthly as $month => $data) {
+            $result[] = [
+                'month' => $month,
+                'average_delay_days' => $data['count'] > 0
+                    ? round($data['total_delay'] / $data['count'], 2)
+                    : 0,
+                'processed_count' => $data['count'],
+            ];
+        }
+
+        ksort($result);
+
+        return array_values($result);
     }
 }

@@ -475,6 +475,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('purchase-line/{line}/non-compliant',  [PurchaseDocumentController::class, 'showLineNonCompliant']);
     Route::delete('purchase-line/{nonCompliant}/non-compliant',  [PurchaseDocumentController::class, 'deleteLineNonCompliant']);
     Route::patch('purchase-line/{nonCompliant}/non-compliant/update',  [PurchaseDocumentController::class, 'LineNonCompliantUpdateSupplier']);
+    Route::get('avg-processing-time', [PurchaseDocumentController::class,'averageProcessingTime']);
 
 
     // Lignes
@@ -502,8 +503,7 @@ Route::get('purchase/count-type-suppliers', [PurchaseController::class, 'countSu
 Route::get('purchase/states', [PurchaseController::class, 'states']);
 Route::get('purchase/monthly-purchases', [PurchaseController::class, 'monthlyPurchases']);
 Route::get('purchase/service-expenditures', [PurchaseController::class, 'serviceExpenditures']);
-
-
+Route::get('purchase/avg-processing-time', [PurchaseDocumentController::class,'averageProcessingTime']);
 
 
 
