@@ -51,7 +51,7 @@
     <tr>
       <td class="border border-black px-3 py-1.5 text-center">
         <span class="text-[9pt] text-gray-600 font-medium">
-          Page <span class="pageNumber"></span> | <span class="totalPages"></span>
+          Page <span class="pageNumber"></span> | <span class="totalPages">2</span>
         </span>
       </td>
     </tr>
