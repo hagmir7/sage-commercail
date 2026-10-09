@@ -13,7 +13,7 @@ SELECT
     [Nom],
     [Hauteur],
     [Largeur],
-    [Profonduer],
+    [Profondeur],
     [Couleur],
     [Chant],
     [Episseur],

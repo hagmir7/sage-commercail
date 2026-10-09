@@ -45,7 +45,7 @@ class ArticleController extends Controller
             'Hauteur'       => $article->Hauteur,
             'Largeur'       => $article->Largeur,
             'Couleur'       => $article->Couleur,
-            'Profonduer' => $article->Profonduer,
+            'Profondeur' => $article->Profondeur,
             'Longueur'   => $article->Longueur,
             'stock'         => $stock,
 

@@ -100,7 +100,7 @@ class PaletteController extends Controller
         $relationships = [
             'lines',
             'lines.docligne:cbMarq,DO_Piece,DO_Ref,CT_Num,Hauteur,Largeur,Chant,Description,Couleur,AR_Ref,Episseur,Line_ID',
-            'lines.docligne.article:AR_Ref,Nom,cbMarq,Hauteur,Largeur,Chant,Profonduer,Episseur,Description,AR_Design,Couleur',
+            'lines.docligne.article:AR_Ref,Nom,cbMarq,Hauteur,Largeur,Chant,Profondeur,Episseur,Description,AR_Design,Couleur',
             'lines.article_stock:code,name,height,width,depth,color,thickness,chant,description',
         ];
 
@@ -224,7 +224,7 @@ class PaletteController extends Controller
         try {
             $line = Line::with([
                 'docligne:cbMarq,DO_Piece,DO_Ref,CT_Num,Hauteur,Largeur,Chant,Description,Couleur,AR_Ref,Profondeur,Line_ID',
-                'docligne.article:AR_Ref,Nom,cbMarq,Hauteur,Largeur,Chant,Profonduer,Episseur,Description,AR_Design,Couleur',
+                'docligne.article:AR_Ref,Nom,cbMarq,Hauteur,Largeur,Chant,Profondeur,Episseur,Description,AR_Design,Couleur',
                 'article_stock:code,name,height,width,depth,color,thickness,chant,description',
             ])
                 ->where('company_id', auth()->user()->company_id)
@@ -911,7 +911,7 @@ class PaletteController extends Controller
             'lines.docligne:DL_No,cbMarq,AR_Ref,Nom,DL_Design,Description,Hauteur,Largeur,Profondeur,Couleur,Chant,Episseur,DL_Qte,EU_Qte,Line_ID',
             'document',
             'user',
-            'lines.docligne.article:cbMarq,AR_Ref,Nom,Hauteur,Largeur,Couleur,Profonduer,Episseur,Chant'
+            'lines.docligne.article:cbMarq,AR_Ref,Nom,Hauteur,Largeur,Couleur,Profondeur,Episseur,Chant'
         ])->where('code', $code)->first();
 
         if (!$palette) {
