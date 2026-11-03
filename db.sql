@@ -1,7 +1,4 @@
 
-
-
-
 ---- Insert to article stock
 INSERT INTO [STILEMOBILI].[dbo].[article_stocks] (
     [code], [description], [name], [height], [width], [depth],

@@ -28,8 +28,7 @@
   <tbody>
     <tr>
       <td rowspan="3" class="border border-black p-2 text-center align-middle w-36">
-        <img src="{{ public_path('imgs/inter-icon.webp') }}"
-             class="mx-auto w-28 block">
+        <img src="{{ public_path('imgs/inter-icon.webp') }}" class="mx-auto w-28 block">
       </td>
       <td class="border border-black px-4 py-1.5 text-center ">
         <span class="text-balck text-[9pt] font-bold tracking-wide uppercase">
