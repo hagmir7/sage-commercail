@@ -12,7 +12,9 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
 use App\Exports\PreparationDocumentsExport;
 use App\Models\DocumentCompany;
+use App\Models\Role;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Support\Str;
 use Maatwebsite\Excel\Facades\Excel;
 
 class DocumentController extends Controller
@@ -229,124 +231,191 @@ class DocumentController extends Controller
     }
 
 
-    public function preparationList(Request $request)
+
+    public function fabricationList(Request $request)
     {
-        $user = auth()->user();
-        $user_roles = $user->roles()->pluck('name', 'id');
-        $roleIds = $user_roles->keys()->toArray();
-
-        $preparationRoles = ['fabrication', 'montage', 'preparation_cuisine', 'preparation_trailer', 'magasinier', 'peinture'];
-        $hasPreparationRole = !empty(array_intersect($user_roles->toArray(), $preparationRoles));
-
-        $query = Document::query()
-            ->select('documents.*')
-            ->join('document_companies as dc', function ($join) use ($user) {
-                $join->on('documents.id', '=', 'dc.document_id')
-                    ->where('dc.company_id', $user->company_id)
-                    ->whereIn('dc.status_id', [1, 2, 3, 4, 5, 6, 7]);
-            })
-            ->join('F_DOCENTETE as de', 'de.cbMarq', '=', 'documents.docentete_id')
-            ->where('de.DO_Domaine', 0)
-            ->whereIn('de.DO_Type', [1, 2])
-            ->whereExists(function ($q) use ($user, $hasPreparationRole, $roleIds) {
-                $q->select(\DB::raw(1))
-                    ->from('lines')
-                    ->whereColumn('lines.document_id', 'documents.id')
-                    ->where('lines.company_id', (string) $user->company_id);
-
-                if ($hasPreparationRole) {
-                    $q->whereIn('lines.role_id', $roleIds)
-                        ->whereNotNull('lines.docligne_id');
-                }
-            })
-            ->with([
-                'companies',
-                'docentete:cbMarq,DO_Date,DO_DateLivr,DO_Reliquat,DO_Piece,cbCreation',
-            ])
-            ->addSelect([
-                'has_user_printer' => \DB::table('user_document_printer')
-                    ->selectRaw('1')
-                    ->whereColumn('user_document_printer.document_id', 'documents.id')
-                    ->where('user_document_printer.user_id', $user->id)
-                    ->limit(1)
-            ]);
-
-        /*
-    |--------------------------------------------------------------------------
-    | 🔍 Search
-    |--------------------------------------------------------------------------
-    */
-        if ($request->filled('search')) {
-            $search = trim($request->search);
-
-            $query->where(function ($q) use ($search) {
-                $q->where('documents.ref', 'like', "%{$search}%")
-                    ->orWhere('documents.piece', 'like', "%{$search}%")
-                    ->orWhere('documents.piece_bc', 'like', "%{$search}%")
-                    ->orWhere('documents.piece_bl', 'like', "%{$search}%")
-                    ->orWhere('documents.piece_fa', 'like', "%{$search}%")
-                    ->orWhere('documents.code', 'like', "%{$search}%")
-                    ->orWhere('documents.client_id', 'like', "%{$search}%");
-            });
-        }
-
-        /*
-    |--------------------------------------------------------------------------
-    | 📅 Date range
-    |--------------------------------------------------------------------------
-    */
-        if ($request->filled('date')) {
-            $dates = explode(',', $request->date);
-            $start = Carbon::parse(urldecode($dates[0]))->startOfDay();
-            $end   = Carbon::parse(urldecode($dates[1] ?? $dates[0]))->endOfDay();
-
-            $query->whereBetween('de.DO_Date', [$start, $end]);
-        }
-
-        /*
-    |--------------------------------------------------------------------------
-    | 📦 Type
-    |--------------------------------------------------------------------------
-    */
-        if ($request->filled('type')) {
-            $query->where('de.Type', $request->type);
-        }
-
-        /*
-    |--------------------------------------------------------------------------
-    | 🔃 Ordering
-    |--------------------------------------------------------------------------
-    */
-        $orderBy  = $request->get('order_by');
-        $orderDir = strtolower($request->get('order_dir', 'asc'));
-        $orderDir = in_array($orderDir, ['asc', 'desc']) ? $orderDir : 'asc';
-
-        $orderMap = [
-            'piece'      => auth()->user()->hasRole("fabrication") ? 'documents.code' : 'documents.piece',
-            'client_id'     => 'documents.client_id',
-            'expedition' => 'documents.expedition',
-            'date' => 'documents.created_at',
-            'status'     => 'dc.status_id',
-            'complation_date'     => 'documents.complation_date',
-            'DO_DateLivr' => 'de.DO_DateLivr'
-        ];
-
-        if (isset($orderMap[$orderBy])) {
-            $query->orderBy($orderMap[$orderBy], $orderDir);
-        } else {
-            $query->orderByDesc('documents.id');
-        }
-
-        /*
-    |--------------------------------------------------------------------------
-    | 📄 Pagination
-    |--------------------------------------------------------------------------
-    */
-        $documents = $query->paginate(70);
-
-        return response()->json($documents);
+        return $this->documentList($request, fn($name) => $name === 'fabrication');
     }
 
+    public function montageList(Request $request)
+    {
+        return $this->documentList($request, fn($name) => $name === 'montage');
+    }
+
+
+    public function peintureList(Request $request)
+    {
+        return $this->documentList($request, fn($name) => $name === 'peinture');
+    }
+
+    // (preparation_cuisine, preparation_trailer, ...)
+    public function preparationList(Request $request)
+    {
+        return $this->documentList($request, fn($name) => Str::contains($name, 'preparation_'));
+    }
+
+
+    public function companyList(Request $request)
+    {
+        return $this->documentList($request, null, true);
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Shared logic
+    |--------------------------------------------------------------------------
+    */
+
+    
+private function documentList(Request $request, ?callable $roleMatcher = null, bool $scopeToCompany = false)
+{
+    $user = auth()->user();
+    $hasRoleFilter = $roleMatcher !== null;
+
+    // Optional company filter from the request (?company=ID)
+    $filterCompanyId = $request->filled('company') ? (int) $request->input('company') : null;
+
+    // companyList: resolve ONE company (request overrides, else the user's own)
+    $scopeCompanyId = $scopeToCompany ? ($filterCompanyId ?? $user->company_id) : null;
+
+    // IDs of the roles this endpoint targets (NOT the user's roles)
+    $roleIds = $hasRoleFilter
+        ? Role::query()
+            ->get(['id', 'name'])
+            ->filter(fn($role) => $roleMatcher($role->name))
+            ->pluck('id')
+            ->all()
+        : [];
+
+    // Line filter: by role only (reused for the exists check and the eager-loaded lines)
+    $lineScope = function ($q) use ($hasRoleFilter, $roleIds) {
+        if ($hasRoleFilter) {
+            $q->whereIn('lines.role_id', $roleIds)
+                ->whereNotNull('lines.docligne_id');
+        }
+    };
+
+    $query = Document::query()
+        ->select('documents.*')
+        // Inner join on F_DOCENTETE ⇒ every row has a real docentete
+        ->join('F_DOCENTETE as de', 'de.cbMarq', '=', 'documents.docentete_id')
+        ->whereNotNull('documents.docentete_id')          // explicit “has document”
+        ->where('de.DO_Domaine', 0)
+        ->whereIn('de.DO_Type', [1, 2])
+
+        // companyList: single exists check against the resolved company
+        ->when($scopeToCompany, function ($query) use ($scopeCompanyId) {
+            $query->whereExists(function ($q) use ($scopeCompanyId) {
+                $q->select(\DB::raw(1))
+                    ->from('document_companies as dc')
+                    ->whereColumn('dc.document_id', 'documents.id')
+                    ->whereIn('dc.status_id', [1, 2, 3, 4, 5, 6, 7]);
+
+                if ($scopeCompanyId) {
+                    $q->where('dc.company_id', $scopeCompanyId);
+                }
+            });
+        })
+
+        // Other endpoints: optional ?company= filter (single exists check)
+        ->when(!$scopeToCompany && $filterCompanyId, function ($query) use ($filterCompanyId) {
+            $query->whereExists(function ($q) use ($filterCompanyId) {
+                $q->select(\DB::raw(1))
+                    ->from('document_companies as dcf')
+                    ->whereColumn('dcf.document_id', 'documents.id')
+                    ->where('dcf.company_id', $filterCompanyId);
+            });
+        })
+
+        // Role filter: only for role endpoints
+        ->when($hasRoleFilter, function ($query) use ($lineScope) {
+            $query->whereExists(function ($q) use ($lineScope) {
+                $q->select(\DB::raw(1))
+                    ->from('lines')
+                    ->whereColumn('lines.document_id', 'documents.id');
+                $lineScope($q);
+            });
+        })
+
+        ->with([
+            'companies',
+            'docentete:cbMarq,DO_Date,DO_DateLivr,DO_Reliquat,DO_Piece,cbCreation',
+            'lines' => fn($q) => $lineScope($q),
+            'lines.role',
+            'status',
+        ])
+        ->addSelect([
+            'has_user_printer' => \DB::table('user_document_printer')
+                ->selectRaw('1')
+                ->whereColumn('user_document_printer.document_id', 'documents.id')
+                ->where('user_document_printer.user_id', $user->id)
+                ->limit(1),
+        ]);
+
+    // 🔍 Search
+    if ($request->filled('search')) {
+        $search = trim($request->search);
+
+        $query->where(function ($q) use ($search) {
+            foreach (['ref', 'piece', 'piece_bc', 'piece_bl', 'piece_fa', 'code', 'client_id'] as $i => $col) {
+                $q->{$i === 0 ? 'where' : 'orWhere'}("documents.$col", 'like', "%{$search}%");
+            }
+        });
+    }
+
+    // 📅 Date range
+    if ($request->filled('date')) {
+        $dates = explode(',', $request->date);
+        $start = Carbon::parse(urldecode($dates[0]))->startOfDay();
+        $end   = Carbon::parse(urldecode($dates[1] ?? $dates[0]))->endOfDay();
+
+        $query->whereBetween('de.DO_Date', [$start, $end]);
+    }
+
+    // 📦 Type
+    if ($request->filled('type')) {
+        $query->where('de.Type', $request->type);
+    }
+
+    // 🔃 Ordering
+    $orderBy  = $request->input('order_by');
+    $orderDir = strtolower($request->input('order_dir', 'asc'));
+    $orderDir = in_array($orderDir, ['asc', 'desc']) ? $orderDir : 'asc';
+
+    if ($orderBy === 'status') {
+        // Status of the filtered company, else the resolved company (companyList), else lowest status
+        $statusCompanyId = $filterCompanyId ?? ($scopeToCompany ? $scopeCompanyId : null);
+
+        if ($statusCompanyId) {
+            $query->orderByRaw(
+                "(select dc.status_id from document_companies dc
+              where dc.document_id = documents.id and dc.company_id = ? limit 1) {$orderDir}",
+                [$statusCompanyId]
+            );
+        } else {
+            $query->orderByRaw(
+                "(select min(dc.status_id) from document_companies dc
+              where dc.document_id = documents.id) {$orderDir}"
+            );
+        }
+    } else {
+        $orderMap = [
+            'piece'           => ($hasRoleFilter && $roleMatcher('fabrication')) ? 'documents.code' : 'documents.piece',
+            'client_id'       => 'documents.client_id',
+            'expedition'      => 'documents.expedition',
+            'date'            => 'documents.created_at',
+            'complation_date' => 'documents.complation_date',
+            'DO_DateLivr'     => 'de.DO_DateLivr',
+        ];
+
+        isset($orderMap[$orderBy])
+            ? $query->orderBy($orderMap[$orderBy], $orderDir)
+            : $query->orderByDesc('documents.id');
+    }
+
+    // 📄 Pagination
+    return response()->json($query->paginate(70));
+}
     /**
      * Show single document with progress
      */

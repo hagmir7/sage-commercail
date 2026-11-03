@@ -328,7 +328,7 @@ Route::middleware('auth:sanctum')->group(function () {
 
     Route::prefix('docentetes')->controller(DocenteteController::class)->group(function () {
         Route::get("not-transferred", 'notTransferred');
-        Route::get("commercial", 'commercial');
+        Route::get("pending", 'pending');
         Route::get("preparation", 'preparation');
         Route::get("fabrication", 'fabrication');
         Route::post("start", 'start');
@@ -422,9 +422,14 @@ Route::middleware('auth:sanctum')->group(function () {
 
 
     Route::prefix('documents')->controller(DocumentController::class)->group(function () {
-        Route::get('archive', 'archive');
+       
         Route::get('/', 'list');
-        Route::get('preparation-list', 'preparationList');
+        Route::get('fabrication', 'fabricationList');
+        Route::get('montage', 'montageList');
+        Route::get('peinture', 'peintureList');
+        Route::get('preparation', 'preparationList');
+        Route::get('company', 'companyList');
+        Route::get('archive', 'archive');
 
         Route::get('ready', 'ready');
         Route::get('progress/{piece}', 'progress');

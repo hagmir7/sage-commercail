@@ -303,9 +303,14 @@ class DocenteteController extends Controller
             'message' => "Date updated successfully"
         ]);
     }
-
-    public function commercial(Request $request)
+    public function pending(Request $request)
     {
+        $request->validate([
+            'date'   => 'nullable|string',
+            'search' => 'nullable|string|max:100',
+            'type'   => 'nullable|string|max:50',
+        ]);
+
         $query = Docentete::with(['document.status', 'document.companies'])
             ->select([
                 'DO_Reliquat',
@@ -315,93 +320,49 @@ class DocenteteController extends Controller
                 'cbMarq',
                 'DO_Date',
                 'DO_DateLivr',
-                'DO_Expedit'
+                'DO_Expedit',
             ])
-            ->orderByDesc('cbCreation')
             ->where('DO_Domaine', 0)
             ->where(function ($q) {
-                $q->where(function ($sub) {
-                    // DO_Statut = 1 AND (no document OR status_id <= 7)
-                    $sub->where('DO_Statut', 1)
-                        ->where(function ($inner) {
-                            $inner->whereDoesntHave('document')
-                                ->orWhereHas('document', function ($doc) {
-                                    $doc->where('status_id', '<=', 7);
-                                });
-                        });
-                })
-                    ->orWhere(function ($sub) {
-                        // OR (DO_Statut != 1 AND has document with status_id <= 7)
-                        $sub->where('DO_Statut', '!=', 1)
-                            ->whereHas('document', function ($doc) {
-                                $doc->where('status_id', '<=', 7);
-                            });
-                    });
+                $q->whereHas('document', fn($d) => $d->where('status_id', '<=', 7))
+                    ->orWhere(fn($s) => $s->where('DO_Statut', 1)->whereDoesntHave('document'));
             })
             ->where(function ($q) {
                 $q->where('DO_Type', 1)
-                    ->orWhere(function ($sub) {
-                        $sub->where('DO_Type', 2)
-                            ->whereHas('document');
-                    });
-            });
-
-        $query->with('document.status');
-
-        if (isset($request->status)) {
-            if ($request->status == "0") {
-                $query->whereDoesntHave('document');
-            } elseif ($request->status == 1) {
-                $query->whereHas('document', function ($q) {
-                    $q->where('status_id', '>=', 1)
-                        ->where('status_id', '<=', 7);
-                });
-            } else if ($request->status == 2) {
-                $query->whereHas('document', function ($q) {
-                    $q->where('status_id', '>=', 2)
-                        ->where('status_id', '<=', 7);
-                });
-            } else {
-                $query->whereHas('document', function ($q) use ($request) {
-                    $q->where('status_id', $request->status)
-                        ->where('status_id', '<=', 7);
-                });
-            }
-        }
+                    ->orWhere(fn($s) => $s->where('DO_Type', 2)->whereHas('document'));
+            })
+            ->orderByDesc('cbCreation')
+            ->orderByDesc('cbMarq');
 
         if ($request->filled('date')) {
-            $dates = explode(',', $request->date, 2);
-            $start = Carbon::parse(urldecode($dates[0]))->startOfDay();
-            $end = Carbon::parse(urldecode($dates[1] ?? $dates[0]))->endOfDay();
+            [$from, $to] = array_pad(explode(',', urldecode($request->date), 2), 2, null);
 
-            $query->where(function ($query) use ($start, $end) {
-                $query->whereDate('cbCreation', '>=', $start)
-                    ->whereDate('cbCreation', '<=', $end);
-            });
+            try {
+                $range = [
+                    Carbon::parse($from)->startOfDay(),
+                    Carbon::parse($to ?: $from)->endOfDay(),
+                ];
+            } catch (\Throwable) {
+                return response()->json(['message' => 'Invalid date range'], 422);
+            }
+
+            $query->whereBetween('cbCreation', $range);
         }
 
         if ($request->filled('search')) {
-            $search = $request->search;
+            $search = addcslashes($request->search, '%_\\') . '%';
 
-            $query->where(function ($q) use ($search) {
-                $q->where('DO_Ref', 'like', "%{$search}%")
-                    ->orWhere('DO_Piece', 'like', "%{$search}%")
-                    ->orWhere('DO_Tiers', 'like', "%{$search}%")
-                    ->orWhere('DO_Reliquat', 'like', "%{$search}%");
-            });
+            $query->where(fn($q) => $q
+                ->where('DO_Ref', 'like', $search)
+                ->orWhere('DO_Piece', 'like', $search)
+                ->orWhere('DO_Tiers', 'like', $search)
+                ->orWhere('DO_Reliquat', 'like', $search));
         }
 
-        if ($request->filled('type')) {
-            $query->where('DO_Type', $request->type);
-        }
+        $query->when($request->filled('type'), fn($q) => $q->where('Type', $request->type));
 
-        // Faster pagination without total counts
-        $results = $query->simplePaginate(100);
-
-        return response()->json($results);
+        return response()->json($query->simplePaginate(100));
     }
-
-
 
     // Controller & Validation List
     public function validation(Request $request)
