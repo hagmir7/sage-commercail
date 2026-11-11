@@ -268,7 +268,6 @@ class DocumentController extends Controller
     |--------------------------------------------------------------------------
     */
 
-
     private function documentList(Request $request, ?callable $roleMatcher = null, bool $scopeToCompany = false)
     {
         $user = auth()->user();
@@ -425,7 +424,7 @@ class DocumentController extends Controller
         // 📄 Pagination
         return response()->json($query->paginate(70));
     }
-    
+
     /**
      * Show single document with progress
      */
