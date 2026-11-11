@@ -2,39 +2,34 @@
 
 namespace App\Http\Controllers;
 
-use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Validator;
+use App\Http\Controllers\Controller;
+use Illuminate\Http\JsonResponse;
 use Spatie\Permission\Models\Permission;
 
 class PermissionController extends Controller
 {
-    public function index()
+    public function index(): JsonResponse
     {
-        return response()->json(Permission::all());
-    }
+        $definitions = config('app_permissions', []);
+        $registered = Permission::query()->where('guard_name', 'web')->get()->keyBy('name');
+        $items = [];
 
-    public function store(Request $request)
-    {
-        $validator = Validator::make($request->all(), [
-            'name' => 'required|string|unique:permissions',
-        ]);
+        foreach ($definitions as $categoryKey => $category) {
+            foreach (($category['permissions'] ?? []) as $action => $label) {
+                $name = "{$categoryKey}.{$action}";
+                $permission = $registered->get($name);
+                if (! $permission) continue;
 
-
-        if ($validator->fails()) {
-            return response()->json([
-                'status' => 'error',
-                'errors' => $validator->errors()
-            ], 422);
+                $items[] = [
+                    'id' => $permission->id,
+                    'name' => $permission->name,
+                    'label' => $label,
+                    'category' => $categoryKey,
+                    'category_label' => $category['label'] ?? $categoryKey,
+                ];
+            }
         }
 
-        $permission = Permission::create([
-            'name' => $request->name,
-            'guard_name' => "web"
-        ]);
-
-        return response()->json([
-            'status' => 'success',
-            'data' => $permission
-        ], 201);
+        return response()->json(['status' => 'success', 'data' => $items]);
     }
 }

@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\ArchiveController;
 use App\Http\Controllers\NcfAttachmentController;
 use App\Http\Controllers\SupplierNonConformityController;
 use App\Http\Controllers\MachineController;
@@ -197,9 +198,24 @@ Route::middleware('auth:sanctum')->group(function () {
 
     // Roles
     Route::get('/roles', [RoleController::class, 'index']);
-    Route::post('/roles', [RoleController::class, 'store']);
     Route::get('/roles/permissions/{roleName}', [RoleController::class, 'permissions']);
 
+    Route::get('permissions', [PermissionController::class, 'index']);
+    Route::get('roles/{role}', [RoleController::class, 'show']);
+    Route::post('roles', [RoleController::class, 'store']);
+    Route::put('roles/{role}', [RoleController::class, 'update']);
+    Route::delete('roles/{role}', [RoleController::class, 'destroy']);
+    Route::put('roles/{role}/permissions', [RoleController::class, 'syncPermissions']);
+
+
+    Route::get('archives/global', [ArchiveController::class, 'globalArchive']);
+    Route::get('archives/fabrication', [ArchiveController::class, 'fabricationArchive']);
+    Route::get('archives/company', [ArchiveController::class, 'companyArchive']);
+    Route::get('archives/montage', [ArchiveController::class, 'montageArchive']);
+    Route::get('archives/peinture', [ArchiveController::class, 'peintureArchive']);
+    Route::get('archives/preparation-peinture', [ArchiveController::class, 'preparationPeintureArchive']);
+
+    
 
 
     // Comparatifs des devis
@@ -215,9 +231,6 @@ Route::middleware('auth:sanctum')->group(function () {
     });
 
 
-    // Permissions
-    Route::get('/permissions', [PermissionController::class, 'index']);
-    Route::post('/permissions', [PermissionController::class, 'store']);
 
     // Assign roles/permissions to users
     Route::get('users/role/{role}', [UserController::class, 'usersByRole']);
@@ -227,7 +240,6 @@ Route::middleware('auth:sanctum')->group(function () {
     // Get user Role and permissions
     Route::get('/user/{id}/permissions', [UserPermissionController::class, 'getUserRolesAndPermissions']);
     Route::get('/user/permissions', [UserPermissionController::class, 'getAuthUserRolesAndPermissions']);
-    Route::get('roles/{role}', [RoleController::class, 'roleUsers']);
 
 
     Route::prefix('depots')->controller(DepotController::class)->group(function () {
@@ -429,7 +441,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('peinture', 'peintureList');
         Route::get('preparation', 'preparationList');
         Route::get('company', 'companyList');
-        Route::get('archive', 'archive');
+
 
         Route::get('ready', 'ready');
         Route::get('progress/{piece}', 'progress');
