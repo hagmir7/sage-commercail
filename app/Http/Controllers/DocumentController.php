@@ -858,6 +858,10 @@ class DocumentController extends Controller
             $documents->orderByDesc($timestampCols[0]);
         }
 
+        $perPage = $request->integer('per_page', 70);
+
+        $perPage = max(1, min($perPage, 500));
+
         $documents = $documents->paginate(70);
 
         $result                = $documents->toArray();
