@@ -862,7 +862,7 @@ class DocumentController extends Controller
 
         $perPage = max(1, min($perPage, 500));
 
-        $documents = $documents->paginate(70);
+        $documents = $documents->paginate($perPage);
 
         $result                = $documents->toArray();
         $result['total_count'] = $totalCount;
