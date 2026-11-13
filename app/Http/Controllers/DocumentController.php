@@ -13,6 +13,7 @@ use Illuminate\Support\Facades\Validator;
 use App\Exports\PreparationDocumentsExport;
 use App\Models\DocumentCompany;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Pagination\LengthAwarePaginator;
 use Maatwebsite\Excel\Facades\Excel;
 
 class DocumentController extends Controller
@@ -786,88 +787,117 @@ class DocumentController extends Controller
 
     public function archive(Request $request)
     {
-        $user          = auth()->user();
-        $isPrivileged  = $user->hasRole(['commercial', 'admin']);
+        $user = auth()->user();
+        $isPrivileged = $user->hasRole(['commercial', 'admin']);
         $userCompanyId = $user->company_id;
-        $lineRole      = $this->resolveLineRole($user);
+        $lineRole = $this->resolveLineRole($user);
 
         $query = $this->buildArchiveQuery($user, $userCompanyId, $isPrivileged, $lineRole);
 
-        $pivot         = (new Document())->companies();
-        $pivotTable    = $pivot->getTable();
-        $pivotForeign  = $pivot->getForeignPivotKeyName();
-        $pivotRelated  = $pivot->getRelatedPivotKeyName();
+        $pivot = (new Document())->companies();
+        $pivotTable = $pivot->getTable();
+        $pivotForeign = $pivot->getForeignPivotKeyName();
+        $pivotRelated = $pivot->getRelatedPivotKeyName();
         $completionCol = "{$pivotTable}.complation_date";
 
         $query->join($pivotTable, function ($join) use ($pivotTable, $pivotForeign, $pivotRelated, $userCompanyId, $isPrivileged) {
             $join->on("{$pivotTable}.{$pivotForeign}", '=', 'documents.id');
-
-            if (!$isPrivileged) {
-                $join->where("{$pivotTable}.{$pivotRelated}", '=', $userCompanyId);
-            }
+            if (!$isPrivileged) $join->where("{$pivotTable}.{$pivotRelated}", '=', $userCompanyId);
         });
 
         if ($request->filled('date')) {
             $dates = explode(',', $request->date, 2);
             $start = Carbon::parse(urldecode($dates[0]))->startOfDay();
-            $end   = Carbon::parse(urldecode($dates[1] ?? $dates[0]))->endOfDay();
+            $end = Carbon::parse(urldecode($dates[1] ?? $dates[0]))->endOfDay();
             $query->whereBetween('documents.created_at', [$start, $end]);
         }
 
-        if ($request->filled('type') && $request->type == 2) {
+        if ($request->integer('type') === 2) {
             $query->where(function ($q) {
-                $q->where('piece_bl', 'like', '%BL%')
-                    ->orWhere('piece', 'like', '%BL%');
+                $q->where('documents.piece_bl', 'like', '%BL%')->orWhere('documents.piece', 'like', '%BL%');
             });
         }
 
         if ($request->filled('search')) {
-            $search = $request->search;
+            $search = $request->input('search');
             $query->where(function ($q) use ($search) {
-                $q->where('piece_fa', 'like', "%$search%")
-                    ->orWhere('piece', 'like', "%$search%")
-                    ->orWhere('ref', 'like', "%$search%")
-                    ->orWhere('code', 'like', "%$search%")
-                    ->orWhere('client_id', 'like', "%$search%");
+                $q->where('documents.piece_fa', 'like', "%{$search}%")
+                ->orWhere('documents.piece', 'like', "%{$search}%")
+                ->orWhere('documents.ref', 'like', "%{$search}%")
+                ->orWhere('documents.code', 'like', "%{$search}%")
+                ->orWhere('documents.client_id', 'like', "%{$search}%");
             });
         }
 
-        $timestampCols       = self::LINE_ROLE_COLUMNS[$lineRole]['at'] ?? ['fabricated_at'];
-        $primaryTimestampCol = $timestampCols[0];
-
-        $totalCount  = (clone $query)->count();
-        $onTimeCount = $this->countLinesByCompletion(clone $query, $completionCol, '<=', $primaryTimestampCol);
-        $lateCount   = $this->countLinesByCompletion(clone $query, $completionCol, '>', $primaryTimestampCol);
-
-        $documents = $query->select('documents.*', "{$completionCol} as complation_date");
+        // Aggregate completion timestamps
+        $timestampCols = self::LINE_ROLE_COLUMNS[$lineRole]['at'] ?? ['fabricated_at'];
+        $lineStats = DB::table('lines')->select('document_id');
 
         foreach ($timestampCols as $col) {
-            $documents->selectSub(function ($sub) use ($col) {
-                $sub->from('lines')
-                    ->selectRaw("MAX([{$col}])")
-                    ->whereColumn('lines.document_id', 'documents.id');
-            }, $col);
+            $lineStats->selectRaw("MAX([{$col}]) AS [{$col}]");
         }
 
-        // Order by the role-relevant timestamp(s) instead of documents.id.
+        $lineStats->groupBy('document_id');
+
+        $query->leftJoinSub($lineStats, 'line_stats', function ($join) {
+            $join->on('line_stats.document_id', '=', 'documents.id');
+        });
+
+        // Latest completion date
+        $first = "line_stats.[{$timestampCols[0]}]";
+
         if (count($timestampCols) > 1) {
-            // fabrication: order by whichever of fabricated_at / cutted_at is set
-            $coalesced = implode(', ', array_map(fn($c) => "[{$c}]", $timestampCols));
-            $documents->orderByRaw("COALESCE({$coalesced}) DESC");
+            $second = "line_stats.[{$timestampCols[1]}]";
+            $latestAt = "CASE WHEN {$first} IS NULL THEN {$second} WHEN {$second} IS NULL THEN {$first} WHEN {$first} >= {$second} THEN {$first} ELSE {$second} END";
         } else {
-            $documents->orderByDesc($timestampCols[0]);
+            $latestAt = $first;
         }
 
-        $perPage = $request->integer('per_page', 70);
+        // Late and on-time conditions
+        $hasCompletion = "{$completionCol} IS NOT NULL AND ({$latestAt}) IS NOT NULL";
+        $lateCondition = "{$hasCompletion} AND CAST(({$latestAt}) AS DATE) > CAST({$completionCol} AS DATE)";
+        $onTimeCondition = "{$hasCompletion} AND CAST(({$latestAt}) AS DATE) <= CAST({$completionCol} AS DATE)";
 
-        $perPage = max(1, min($perPage, 500));
+        // Statistics in a single query
+        $stats = (clone $query)->toBase()
+            ->selectRaw("COUNT_BIG(*) AS total_count")
+            ->selectRaw("COALESCE(SUM(CASE WHEN {$lateCondition} THEN 1 ELSE 0 END), 0) AS late")
+            ->selectRaw("COALESCE(SUM(CASE WHEN {$onTimeCondition} THEN 1 ELSE 0 END), 0) AS on_time")
+            ->first();
 
-        $documents = $documents->paginate($perPage);
+        // Documents with computed is_late
+        $documentsQuery = (clone $query)
+            ->select('documents.*')
+            ->selectRaw("{$completionCol} AS [complation_date]")
+            ->selectRaw("CASE WHEN {$lateCondition} THEN 1 ELSE 0 END AS [is_late]");
 
-        $result                = $documents->toArray();
-        $result['total_count'] = $totalCount;
-        $result['on_time']     = $onTimeCount;
-        $result['late']        = $lateCount;
+        foreach ($timestampCols as $col) {
+            $documentsQuery->addSelect(DB::raw("line_stats.[{$col}] AS [{$col}]"));
+        }
+
+        $documentsQuery->orderByRaw("({$latestAt}) DESC")
+            ->orderBy('documents.id', 'desc')
+            ->orderBy("{$pivotTable}.{$pivotRelated}", 'asc');
+
+        // Pagination
+        $perPage = max(1, min($request->integer('per_page', 70), 500));
+        $page = max(1, $request->integer('page', 1));
+
+        $items = $documentsQuery->forPage($page, $perPage)->get();
+
+        $items->each(function ($document) {
+            $document->setAttribute('is_late', (bool) $document->getAttribute('is_late'));
+        });
+
+        $documents = new LengthAwarePaginator($items, (int) $stats->total_count, $perPage, $page, [
+            'path' => $request->url(),
+            'query' => $request->query(),
+        ]);
+
+        $result = $documents->toArray();
+        $result['total_count'] = (int) $stats->total_count;
+        $result['on_time'] = (int) $stats->on_time;
+        $result['late'] = (int) $stats->late;
 
         return response()->json($result, 200, [], JSON_UNESCAPED_UNICODE);
     }
@@ -888,63 +918,46 @@ class DocumentController extends Controller
 
     private function buildArchiveQuery($user, ?int $userCompanyId, bool $isPrivileged = false, ?string $lineRole = null)
     {
-        if ($lineRole === 'fabrication') {
-            return Document::with([
-                'docentete:DO_Domaine,DO_Type,DO_Piece,DO_Date,DO_Ref,DO_Tiers,DO_Statut,cbMarq,cbCreation,DO_DateLivr,DO_Expedit',
-                'status',
-                'companies',
-                'shipping',
-                'lines' => fn($q) => $q->where(function ($q2) {
-                    $q2->whereNotNull('fabricated_at')
-                        ->orWhereNotNull('cutted_at');
-                })->limit(1),
-            ])
-                ->whereHas('lines', function ($q) {
-                    $q->where(function ($q2) {
-                        $q2->whereNotNull('fabricated_at')
-                            ->orWhereNotNull('cutted_at');
-                    });
-                })
-                ->whereHas('companies', fn($q) => $q->where('companies.id', $userCompanyId));
-        }
-
-        if ($lineRole !== null) {
-            // montage / peinture — single-column roles, unchanged
-            $atCol = self::LINE_ROLE_COLUMNS[$lineRole]['at'][0];
-            $byCol = self::LINE_ROLE_COLUMNS[$lineRole]['by'];
-
-            return Document::with([
-                'docentete:DO_Domaine,DO_Type,DO_Piece,DO_Date,DO_Ref,DO_Tiers,DO_Statut,cbMarq,cbCreation,DO_DateLivr,DO_Expedit',
-                'status',
-                'companies',
-                'shipping',
-                'lines' => fn($q) => $q->whereNotNull($atCol)->limit(1),
-            ])
-                ->whereHas('lines', fn($q) => $q->whereNotNull($byCol))
-                ->whereHas('companies', fn($q) => $q->where('companies.id', $userCompanyId));
-        }
-
-        if ($user->hasRole('commercial')) {
-            return Document::with([
-                'docentete:DO_Domaine,DO_Type,DO_Piece,DO_Date,DO_Ref,DO_Tiers,DO_Statut,cbMarq,cbCreation,DO_DateLivr,DO_Expedit',
-                'status',
-                'shipping'
-            ]);
-        }
-
-        if ($user->hasRole('admin')) {
-            return Document::with([
-                'docentete:cbMarq,DO_Domaine,DO_Type,DO_Piece,DO_Date,DO_Ref,DO_Tiers,DO_Statut,cbCreation,DO_DateLivr,DO_Expedit',
-                'status',
-                'shipping'
-            ]);
-        }
-
-        return Document::with([
+        $relations = [
             'docentete:cbMarq,DO_Domaine,DO_Type,DO_Piece,DO_Date,DO_Ref,DO_Tiers,DO_Statut,cbCreation,DO_DateLivr,DO_Expedit',
             'status',
-            'shipping'
-        ])->whereHas('companies', fn($q) => $q->where('companies.id', $userCompanyId));
+            'shipping',
+        ];
+
+        $query = Document::with($relations);
+
+        // Fabrication, Montage, Peinture
+        if ($lineRole !== null && isset(self::LINE_ROLE_COLUMNS[$lineRole])) {
+            $timestampCols = self::LINE_ROLE_COLUMNS[$lineRole]['at'];
+
+            $lineFilter = function ($q) use ($timestampCols) {
+                $q->where(function ($sub) use ($timestampCols) {
+                    foreach ($timestampCols as $col) {
+                        $sub->orWhereNotNull($col);
+                    }
+                });
+            };
+
+            $query->with([
+                'companies',
+                'lines' => function ($q) use ($lineFilter) {
+                    $lineFilter($q);
+                    $q->limit(1);
+                },
+            ]);
+
+            return $query
+                ->whereHas('lines', $lineFilter)
+                ->whereHas('companies', fn($q) => $q->where('companies.id', $userCompanyId));
+        }
+
+        // Admin / Commercial: all documents
+        if ($isPrivileged) {
+            return $query;
+        }
+
+        // Other users: documents belonging to their company
+        return $query->whereHas('companies', fn($q) => $q->where('companies.id', $userCompanyId));
     }
     /**
      * Counts documents whose latest completed line (per $timestampCol) is
